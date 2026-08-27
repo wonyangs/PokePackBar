@@ -908,7 +908,10 @@ final class UsageStore {
     /// 팝오버 첫 오픈 등 사용자 의도 시점에 1회만 알림 권한 요청(멱등).
     func requestNotificationAuthorizationIfNeeded() {
         guard !notifAuthRequested else { return }
-        guard AppEnv.isBundledApp else { return }
+        guard AppEnv.canUseNotifications else {
+            AppLog.write("notifications unavailable — bundle not registered with LaunchServices")
+            return
+        }
         notifAuthRequested = true
         Task {
             try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
@@ -973,7 +976,7 @@ final class UsageStore {
             windows: windows, warn: warnThreshold, crit: critThreshold, tiers: &notifiedTier)
         guard !alerts.isEmpty else { return }
 
-        if limitNotifications, AppEnv.isBundledApp {
+        if limitNotifications, AppEnv.canUseNotifications {
             postLimitNotifications(alerts)
         }
         if floatingPetEnabled, floatingPetBubbleAlerts {
@@ -1038,6 +1041,9 @@ final class UsageStore {
     }
 
     private func postLimitNotifications(_ alerts: [LimitAlert]) {
+        // 호출부에도 같은 가드가 있지만 여기에도 둔다. 위험한 호출 바로 앞을 막아야
+        // 새 호출부가 생겼을 때 가드를 빠뜨려도 앱이 죽지 않는다.
+        guard AppEnv.canUseNotifications else { return }
         let l = L(localizationLanguage)
         for alert in alerts {
             let content = UNMutableNotificationContent()

@@ -189,6 +189,8 @@ private struct RevealView: View {
                 CardSpotlightView(wallet: wallet, cardID: focused.id,
                                   name: index?.card(focused.id)?.name ?? focused.id,
                                   tier: focused.tier,
+                                  setID: index?.card(focused.id)?.setID ?? "",
+                                  setName: opened.setName,
                                   ownedCount: wallet.cardCount(focused.id),
                                   preloaded: opened.hires[focused.id]) {
                     spotlight = nil

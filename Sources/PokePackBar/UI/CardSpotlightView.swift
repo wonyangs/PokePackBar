@@ -13,6 +13,10 @@ struct CardSpotlightView: View {
     let cardID: String
     let name: String
     let tier: CardTier
+    /// 이 카드가 나오는 세트. 카드 번호보다 이게 필요하다 —
+    /// 갖고 싶은 카드를 보고 어느 팩을 사야 하는지 알 수 있어야 한다.
+    let setID: String
+    let setName: String
     /// 보유 장수. 0 이면 아직 얻지 못한 카드로 표시한다.
     let ownedCount: Int
     /// 미리 받아 둔 큰 그림이 있으면 기다리지 않는다.
@@ -60,8 +64,12 @@ struct CardSpotlightView: View {
                     Text(l.tierName(tier)).font(.caption).foregroundStyle(.secondary)
                 }
 
-                HStack(spacing: 6) {
-                    Text(cardID).font(.caption2).foregroundStyle(.tertiary).monospaced()
+                // 출처 팩 — 그림까지 함께 둔다. 이름만으로는 상점에서 어느 것인지 바로 못 찾는다.
+                HStack(spacing: 5) {
+                    PackImageView(setID: setID, width: 15)
+                    Text(setName)
+                        .font(.caption.weight(.medium))
+                        .lineLimit(1).truncationMode(.tail)
                     Text("·").font(.caption2).foregroundStyle(.tertiary)
                     Text(ownedCount > 0 ? l.copiesOwned(ownedCount) : l.notOwnedYet)
                         .font(.caption2.weight(ownedCount > 0 ? .semibold : .regular))

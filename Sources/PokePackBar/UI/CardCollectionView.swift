@@ -52,7 +52,9 @@ struct CardCollectionView: View {
             } else if let selectedCard, let entry = index?.card(selectedCard) {
                 // 하단에 작게 붙이면 카드를 제대로 볼 수 없다. 화면을 통째로 내준다.
                 CardSpotlightView(wallet: wallet, cardID: entry.id, name: entry.name,
-                                  tier: entry.tier, ownedCount: wallet.cardCount(entry.id)) {
+                                  tier: entry.tier, setID: entry.setID,
+                                  setName: index?.set(entry.setID)?.name ?? entry.setID,
+                                  ownedCount: wallet.cardCount(entry.id)) {
                     self.selectedCard = nil
                 }
             } else if wallet.distinctCardCount == 0 {
