@@ -36,11 +36,11 @@ enum PackConfig {
 
 /// 팩 가격. 세트마다 표를 두지 않고 구성에서 유도한다 — 세트를 추가할 때 가격을 잊지 않게.
 enum PackPricing {
-    /// 일반 팩(10장). 무거운 사용자가 하루 몇 개, 가벼운 사용자가 이틀에 하나 살 수 있는 수준으로 잡았다.
-    static let standard = 25_000_000
+    /// 일반 팩(10장).
+    static let standard = 10_000_000
 
     /// 특별 팩(4장) — 전 카드가 레어 이상이라 장수가 적어도 값이 높다.
-    static let special = 50_000_000
+    static let special = 20_000_000
 
     static func price(setID: String, index: CardIndex) -> Int {
         let pool = index.pools[setID] ?? [:]
