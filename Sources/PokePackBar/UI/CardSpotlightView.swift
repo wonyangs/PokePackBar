@@ -6,6 +6,8 @@ import SwiftUI
 /// 카드 뒤에 등급 후광을 깔고 정보는 아래에 붙인다. 컬렉션과 개봉 결과가 같이 쓴다 —
 /// 두 곳에서 따로 만들면 한쪽만 손보게 되고 같은 카드가 화면마다 달라 보인다.
 ///
+/// 카드 자체는 `HolographicCardView` 가 그린다 — 기울기와 광택은 그쪽에 있다.
+///
 /// 팝오버라 모달을 쓸 수 없어 탭 안에서 화면만 바꾼다. 닫기는 X 버튼이 맡는다.
 @MainActor
 struct CardSpotlightView: View {
@@ -44,13 +46,12 @@ struct CardSpotlightView: View {
 
             Spacer(minLength: 0)
 
-            ZStack {
-                TierGlow(tier: tier, width: 200)
-                CardImageView(cardID: cardID, hires: true, width: 200,
-                              dimmed: ownedCount == 0, preloaded: preloaded)
-            }
-            .scaleEffect(landed ? 1 : 0.9)
-            .opacity(landed ? 1 : 0)
+            // 마우스를 올리면 기울고 광택이 흐른다 — 확대 화면에서만 준다.
+            // 격자에서는 크기가 작아 각도가 읽히지 않고, 지나가는 커서마다 반응하면 산만하다.
+            HolographicCardView(cardID: cardID, tier: tier, width: 200,
+                                dimmed: ownedCount == 0, preloaded: preloaded)
+                .scaleEffect(landed ? 1 : 0.9)
+                .opacity(landed ? 1 : 0)
 
             Spacer(minLength: 0)
 

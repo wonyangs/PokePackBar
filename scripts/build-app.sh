@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="0.1.7"
+VERSION="0.1.8"
 APP_NAME="PokePackBar"
 BUILD_DIR="build"
 # 원본과 겹치면 로그인 항목·Keychain ACL·LaunchServices 상태가 섞인다.
