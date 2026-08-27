@@ -21,8 +21,12 @@ Claude Code, Codex, Gemini CLI 등 11개 도구의 로컬 로그에서 사용량
 
 ```bash
 brew tap wonyangs/tap
+brew trust --cask wonyangs/tap/poke-pack-bar
 brew install --cask poke-pack-bar
 ```
+
+가운데 `brew trust` 는 건너뛸 수 없다. Homebrew 가 서드파티 tap 의 cask 를
+기본으로 거부하므로, 없으면 설치가 막힌다.
 
 macOS 14 이상.
 

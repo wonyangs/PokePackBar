@@ -99,8 +99,10 @@ cat <<NEXT
 3) tap 저장소에 cask 반영
    $CASK_FILE 를 tap 저장소의 Casks/ 로 복사하고 push
 
-테스터 설치:
-   brew tap <소유자>/tap && brew install --cask poke-pack-bar
+테스터 설치 (brew trust 는 건너뛸 수 없다 — 서드파티 tap 은 기본 거부):
+   brew tap $(dirname "$REPO")/tap
+   brew trust --cask $(dirname "$REPO")/tap/poke-pack-bar
+   brew install --cask poke-pack-bar
 업데이트:
    앱의 업데이트 버튼, 또는 brew upgrade --cask poke-pack-bar
 ──────────────────────────────────────────────────────────────────

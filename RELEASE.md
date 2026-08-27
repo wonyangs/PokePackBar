@@ -27,9 +27,13 @@
 ## 테스터
 
 ```bash
-brew tap <소유자>/tap
+brew tap wonyangs/tap
+brew trust --cask wonyangs/tap/poke-pack-bar
 brew install --cask poke-pack-bar
 ```
+
+가운데 `brew trust` 는 건너뛸 수 없다. Homebrew 가 서드파티 tap 의 cask 를
+기본으로 거부하므로, 없으면 설치가 막힌다.
 
 갱신은 앱의 업데이트 버튼을 누르거나 `brew upgrade --cask poke-pack-bar`.
 
@@ -42,3 +46,7 @@ brew install --cask poke-pack-bar
 코드 서명이 깨진다.
 
 **업데이트 버튼은 brew 로 설치했을 때만 brew 를 쓴다.** 그 외에는 릴리스 페이지를 연다.
+
+**테스터는 `brew trust` 를 한 번 거쳐야 한다.** Homebrew 가 서드파티 tap 의 cask 를
+기본으로 거부한다. tap 전체를 신뢰하는 `brew trust <tap>` 도 되지만 권장되지 않으며
+없어질 예정이라고 경고한다 — cask 하나만 지정하는 형태를 안내한다.
