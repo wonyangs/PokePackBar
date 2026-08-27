@@ -23,6 +23,11 @@ extension L {
                                    "Aucun usage pour l'instant. Utilise un outil d'IA une fois pour démarrer.",
                                    "Ainda sem uso. Use uma ferramenta de IA uma vez para começar.") }
 
+    func updateAvailableHelp(_ version: String) -> String {
+        t2("새 버전 \(version) 으로 업데이트", "Update to \(version)", "\(version) に更新",
+           "Actualizar a \(version)", "Mettre à jour vers \(version)", "Atualizar para \(version)")
+    }
+
     // MARK: 상점
     var shopCardHint: String { t2("세트를 골라 팩을 사세요.", "Pick a set and buy a pack.",
                                   "セットを選んでパックを買いましょう。", "Elige un set y compra un sobre.",
@@ -34,6 +39,22 @@ extension L {
     func packContents(_ count: Int) -> String {
         t2("카드 \(count)장", "\(count) cards", "カード \(count)枚",
            "\(count) cartas", "\(count) cartes", "\(count) cartas")
+    }
+
+    var packTotalCards: String { t2("전체 카드", "Cards in set", "収録カード",
+                                     "Cartas del set", "Cartes du set", "Cartas do set") }
+    var packCollected: String { t2("수집률", "Collected", "収集率", "Recolectadas", "Collectées", "Coletadas") }
+    var packOdds: String { t2("히트 슬롯 확률", "Hit slot odds", "ヒット枠の確率",
+                              "Probabilidad del hueco", "Probabilité du slot", "Chance do slot") }
+    var packOddsHint: String { t2("나머지 칸은 커먼·언커먼으로 채워져요.",
+                                  "The other slots are commons and uncommons.",
+                                  "残りの枠はコモン・アンコモンです。",
+                                  "Los demás huecos son comunes y poco comunes.",
+                                  "Les autres emplacements sont communes et peu communes.",
+                                  "Os outros espaços são comuns e incomuns.") }
+    var packQuantity: String { t2("수량", "Quantity", "数量", "Cantidad", "Quantité", "Quantidade") }
+    func buyCount(_ n: Int) -> String {
+        t2("\(n)개 구매", "Buy \(n)", "\(n)個 購入", "Comprar \(n)", "Acheter \(n)", "Comprar \(n)")
     }
 
     // MARK: 팩

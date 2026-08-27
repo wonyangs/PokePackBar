@@ -118,6 +118,22 @@ enum PackOpening {
         return picked
     }
 
+    /// 이 세트의 히트 슬롯이 각 등급으로 나올 확률. 합은 1 이다.
+    ///
+    /// 세트에 없는 등급은 후보에서 빠지고 나머지 가중치가 재정규화된다 —
+    /// 뽑기가 실제로 하는 것과 같은 계산이라 상점에 표시한 값과 결과가 어긋나지 않는다.
+    /// 나머지 슬롯은 커먼·언커먼으로 고정이라 확률로 보여줄 것이 없다.
+    static func hitOdds(setID: String, index: CardIndex) -> [(tier: CardTier, probability: Double)] {
+        let pool = index.pools[setID] ?? [:]
+        let weights = (pool[.common] ?? []).isEmpty ? PackConfig.specialWeights : PackConfig.hitWeights
+        let available = weights.filter { !(pool[$0.tier] ?? []).isEmpty }
+        let total = available.reduce(0) { $0 + $1.weight }
+        guard total > 0 else { return [] }
+        return available
+            .map { (tier: $0.tier, probability: Double($0.weight) / Double(total)) }
+            .sorted { $0.tier.rank > $1.tier.rank }
+    }
+
     /// 개봉에서 보여줄 순서 — 등급 오름차순. 가장 희귀한 카드가 마지막에 나온다.
     /// 같은 등급 안에서는 뽑힌 순서를 유지한다.
     static func revealOrder(_ cards: [PulledCard]) -> [PulledCard] {

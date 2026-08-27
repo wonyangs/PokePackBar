@@ -33,6 +33,7 @@ final class PopoverNavigation {
 struct PopoverView: View {
     @Environment(UsageStore.self) private var store
     @Environment(WalletStore.self) private var wallet
+    @Environment(UpdateChecker.self) private var updater
     @Environment(PopoverNavigation.self) private var nav
 
     /// 카드 목록은 번들 리소스라 한 번만 읽는다.
@@ -69,6 +70,23 @@ struct PopoverView: View {
                         .lineLimit(1).minimumScaleFactor(0.6)
                 }
                 Spacer()
+                // 새 버전이 있으면 설정 옆에 바로 띄운다. 설정 안에 숨겨 두면
+                // 들어가 보지 않는 한 업데이트가 있는지도 모른다.
+                if let update = updater.available {
+                    Button {
+                        updater.applyUpdate()
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.down.circle.fill")
+                            Text(update.version).monospacedDigit()
+                        }
+                        .font(.system(size: 11, weight: .semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.mini)
+                    .disabled(updater.isUpdating)
+                    .help(l.updateAvailableHelp(update.version))
+                }
                 Button {
                     nav.showSettings = true
                 } label: {

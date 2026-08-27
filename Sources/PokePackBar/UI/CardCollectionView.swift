@@ -57,27 +57,26 @@ struct CardCollectionView: View {
                                   ownedCount: wallet.cardCount(entry.id)) {
                     self.selectedCard = nil
                 }
-            } else if wallet.distinctCardCount == 0 {
-                emptyState
             } else {
+                // 카드가 없어도 격자를 보여준다. 무엇을 모을 수 있는지 알아야
+                // 어느 팩을 살지 정할 수 있다 — 빈 화면은 그 판단을 막는다.
                 header
                 filterBar
                 tierSummary
+                if wallet.distinctCardCount == 0 { emptyHint }
                 grid
             }
         }
         .frame(height: 470)
     }
 
-    private var emptyState: some View {
-        let l = wallet.l
-        return VStack(spacing: 8) {
-            Image(systemName: "square.grid.2x2")
-                .font(.system(size: 40)).foregroundStyle(.tertiary)
-            Text(l.collectionEmptyTitle).font(.callout.weight(.semibold))
-            Text(l.collectionEmptyHint).font(.caption).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    /// 아직 한 장도 없을 때의 안내. 격자는 그대로 두고 위에 한 줄만 얹는다.
+    private var emptyHint: some View {
+        Text(wallet.l.collectionEmptyHint)
+            .font(.caption2).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 3)
+            .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 5))
     }
 
     private var header: some View {

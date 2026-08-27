@@ -463,3 +463,65 @@ final class CollectionFilterTests: XCTestCase {
         }
     }
 }
+
+final class HitOddsTests: XCTestCase {
+
+    /// 확률의 합은 1 이다.
+    func testOddsSumToOneForEverySet() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        for set in index.sets {
+            let odds = PackOpening.hitOdds(setID: set.id, index: index)
+            XCTAssertFalse(odds.isEmpty, "\(set.id) 확률이 비었다")
+            XCTAssertEqual(odds.reduce(0) { $0 + $1.probability }, 1.0, accuracy: 0.0001,
+                           "\(set.id) 합이 1 이 아니다")
+        }
+    }
+
+    /// 그 세트에 없는 등급은 목록에 없어야 한다 — 뽑을 수 없는 것을 확률로 보여주면 안 된다.
+    func testOddsExcludeTiersTheSetDoesNotHave() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        for set in index.sets {
+            let pool = index.pools[set.id] ?? [:]
+            for entry in PackOpening.hitOdds(setID: set.id, index: index) {
+                XCTAssertFalse((pool[entry.tier] ?? []).isEmpty,
+                               "\(set.id) 에 없는 \(entry.tier.rawValue) 가 확률에 있다")
+            }
+        }
+    }
+
+    /// 희귀할수록 확률이 낮다.
+    func testRarerTiersAreNotMoreLikely() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        for set in index.sets {
+            let odds = PackOpening.hitOdds(setID: set.id, index: index)   // 희귀한 것부터
+            for (a, b) in zip(odds, odds.dropFirst()) {
+                XCTAssertLessThanOrEqual(a.probability, b.probability,
+                                         "\(set.id): \(a.tier.rawValue) 가 \(b.tier.rawValue) 보다 흔하다")
+            }
+        }
+    }
+
+    /// 상점에 적힌 확률이 실제 뽑기 결과와 맞아야 한다.
+    /// 표시용 계산을 따로 두면 둘이 조용히 갈라진다.
+    func testDisplayedOddsMatchActualDraws() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let setID = "sv10"
+        let expected = Dictionary(uniqueKeysWithValues:
+            PackOpening.hitOdds(setID: setID, index: index).map { ($0.tier, $0.probability) })
+
+        // 히트 슬롯만 본다. 나머지 칸은 커먼·언커먼 고정이라 확률의 대상이 아니다.
+        var observed: [CardTier: Int] = [:]
+        let trials = 20_000
+        let pool = index.pools[setID] ?? [:]
+        for seed in 1...trials {
+            var g = SeededGenerator(seed: UInt64(seed))
+            observed[PackOpening.hitTier(available: pool, using: &g), default: 0] += 1
+        }
+
+        for (tier, probability) in expected {
+            let actual = Double(observed[tier] ?? 0) / Double(trials)
+            XCTAssertEqual(actual, probability, accuracy: 0.02,
+                           "\(tier.rawValue) 표시 \(probability) 실제 \(actual)")
+        }
+    }
+}
