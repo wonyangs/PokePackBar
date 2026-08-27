@@ -49,7 +49,6 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     generalGroup(store)
                     menuBarGroup(store)
-                    floatingPetGroup(store)
                     notificationsGroup(store)
                     updateGroup(store)
                     advancedGroup(store)
@@ -180,33 +179,6 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func floatingPetGroup(_ store: UsageStore) -> some View {
-        @Bindable var store = store
-        settingsSection(l.floatingPetSectionTitle) {
-            groupRow {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(l.floatingPetEnableLabel)
-                    Text(l.floatingPetHint).font(.caption2).foregroundStyle(.tertiary)
-                }
-                Spacer()
-                Toggle("", isOn: $store.floatingPetEnabled)
-                    .labelsHidden().toggleStyle(.switch).controlSize(.small)
-            }
-            if store.floatingPetEnabled {
-                Divider()
-                groupRow {
-                    Text(l.floatingPetSizeLabel).font(.callout)
-                    Slider(value: $store.floatingPetSize, in: 48...192, step: 8)
-                    Text("\(Int(store.floatingPetSize))px")
-                        .font(.caption).monospacedDigit().frame(width: 44, alignment: .trailing)
-                }
-                Divider()
-                toggleRow(l.floatingPetBubbleAlertsLabel, $store.floatingPetBubbleAlerts)
-            }
-        }
-    }
-
-    @ViewBuilder
     private func notificationsGroup(_ store: UsageStore) -> some View {
         @Bindable var store = store
         settingsSection(l.notificationsSection) {
@@ -228,7 +200,15 @@ struct SettingsView: View {
                 }
             }
             Divider()
-            toggleRow(l.companionNotificationsLabel, $store.companionNotifications)
+            groupRow {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(l.bonusPackNotificationsLabel)
+                    Text(l.bonusPackNotificationsHint).font(.caption2).foregroundStyle(.tertiary)
+                }
+                Spacer()
+                Toggle("", isOn: $store.bonusPackNotifications)
+                    .labelsHidden().toggleStyle(.switch).controlSize(.small)
+            }
             Divider()
             groupRow {
                 VStack(alignment: .leading, spacing: 1) {

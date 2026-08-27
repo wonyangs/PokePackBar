@@ -167,13 +167,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         updateWallet()
         // 한도가 신선한 시점에 지급을 묶는다. 사용량 관찰만으로는 한도 변경이 전달되지 않는
         // 경로가 있다(UsageStore.onRefresh 주석 참조).
-        wallet.grantBonusPacks(from: store.bonusEligibleWindows,
-                               limitsReady: store.limitsReady,
-                               availableSets: Self.packSetIDs)
+        let grants = wallet.grantBonusPacks(from: store.bonusEligibleWindows,
+                                            limitsReady: store.limitsReady,
+                                            availableSets: Self.packSetIDs)
+        for grant in grants {
+            store.postBonusPackNotification(window: grant.windowName,
+                                            setName: Self.setNames[grant.setID] ?? grant.setID,
+                                            count: grant.count)
+        }
     }
 
     /// 보너스 팩으로 줄 수 있는 세트. 카드 목록은 번들 리소스라 한 번만 읽는다.
     private static let packSetIDs: [String] = CardIndex.loadBundled()?.setIDs ?? []
+
+    /// 알림 문구에 쓸 세트 이름.
+    private static let setNames: [String: String] = {
+        guard let index = CardIndex.loadBundled() else { return [:] }
+        return Dictionary(uniqueKeysWithValues: index.sets.map { ($0.id, $0.name) })
+    }()
 
     // MARK: 메뉴바 애니메이션
 

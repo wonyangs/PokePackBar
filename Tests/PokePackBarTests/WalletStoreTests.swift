@@ -214,10 +214,10 @@ final class WalletStoreTests: XCTestCase {
 
         let full = [BonusWindow(key: key, name: "5h", kind: .session, utilization: 100)]
         s.grantBonusPacks(from: full, limitsReady: true, availableSets: ["sv10"])
-        XCTAssertEqual(s.totalPackCount, 1)
+        XCTAssertEqual(s.totalPackCount, PackConfig.bonusPackCount)
 
         s.grantBonusPacks(from: full, limitsReady: true, availableSets: ["sv10"])
-        XCTAssertEqual(s.totalPackCount, 1, "같은 창에서 재지급하지 않는다")
+        XCTAssertEqual(s.totalPackCount, PackConfig.bonusPackCount, "같은 창에서 재지급하지 않는다")
     }
 
     /// 창이 100% 아래로 내려가면 다시 무장되고, 다음 도달에 또 지급한다.
@@ -230,13 +230,13 @@ final class WalletStoreTests: XCTestCase {
         }
         s.grantBonusPacks(from: windows(10), limitsReady: true, availableSets: ["sv10"])
         s.grantBonusPacks(from: windows(100), limitsReady: true, availableSets: ["sv10"])
-        XCTAssertEqual(s.totalPackCount, 1)
+        XCTAssertEqual(s.totalPackCount, PackConfig.bonusPackCount)
 
         s.grantBonusPacks(from: windows(5), limitsReady: true, availableSets: ["sv10"])   // 재무장
         // 재시작을 흉내낸다 — 재무장이 저장돼 있어야 다음 도달에 지급된다.
         let reloaded = makeStore()
         reloaded.grantBonusPacks(from: windows(100), limitsReady: true, availableSets: ["sv10"])
-        XCTAssertEqual(reloaded.totalPackCount, 2)
+        XCTAssertEqual(reloaded.totalPackCount, PackConfig.bonusPackCount * 2)
     }
 
     /// 한도가 아직 로드되지 않았으면 시드도 지급도 하지 않는다.

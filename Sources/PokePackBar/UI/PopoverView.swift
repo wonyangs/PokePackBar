@@ -138,7 +138,7 @@ struct PopoverView: View {
                 Image(systemName: "gift.fill").foregroundStyle(.green)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(l.bonusPackTitle).font(.caption.weight(.semibold))
-                    Text(l.bonusPackBody(window: grant.windowName, set: setName))
+                    Text(l.bonusPackBody(window: grant.windowName, set: setName, count: grant.count))
                         .font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

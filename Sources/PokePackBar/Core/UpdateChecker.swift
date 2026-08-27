@@ -130,11 +130,20 @@ final class UpdateChecker {
     brew_pid=$!
     for i in $(seq 1 300); do kill -0 "$brew_pid" 2>/dev/null || break; sleep 1; done
     kill "$brew_pid" 2>/dev/null
-    for i in $(seq 1 15); do
-      launchctl kickstart -k "gui/$(id -u)/\(LoginItem.label)" 2>/dev/null && break
-      open "$2" 2>/dev/null && break
-      sleep 1
-    done
+    # open 을 먼저 쓴다. launchctl kickstart 는 에이전트가 등록만 돼 있으면 앱을 띄우지
+    # 않고도 0 을 돌려주므로, 그걸 먼저 시도하고 성공으로 보면 앱이 영영 안 뜬다.
+    # open 은 .app 을 실제로 띄웠을 때만 0 이다.
+    #
+    # 결과 확인에 pgrep 을 쓰지 않는다 — 이름으로 찾으면 다른 인스턴스에 걸린다(#175).
+    #
+    # 경로가 비면 open 은 현재 디렉터리를 Finder 로 연다. 앱 대신 창만 뜨는 일이 없게 막는다.
+    if [ -d "$2" ]; then
+      for i in $(seq 1 20); do
+        open "$2" 2>/dev/null && break
+        launchctl kickstart -k "gui/$(id -u)/\(LoginItem.label)" 2>/dev/null
+        sleep 1
+      done
+    fi
     """
 
     nonisolated static func launchDetachedUpgrade(

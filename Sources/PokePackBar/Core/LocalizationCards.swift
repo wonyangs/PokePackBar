@@ -140,6 +140,29 @@ extension L {
            "\(count) copias", "\(count) exemplaires", "\(count) cópias")
     }
 
+    // MARK: 설정
+
+    var bonusPackNotificationsLabel: String {
+        t2("보너스 팩 알림", "Bonus pack alerts", "ボーナスパック通知",
+           "Avisos de sobre extra", "Alertes de booster bonus", "Avisos de pacote bônus")
+    }
+    var bonusPackNotificationsHint: String {
+        t2("사용 한도를 다 채워 팩을 받으면 알려줘요.",
+           "Tells you when filling a usage limit earns a pack.",
+           "使用上限を使い切ってパックを得たときに知らせます。",
+           "Avisa cuando alcanzar un límite te da un sobre.",
+           "Prévient quand atteindre une limite donne un booster.",
+           "Avisa quando atingir um limite rende um pacote.")
+    }
+    func bonusPackNotificationBody(window: String, set: String, count: Int) -> String {
+        t2("\(window) 한도를 다 채웠어요 — \(set) 팩 \(count)개가 기다립니다.",
+           "You maxed the \(window) limit — \(count) \(set) packs are waiting.",
+           "\(window) の上限を使い切りました — \(set) パック\(count)つが待っています。",
+           "Alcanzaste el límite de \(window): \(count) sobres de \(set) te esperan.",
+           "Tu as atteint la limite \(window) : \(count) boosters \(set) t'attendent.",
+           "Você atingiu o limite de \(window): \(count) pacotes de \(set) esperam.")
+    }
+
     // MARK: 카드 갈기
 
     var disenchant: String { t2("중복 갈기", "Recycle spares", "重複を分解",
@@ -182,13 +205,13 @@ extension L {
     // MARK: 보너스 팩 알림
     var bonusPackTitle: String { t2("보너스 팩 도착!", "Bonus pack!", "ボーナスパック！",
                                     "¡Sobre extra!", "Booster bonus !", "Pacote bônus!") }
-    func bonusPackBody(window: String, set: String) -> String {
-        t2("\(window) 한도를 다 채웠어요 — \(set) 팩 1개를 받았어요.",
-           "You maxed the \(window) limit — here's a \(set) pack.",
-           "\(window) の上限を使い切りました — \(set) パックを1つ獲得。",
-           "Alcanzaste el límite de \(window): un sobre de \(set).",
-           "Tu as atteint la limite \(window) : un booster \(set).",
-           "Você atingiu o limite de \(window): um pacote de \(set).")
+    func bonusPackBody(window: String, set: String, count: Int) -> String {
+        t2("\(window) 한도를 다 채웠어요 — \(set) 팩 \(count)개를 받았어요.",
+           "You maxed the \(window) limit — \(count) \(set) packs.",
+           "\(window) の上限を使い切りました — \(set) パックを\(count)つ獲得。",
+           "Alcanzaste el límite de \(window): \(count) sobres de \(set).",
+           "Tu as atteint la limite \(window) : \(count) boosters \(set).",
+           "Você atingiu o limite de \(window): \(count) pacotes de \(set).")
     }
 
     // MARK: 오류

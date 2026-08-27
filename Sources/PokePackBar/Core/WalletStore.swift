@@ -18,6 +18,7 @@ struct PackGrant: Equatable, Sendable {
     let windowKey: String
     let windowName: String
     let setID: String
+    let count: Int
 }
 
 /// 재화(토큰) 지갑과 카드·팩 보유량을 관리한다.
@@ -254,7 +255,8 @@ final class WalletStore {
             // 한도 종류와 무관하게 1개다. 세션 한도가 주간보다 자주 차므로,
             // 주간에 가중을 주면 보상이 세션 쪽으로 쏠린다.
             let setID = availableSets[Int(generator.next(upperBound: UInt64(availableSets.count)))]
-            grants.append(PackGrant(windowKey: w.key, windowName: w.name, setID: setID))
+            grants.append(PackGrant(windowKey: w.key, windowName: w.name,
+                                    setID: setID, count: PackConfig.bonusPackCount))
         }
         return grants
     }
@@ -264,14 +266,16 @@ final class WalletStore {
     /// - 첫 실행에는 지급 없이 현재 100% 인 창만 시드한다. 설치 직후 이미 차 있던 창에
     ///   소급 지급하지 않기 위한 것이다.
     /// - 한도가 아직 로드되지 않았으면 시드도 지급도 하지 않고 다음 새로고침에 재시도한다.
-    func grantBonusPacks(from windows: [BonusWindow], limitsReady: Bool, availableSets: [String]) {
-        guard limitsReady, !availableSets.isEmpty else { return }
+    @discardableResult
+    func grantBonusPacks(from windows: [BonusWindow], limitsReady: Bool,
+                         availableSets: [String]) -> [PackGrant] {
+        guard limitsReady, !availableSets.isEmpty else { return [] }
 
         if !state.packGrantSeeded {
             for w in windows where w.utilization >= 100 { state.packGrantTier[w.key] = 1 }
             state.packGrantSeeded = true
             save()
-            return
+            return []
         }
 
         let before = state.packGrantTier
@@ -279,14 +283,15 @@ final class WalletStore {
         let grants = Self.evaluateGrants(windows: windows, grantTier: &state.packGrantTier,
                                          availableSets: availableSets, using: &generator)
         for g in grants {
-            state.packs[g.setID, default: 0] += 1
+            state.packs[g.setID, default: 0] += g.count
             lastGrant = g
-            AppLog.write("bonus pack granted window=\(g.windowKey) set=\(g.setID)")
+            AppLog.write("bonus packs granted window=\(g.windowKey) set=\(g.setID) count=\(g.count)")
         }
 
         // 지급이 없어도 재무장(창이 100% 아래로 내려가 맵에서 제거된 것)은 영속해야 한다.
         // 안 하면 재시작 시 남아 있는 지급 표시 때문에 다음 100% 도달이 "이미 지급" 으로 오판된다.
         if !grants.isEmpty || state.packGrantTier != before { save() }
+        return grants
     }
 
     // MARK: 영속

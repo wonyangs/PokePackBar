@@ -36,8 +36,6 @@ final class UsageStore {
 
     // MARK: Bubble Alert State
     /// Transient speech-bubble payload for the floating pet. Cleared after the TTL.
-    private(set) var currentBubbleAlert: LimitAlert?
-    private var currentBubbleDate: Date = .distantPast
 
     // MARK: 설정 (UserDefaults)
 
@@ -76,8 +74,8 @@ final class UsageStore {
     var limitNotifications: Bool {
         didSet { defaults.set(limitNotifications, forKey: "limitNotifications") }
     }
-    var companionNotifications: Bool {
-        didSet { defaults.set(companionNotifications, forKey: "companionNotifications") }
+    var bonusPackNotifications: Bool {
+        didSet { defaults.set(bonusPackNotifications, forKey: "bonusPackNotifications") }
     }
     /// 새 버전 알림(팝오버 업데이트 배너) 표시 여부 — 기본 켬. 끄면 배너 숨김(수동 확인은 설정에서 가능).
     var updateNotificationsEnabled: Bool {
@@ -87,18 +85,8 @@ final class UsageStore {
     var statusChecksEnabled: Bool {
         didSet { defaults.set(statusChecksEnabled, forKey: "statusChecksEnabled") }
     }
-    // 플로팅 펫 (데스크톱 위 고정 오버레이 — 스스로 이동하지 않음, 드래그로만 위치 변경)
-    var floatingPetEnabled: Bool {
-        didSet { defaults.set(floatingPetEnabled, forKey: "floatingPetEnabled") }
-    }
     /// 플로팅 펫 스프라이트 한 변 크기(pt).
-    var floatingPetSize: Double {
-        didSet { defaults.set(floatingPetSize, forKey: "floatingPetSize") }
-    }
     /// Show limit alerts as speech bubbles on the floating pet. Default on; independent of Notification Center.
-    var floatingPetBubbleAlerts: Bool {
-        didSet { defaults.set(floatingPetBubbleAlerts, forKey: "floatingPetBubbleAlerts") }
-    }
     var disableKeychainAccess: Bool {
         didSet {
             defaults.set(disableKeychainAccess, forKey: "disableKeychainAccess")   // 저장 누락이던 기존 버그 — 재시작 후 풀렸음
@@ -479,12 +467,9 @@ final class UsageStore {
         showLimitInMenu = d.object(forKey: "showLimitInMenu") as? Bool ?? false
         limitDisplayMode = LimitDisplayMode(rawValue: d.string(forKey: "limitDisplayMode") ?? "") ?? .used
         limitNotifications = d.object(forKey: "limitNotifications") as? Bool ?? true
-        companionNotifications = d.object(forKey: "companionNotifications") as? Bool ?? true
+        bonusPackNotifications = d.object(forKey: "bonusPackNotifications") as? Bool ?? true
         updateNotificationsEnabled = d.object(forKey: "updateNotificationsEnabled") as? Bool ?? true
         statusChecksEnabled = d.object(forKey: "statusChecksEnabled") as? Bool ?? true
-        floatingPetEnabled = d.object(forKey: "floatingPetEnabled") as? Bool ?? false
-        floatingPetSize = d.object(forKey: "floatingPetSize") as? Double ?? 96
-        floatingPetBubbleAlerts = d.object(forKey: "floatingPetBubbleAlerts") as? Bool ?? true
         disableKeychainAccess = d.object(forKey: "disableKeychainAccess") as? Bool ?? false
 
         reschedule()
@@ -954,19 +939,7 @@ final class UsageStore {
         return alerts
     }
 
-    /// Pick the single bubble to show for a refresh: critical > warn, then highest utilization.
-    /// Pure — separate from AppKit presentation (issue #109 testing requirement).
-    static func bubbleAlert(from alerts: [LimitAlert]) -> LimitAlert? {
-        alerts.max { a, b in
-            if a.isCritical != b.isCritical { return !a.isCritical && b.isCritical }
-            return a.utilization < b.utilization
-        }
-    }
 
-    /// Whether a bubble shown at `shownAt` should clear by `now` (default TTL 6s). Pure time check.
-    static func shouldDismissBubble(shownAt: Date, now: Date, ttl: TimeInterval = 6) -> Bool {
-        now.timeIntervalSince(shownAt) >= ttl
-    }
 
     /// Shared limit-alert pipeline: evaluate once, advance tiers once, then fan out to
     /// Notification Center and/or the floating-pet bubble under independent gates.
@@ -978,9 +951,6 @@ final class UsageStore {
 
         if limitNotifications, AppEnv.canUseNotifications {
             postLimitNotifications(alerts)
-        }
-        if floatingPetEnabled, floatingPetBubbleAlerts {
-            showBubble(Self.bubbleAlert(from: alerts))
         }
     }
 
@@ -1040,6 +1010,19 @@ final class UsageStore {
         return windows
     }
 
+    /// 보너스 팩 지급 알림. 팝오버를 보고 있지 않을 때 받는 경우가 대부분이라
+    /// 앱 안의 토스트만으로는 지급된 줄 모르고 지나간다.
+    func postBonusPackNotification(window: String, setName: String, count: Int) {
+        guard bonusPackNotifications, AppEnv.canUseNotifications else { return }
+        let l = L(localizationLanguage)
+        let content = UNMutableNotificationContent()
+        content.title = l.bonusPackTitle
+        content.body = l.bonusPackNotificationBody(window: window, set: setName, count: count)
+        UNUserNotificationCenter.current().add(
+            UNNotificationRequest(identifier: "bonus-pack-\(window)-\(setName)",
+                                  content: content, trigger: nil))
+    }
+
     private func postLimitNotifications(_ alerts: [LimitAlert]) {
         // 호출부에도 같은 가드가 있지만 여기에도 둔다. 위험한 호출 바로 앞을 막아야
         // 새 호출부가 생겼을 때 가드를 빠뜨려도 앱이 죽지 않는다.
@@ -1057,18 +1040,6 @@ final class UsageStore {
         }
     }
 
-    private func showBubble(_ alert: LimitAlert?) {
-        guard let alert else { return }
-        let now = Date()
-        currentBubbleAlert = alert
-        currentBubbleDate = now
-        Task {
-            try? await Task.sleep(nanoseconds: UInt64(6 * 1_000_000_000))
-            if Self.shouldDismissBubble(shownAt: now, now: Date()), self.currentBubbleDate == now {
-                self.currentBubbleAlert = nil
-            }
-        }
-    }
 
     // MARK: parity-check.sh 용 스냅샷 파일
 
