@@ -62,8 +62,11 @@ struct PopoverView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(l.walletBalance).font(.caption).foregroundStyle(.secondary)
-                    Text(TokenFormatter.compact(wallet.availableTokens))
-                        .font(.system(size: 26, weight: .bold)).monospacedDigit()
+                    // 앱 안에서는 실제 숫자를 쓴다. 요약 표기(95.2M)는 메뉴바 전용이다 —
+                    // 팩 값과 잔액을 비교하려면 자리수가 그대로 보여야 한다.
+                    Text(TokenFormatter.grouped(wallet.availableTokens))
+                        .font(.system(size: 22, weight: .bold)).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.6)
                 }
                 Spacer()
                 Button {
@@ -81,7 +84,7 @@ struct PopoverView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 HStack(spacing: 5) {
-                    Text("\(l.todayTokens) \(TokenFormatter.compact(store.todayTotalTokens))")
+                    Text("\(l.todayTokens) \(TokenFormatter.grouped(store.todayTotalTokens))")
                         .monospacedDigit()
                     if let top = topWindow {
                         Text("·")

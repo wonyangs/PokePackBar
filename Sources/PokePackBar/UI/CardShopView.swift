@@ -89,8 +89,9 @@ private struct PackCard: View {
             }
         } else {
             HStack {
-                Text("\(l.shopPriceLabel) \(TokenFormatter.compact(price))")
+                Text("\(l.shopPriceLabel) \(TokenFormatter.grouped(price))")
                     .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
+                    .lineLimit(1)
                 Spacer()
                 if canBuy {
                     Button(l.buy) { confirming = true }.buttonStyle(.bordered).controlSize(.small)
