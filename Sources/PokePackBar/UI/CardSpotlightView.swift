@@ -24,6 +24,9 @@ struct CardSpotlightView: View {
     let onClose: () -> Void
 
     @State private var landed = false
+    @State private var confirmingDisenchant = false
+    /// 방금 돌려받은 액수. 잠깐 보여주고 지운다.
+    @State private var lastRefund: Int?
 
     var body: some View {
         let l = wallet.l
@@ -77,11 +80,69 @@ struct CardSpotlightView: View {
                         .monospacedDigit()
                 }
             }
-            .padding(.bottom, 6)
+
+            disenchantControls(l)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             withAnimation(.spring(response: 0.34, dampingFraction: 0.75)) { landed = true }
+        }
+        .onChange(of: cardID) {
+            confirmingDisenchant = false
+            lastRefund = nil
+        }
+    }
+
+    /// 중복분을 갈아 토큰으로 돌려받는다.
+    ///
+    /// 마지막 한 장은 남긴다 — 수집한 카드가 컬렉션에서 사라지는 것은 되돌릴 수 없다.
+    /// 그래서 한 장뿐이면 버튼 자체가 뜨지 않고, 왜 못 가는지만 알려 준다.
+    /// 확인은 인라인이다(`.alert` 금지 — 팝오버가 닫히면 고아 시트가 남는다).
+    @ViewBuilder
+    private func disenchantControls(_ l: L) -> some View {
+        let spare = wallet.spareCount(cardID)
+        let refund = CardDust.value(for: tier) * spare
+
+        if let lastRefund {
+            Label(l.disenchantDone(TokenFormatter.grouped(lastRefund)), systemImage: "checkmark.circle.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.green)
+        } else if spare <= 0 {
+            if ownedCount > 0 {
+                Text(l.disenchantNeedsSpare)
+                    .font(.caption2).foregroundStyle(.tertiary)
+            }
+        } else if confirmingDisenchant {
+            VStack(spacing: 5) {
+                Text(l.disenchantConfirm(spare, TokenFormatter.grouped(refund)))
+                    .font(.caption2).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button(l.disenchant) {
+                        let got = wallet.disenchant(cardID: cardID, tier: tier, count: spare)
+                        confirmingDisenchant = false
+                        lastRefund = got > 0 ? got : nil
+                    }
+                    .buttonStyle(.borderedProminent).controlSize(.small)
+                    Button(l.cancel) { confirmingDisenchant = false }
+                        .buttonStyle(.borderless).controlSize(.small)
+                }
+            }
+        } else {
+            Button {
+                confirmingDisenchant = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.3.trianglepath")
+                    Text("\(l.disenchant) ×\(spare)")
+                    Text("+\(TokenFormatter.grouped(refund))").monospacedDigit().foregroundStyle(.secondary)
+                }
+                .font(.caption)
+            }
+            .buttonStyle(.bordered).controlSize(.small)
         }
     }
 }

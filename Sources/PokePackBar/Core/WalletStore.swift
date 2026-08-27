@@ -63,8 +63,10 @@ final class WalletStore {
 
     // MARK: 재화
 
-    /// 상점에서 쓸 수 있는 토큰 = 설치 이후 누적 사용량 − 지출 누적.
-    var availableTokens: Int { max(0, state.usedSinceInstall - state.spentTokens) }
+    /// 상점에서 쓸 수 있는 토큰 = 누적 사용량 − 지출 + 카드를 갈아 돌려받은 것.
+    var availableTokens: Int {
+        max(0, state.usedSinceInstall - state.spentTokens + state.refundedTokens)
+    }
 
     var usedSinceInstall: Int { state.usedSinceInstall }
 
@@ -187,6 +189,30 @@ final class WalletStore {
         state.packsOpened += 1
         save()
         return true
+    }
+
+    // MARK: 카드 갈기
+
+    /// 갈 수 있는 장수 — 보유분에서 한 장은 남긴다. 컬렉션에서 사라지면 안 된다.
+    func spareCount(_ cardID: String) -> Int { max(0, cardCount(cardID) - 1) }
+
+    /// 중복분을 갈아 토큰으로 돌려받는다. 돌려받은 액수를 반환하고, 갈 것이 없으면 0.
+    ///
+    /// 마지막 한 장은 남긴다. 수집한 카드가 컬렉션에서 없어지는 것은
+    /// 되돌릴 수 없고, 실수로 그렇게 되면 잃은 것이 크다.
+    @discardableResult
+    func disenchant(cardID: String, tier: CardTier, count: Int) -> Int {
+        let spare = spareCount(cardID)
+        let amount = min(max(count, 0), spare)
+        guard amount > 0 else { return 0 }
+
+        state.cards[cardID] = cardCount(cardID) - amount
+        let refund = CardDust.value(for: tier) * amount
+        state.refundedTokens += refund
+        state.cardsDisenchanted += amount
+        save()
+        AppLog.write("disenchanted \(amount)x \(cardID) (\(tier.rawValue)) for \(refund)")
+        return refund
     }
 
     // MARK: 카드 보유량

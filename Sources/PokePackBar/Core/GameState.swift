@@ -16,7 +16,15 @@ struct GameState: Codable, Sendable {
     /// 설치 이후 누적 사용 토큰. 감소하지 않는다.
     var usedSinceInstall = 0
 
-    /// 상점에서 쓴 토큰 누적. 쓸 수 있는 재화 = `usedSinceInstall − spentTokens`.
+    /// 중복 카드를 갈아 돌려받은 토큰 누적.
+    /// 지출과 따로 센다 — 사용량 통계(`usedSinceInstall`)를 건드리지 않으면서
+    /// 잔액만 늘리려면 별도 항목이 있어야 한다.
+    var refundedTokens = 0
+
+    /// 갈아 없앤 카드 누적 장수. 통계용.
+    var cardsDisenchanted = 0
+
+    /// 상점에서 쓴 토큰 누적. 쓸 수 있는 재화 = `usedSinceInstall − spentTokens + refundedTokens`.
     /// 구매는 이 값만 올린다 — 누적 사용량은 통계이므로 되감지 않는다.
     var spentTokens = 0
 
@@ -70,6 +78,8 @@ struct GameState: Codable, Sendable {
         installBaselineSet = value(.installBaselineSet, false)
         usedSinceInstall = value(.usedSinceInstall, 0)
         spentTokens = value(.spentTokens, 0)
+        refundedTokens = value(.refundedTokens, 0)
+        cardsDisenchanted = value(.cardsDisenchanted, 0)
         // 옵셔널은 위 헬퍼로 다룰 수 없다 — 값 없음과 디코딩 실패를 구분해야 한다.
         claimedTodayTokensByProvider = try? c.decodeIfPresent([String: Int].self,
                                                              forKey: .claimedTodayTokensByProvider)

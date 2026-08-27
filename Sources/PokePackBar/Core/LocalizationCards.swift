@@ -41,17 +41,59 @@ extension L {
            "\(count) cartas", "\(count) cartes", "\(count) cartas")
     }
 
+    /// 팩 한 줄 소개. 그 세트가 왜 특별한지 실제 사실로 적는다 —
+    /// 이름과 연도만으로는 어느 팩을 살지 정하기 어렵다.
+    ///
+    /// 한국어와 영어만 쓴다. 사실 서술이라 나머지 언어는 영어로 둔다.
+    func packBlurb(_ setID: String) -> String? {
+        switch setID {
+        case "base1":
+            return blurb("포켓몬 카드가 시작된 자리. 1999년 첫 세트로, 초판 리자몽이 여기서 나왔습니다.",
+                         "Where it all began. The 1999 first set, home of the original Charizard.")
+        case "neo1":
+            return blurb("2세대의 문을 연 세트. 악·강철 타입과 베이비 포켓몬이 처음 등장했습니다.",
+                         "Opens the Johto era — the debut of Darkness and Metal types, and Baby Pokémon.")
+        case "xy12":
+            return blurb("20주년 기념 복각. 1999년 초판의 그림과 구성을 현대 규칙으로 다시 냈습니다.",
+                         "The 20th-anniversary throwback: 1999 artwork and lineup, rebuilt for modern rules.")
+        case "sm115":
+            return blurb("이로치 카드를 모으는 '샤이니 볼트'가 처음 붙은 세트. 75종이 넘습니다.",
+                         "The set that introduced the Shiny Vault — over 75 Shiny cards to chase.")
+        case "swsh45":
+            return blurb("샤이니 볼트를 100종 넘게 키운 세트. 이로치를 노린다면 여기입니다.",
+                         "Shiny Vault grown past 100 cards. The set to open if you are hunting Shinies.")
+        case "cel25":
+            return blurb("25주년 기념 세트. 역대 명장면 카드를 복각해 25장만 담은 작은 팩입니다.",
+                         "The 25th-anniversary set: 25 reprinted classics in a deliberately tiny pack.")
+        case "swsh12pt5":
+            return blurb("소드·실드 시리즈를 마무리한 세트. 갈라르 갤러리 일러스트가 들어 있습니다.",
+                         "The send-off for Sword & Shield, carrying the Galarian Gallery illustrations.")
+        case "sv3pt5":
+            return blurb("1세대 151마리를 빠짐없이 담은 세트. 관동 지방을 통째로 모을 수 있습니다.",
+                         "All 151 originals in one set — the whole Kanto roster, collectible end to end.")
+        case "sv8pt5":
+            return blurb("이브이 진화형이 주인공인 세트. 몬스터볼·마스터볼 무늬 카드가 여기서 나옵니다.",
+                         "Built around the Eeveelutions, with the Poké Ball and Master Ball patterned cards.")
+        case "sv10":
+            return blurb("로켓단이 전면에 선 세트. 트레이너가 소유한 포켓몬 카드가 돌아왔습니다.",
+                         "Team Rocket takes the lead, and trainer-owned Pokémon cards return.")
+        default:
+            return nil
+        }
+    }
+
+    private func blurb(_ ko: String, _ en: String) -> String {
+        lang == .ko ? ko : en
+    }
+
     var packTotalCards: String { t2("전체 카드", "Cards in set", "収録カード",
                                      "Cartas del set", "Cartes du set", "Cartas do set") }
     var packCollected: String { t2("수집률", "Collected", "収集率", "Recolectadas", "Collectées", "Coletadas") }
-    var packOdds: String { t2("히트 슬롯 확률", "Hit slot odds", "ヒット枠の確率",
-                              "Probabilidad del hueco", "Probabilité du slot", "Chance do slot") }
-    var packOddsHint: String { t2("나머지 칸은 커먼·언커먼으로 채워져요.",
-                                  "The other slots are commons and uncommons.",
-                                  "残りの枠はコモン・アンコモンです。",
-                                  "Los demás huecos son comunes y poco comunes.",
-                                  "Les autres emplacements sont communes et peu communes.",
-                                  "Os outros espaços são comuns e incomuns.") }
+    var packOdds: String { t2("등급별 확률", "Odds by rarity", "レアリティ別確率",
+                              "Probabilidad por rareza", "Probabilité par rareté", "Chance por raridade") }
+    var packOddsColumns: String { t2("팩당 확률 · 기대 장수", "Per pack · expected",
+                                     "1パックあたり · 期待枚数", "Por sobre · esperado",
+                                     "Par booster · attendu", "Por pacote · esperado") }
     var packQuantity: String { t2("수량", "Quantity", "数量", "Cantidad", "Quantité", "Quantidade") }
     func buyCount(_ n: Int) -> String {
         t2("\(n)개 구매", "Buy \(n)", "\(n)個 購入", "Comprar \(n)", "Acheter \(n)", "Comprar \(n)")
@@ -97,6 +139,26 @@ extension L {
     func copiesOwned(_ count: Int) -> String {
         t2("\(count)장 보유", "\(count) copies", "\(count)枚所持",
            "\(count) copias", "\(count) exemplaires", "\(count) cópias")
+    }
+
+    // MARK: 카드 갈기
+
+    var disenchant: String { t2("중복 갈기", "Recycle spares", "重複を分解",
+                                "Reciclar repetidas", "Recycler les doubles", "Reciclar repetidas") }
+    func disenchantConfirm(_ count: Int, _ tokens: String) -> String {
+        t2("\(count)장을 갈아 \(tokens) 토큰을 받습니다. 한 장은 남습니다.",
+           "Recycle \(count) for \(tokens) tokens. One copy stays.",
+           "\(count)枚を分解して \(tokens) トークン。1枚は残ります。",
+           "Recicla \(count) por \(tokens) tokens. Se conserva una.",
+           "Recycle \(count) pour \(tokens) tokens. Un exemplaire reste.",
+           "Recicle \(count) por \(tokens) tokens. Uma cópia fica.")
+    }
+    var disenchantNeedsSpare: String { t2("두 장부터 갈 수 있어요", "Needs a spare copy",
+                                          "2枚目から分解できます", "Necesitas una repetida",
+                                          "Il faut un double", "Precisa de uma repetida") }
+    func disenchantDone(_ tokens: String) -> String {
+        t2("+\(tokens) 토큰", "+\(tokens) tokens", "+\(tokens) トークン",
+           "+\(tokens) tokens", "+\(tokens) tokens", "+\(tokens) tokens")
     }
 
     // MARK: 등급

@@ -53,6 +53,28 @@ enum PackPricing {
     }
 }
 
+/// 중복 카드를 갈았을 때 돌려주는 토큰.
+///
+/// 팩 하나를 갈아 나오는 총액이 팩 값을 넘으면 안 된다 — 사서 갈기만 반복하는 것이
+/// 이득이 되면 게임이 성립하지 않는다. 지금 값으로 일반 팩 1개의 기대 환급은
+/// 약 330만이고 팩 값은 1,000만이라 3분의 1 수준이다.
+enum CardDust {
+    static func value(for tier: CardTier) -> Int {
+        switch tier {
+        case .energy:         return 50_000
+        case .common:         return 100_000
+        case .uncommon:       return 200_000
+        case .rare:           return 500_000
+        case .doubleRare:     return 1_500_000
+        case .tripleRare:     return 3_000_000
+        case .artRare:        return 5_000_000
+        case .superRare:      return 8_000_000
+        case .specialArtRare: return 15_000_000
+        case .ultraRare:      return 30_000_000
+        }
+    }
+}
+
 /// 팩 개봉 결과 카드 1장.
 struct PulledCard: Equatable, Sendable, Identifiable {
     let id: String        // 카드 ID
@@ -118,11 +140,70 @@ enum PackOpening {
         return picked
     }
 
-    /// 이 세트의 히트 슬롯이 각 등급으로 나올 확률. 합은 1 이다.
+    /// 팩 1개에서 각 등급이 나올 확률과 기대 장수.
     ///
-    /// 세트에 없는 등급은 후보에서 빠지고 나머지 가중치가 재정규화된다 —
-    /// 뽑기가 실제로 하는 것과 같은 계산이라 상점에 표시한 값과 결과가 어긋나지 않는다.
-    /// 나머지 슬롯은 커먼·언커먼으로 고정이라 확률로 보여줄 것이 없다.
+    /// 히트 슬롯만 확률을 매기고 나머지를 "커먼·언커먼" 으로 묶어 두면, 커먼이
+    /// 왜 확률이 없는지 알 수 없다. 모든 등급에 값을 준다 — 고정 슬롯으로 반드시
+    /// 들어오는 등급은 100% 이고, 기대 장수가 그 등급의 실제 비중을 말해 준다.
+    ///
+    /// 뽑기가 만드는 슬롯 구성을 그대로 따라가며 센다. 폴백까지 반영하므로
+    /// 표시한 값과 실제 결과가 갈라지지 않는다.
+    struct TierOdds: Equatable {
+        let tier: CardTier
+        /// 팩 1개에 한 장 이상 들어올 확률 (0~1).
+        let packProbability: Double
+        /// 팩 1개당 기대 장수.
+        let expectedPerPack: Double
+    }
+
+    static func packOdds(setID: String, index: CardIndex) -> [TierOdds] {
+        let pool = index.pools[setID] ?? [:]
+        guard !pool.isEmpty else { return [] }
+
+        var expected: [CardTier: Double] = [:]
+        var missChance: [CardTier: Double] = [:]   // 한 장도 안 나올 확률(곱해 나간다)
+
+        func addFixed(_ requested: CardTier) {
+            // 폴백까지 따라가 실제로 어느 등급이 나오는지 확정한다.
+            guard let actual = requested.fallbackChain.first(where: { !(pool[$0] ?? []).isEmpty })
+            else { return }
+            expected[actual, default: 0] += 1
+            missChance[actual] = 0            // 고정 슬롯은 반드시 들어온다
+        }
+
+        func addWeighted(_ weights: [(tier: CardTier, weight: Int)], slots: Int) {
+            let available = weights.filter { !(pool[$0.tier] ?? []).isEmpty }
+            let total = available.reduce(0) { $0 + $1.weight }
+            guard total > 0, slots > 0 else { return }
+            for entry in available {
+                let p = Double(entry.weight) / Double(total)
+                expected[entry.tier, default: 0] += p * Double(slots)
+                let miss = missChance[entry.tier] ?? 1
+                missChance[entry.tier] = miss * pow(1 - p, Double(slots))
+            }
+        }
+
+        if (pool[.common] ?? []).isEmpty {
+            // 특별 세트 — 전 슬롯이 가중 추첨이다.
+            addWeighted(PackConfig.specialWeights, slots: PackConfig.specialPackSize)
+        } else {
+            for _ in 0..<PackConfig.commonSlots { addFixed(.common) }
+            for _ in 0..<PackConfig.uncommonSlots { addFixed(.uncommon) }
+            let hasEnergy = !(pool[.energy] ?? []).isEmpty
+            for slot in 0..<PackConfig.fillerSlots {
+                addFixed(hasEnergy && slot == 0 ? .energy : .common)
+            }
+            addWeighted(PackConfig.hitWeights, slots: PackConfig.hitSlots)
+        }
+
+        return expected.keys
+            .map { TierOdds(tier: $0,
+                            packProbability: 1 - (missChance[$0] ?? 0),
+                            expectedPerPack: expected[$0] ?? 0) }
+            .sorted { $0.tier.rank > $1.tier.rank }
+    }
+
+    /// 히트 슬롯만의 등급 분포. 뽑기 내부와 상세 표시가 같은 값을 쓰도록 남겨 둔다.
     static func hitOdds(setID: String, index: CardIndex) -> [(tier: CardTier, probability: Double)] {
         let pool = index.pools[setID] ?? [:]
         let weights = (pool[.common] ?? []).isEmpty ? PackConfig.specialWeights : PackConfig.hitWeights

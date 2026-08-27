@@ -112,98 +112,110 @@ private struct PackDetailView: View {
 
     var body: some View {
         let l = wallet.l
-        VStack(spacing: 0) {
+        // 스크롤을 두지 않는다. 팩 하나를 살지 말지 정하는 화면에서 정보가 화면 밖에
+        // 숨으면 끌어내려 봐야 하는데, 그러느니 그림을 줄이는 편이 낫다.
+        VStack(spacing: 7) {
             HStack {
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17)).foregroundStyle(.secondary)
+                        .font(.system(size: 16)).foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 .help(l.close)
             }
 
-            ScrollView {
-                VStack(spacing: 10) {
-                    PackImageView(setID: set.id, width: 104)
-                        .shadow(radius: 6, y: 2)
-
-                    VStack(spacing: 2) {
-                        Text(set.name).font(.title3.weight(.semibold))
-                            .multilineTextAlignment(.center)
+            HStack(alignment: .top, spacing: 10) {
+                PackImageView(setID: set.id, width: 62)
+                    .shadow(radius: 4, y: 2)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(set.name)
+                        .font(.callout.weight(.semibold))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("\(String(set.released.prefix(4)))  ·  \(l.packContents(cardsPerPack))")
+                        .font(.caption2).foregroundStyle(.secondary)
+                    if let blurb = l.packBlurb(set.id) {
+                        Text(blurb)
+                            .font(.caption2).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("\(String(set.released.prefix(4)))  ·  \(l.packContents(cardsPerPack))")
-                            .font(.caption).foregroundStyle(.secondary)
                     }
-
-                    summaryRows(l)
-                    oddsTable(l)
                 }
-                .padding(.horizontal, 2)
+                Spacer(minLength: 0)
             }
 
+            summaryRows(l)
+            oddsTable(l)
+            Spacer(minLength: 0)
             purchaseBar(l)
         }
     }
 
     private func summaryRows(_ l: L) -> some View {
         let rate = members.isEmpty ? 0 : Double(ownedCount) / Double(members.count) * 100
-        return VStack(spacing: 4) {
-            row(l.packTotalCards, "\(members.count)")
-            row(l.packCollected, "\(ownedCount) / \(members.count)  (\(String(format: "%.1f", rate))%)")
-        }
-        .padding(8)
-        .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack {
-            Text(label).font(.caption).foregroundStyle(.secondary)
+        return HStack {
+            Text(l.packTotalCards).font(.caption2).foregroundStyle(.secondary)
+            Text("\(members.count)").font(.caption2.weight(.semibold)).monospacedDigit()
             Spacer()
-            Text(value).font(.caption.weight(.semibold)).monospacedDigit()
+            Text(l.packCollected).font(.caption2).foregroundStyle(.secondary)
+            Text("\(ownedCount)/\(members.count) (\(String(format: "%.0f", rate))%)")
+                .font(.caption2.weight(.semibold)).monospacedDigit()
         }
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(Color.secondary.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 
-    /// 등급별 보유 장수와 히트 확률. 확률은 뽑기가 실제로 쓰는 계산과 같은 것이다.
+    /// 모든 등급에 확률을 매긴다. 고정 슬롯으로 반드시 들어오는 등급은 100% 이고,
+    /// 기대 장수가 그 등급이 실제로 얼마나 차지하는지 말해 준다.
     private func oddsTable(_ l: L) -> some View {
-        let odds = Dictionary(uniqueKeysWithValues:
-            PackOpening.hitOdds(setID: set.id, index: index).map { ($0.tier, $0.probability) })
+        let odds = PackOpening.packOdds(setID: set.id, index: index)
         let pool = index.pools[set.id] ?? [:]
-        let tiers = CardTier.allCases.reversed().filter { !(pool[$0] ?? []).isEmpty }
 
-        return VStack(alignment: .leading, spacing: 4) {
+        return VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(l.packOdds).font(.caption.weight(.semibold))
+                Text(l.packOdds).font(.caption2.weight(.semibold))
                 Spacer()
+                Text(l.packOddsColumns).font(.system(size: 9)).foregroundStyle(.tertiary)
             }
-            ForEach(tiers, id: \.self) { tier in
-                let owned = (pool[tier] ?? []).filter { wallet.cardCount($0) > 0 }.count
-                HStack(spacing: 6) {
-                    Text(tier.rawValue)
+            .padding(.bottom, 1)
+
+            ForEach(odds, id: \.tier) { entry in
+                let all = (pool[entry.tier] ?? []).count
+                let owned = (pool[entry.tier] ?? []).filter { wallet.cardCount($0) > 0 }.count
+                HStack(spacing: 5) {
+                    Text(entry.tier.rawValue)
                         .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(tierColor(tier))
+                        .foregroundStyle(tierColor(entry.tier))
                         .frame(width: 30, alignment: .leading)
-                    Text(l.tierName(tier)).font(.caption2).foregroundStyle(.secondary)
+                    Text("\(owned)/\(all)")
+                        .font(.system(size: 10)).foregroundStyle(.tertiary).monospacedDigit()
                     Spacer()
-                    Text("\(owned)/\((pool[tier] ?? []).count)")
-                        .font(.caption2).foregroundStyle(.tertiary).monospacedDigit()
-                    Text(odds[tier].map { String(format: "%.1f%%", $0 * 100) } ?? "—")
-                        .font(.caption2.weight(.semibold)).monospacedDigit()
-                        .frame(width: 42, alignment: .trailing)
+                    Text(percentText(entry.packProbability))
+                        .font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                        .frame(width: 44, alignment: .trailing)
+                    Text(String(format: "%.2f", entry.expectedPerPack))
+                        .font(.system(size: 10)).foregroundStyle(.secondary).monospacedDigit()
+                        .frame(width: 32, alignment: .trailing)
                 }
             }
-            Text(l.packOddsHint).font(.system(size: 9)).foregroundStyle(.tertiary)
         }
-        .padding(8)
+        .padding(.horizontal, 8).padding(.vertical, 6)
         .background(Color.secondary.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: 7))
+    }
+
+    /// 아주 낮은 확률을 0% 로 반올림하지 않는다 — 1.1% 와 0.04% 는 다른 이야기다.
+    private func percentText(_ p: Double) -> String {
+        let pct = p * 100
+        if pct >= 99.95 { return "100%" }
+        if pct < 1 { return String(format: "%.2f%%", pct) }
+        return String(format: "%.1f%%", pct)
     }
 
     private func purchaseBar(_ l: L) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 5) {
             HStack(spacing: 8) {
-                Text(l.packQuantity).font(.caption).foregroundStyle(.secondary)
+                Text(l.packQuantity).font(.caption2).foregroundStyle(.secondary)
                 Stepper(value: $quantity, in: 1...maxQuantity) {
                     Text("\(quantity)").font(.callout.weight(.semibold)).monospacedDigit()
                 }
@@ -219,7 +231,6 @@ private struct PackDetailView: View {
                 .disabled(!canBuy)
                 .frame(maxWidth: .infinity)
         }
-        .padding(.top, 8)
         // 잔액이 줄면 살 수 있는 수량도 줄어든다. 남은 수량이 한도를 넘으면 끌어내린다.
         .onChange(of: wallet.availableTokens) {
             if quantity > maxQuantity { quantity = maxQuantity }

@@ -272,3 +272,64 @@ final class WalletStoreTests: XCTestCase {
         XCTAssertEqual(a.count, 1)
     }
 }
+
+@MainActor
+final class DisenchantTests: XCTestCase {
+
+    private func makeStore() -> WalletStore {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("dust-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return WalletStore(fileURL: dir.appendingPathComponent("game-state.json"))
+    }
+
+    /// 마지막 한 장은 남는다. 수집한 카드가 컬렉션에서 사라지면 되돌릴 수 없다.
+    func testKeepsOneCopy() {
+        let s = makeStore()
+        s.collect(["sv10-1", "sv10-1", "sv10-1"])
+        XCTAssertEqual(s.spareCount("sv10-1"), 2)
+
+        let refund = s.disenchant(cardID: "sv10-1", tier: .rare, count: 99)
+        XCTAssertEqual(s.cardCount("sv10-1"), 1, "한 장은 남아야 한다")
+        XCTAssertEqual(refund, CardDust.value(for: .rare) * 2)
+    }
+
+    /// 한 장뿐이면 갈 수 없다.
+    func testSingleCopyCannotBeRecycled() {
+        let s = makeStore()
+        s.collect(["sv10-1"])
+        XCTAssertEqual(s.spareCount("sv10-1"), 0)
+        XCTAssertEqual(s.disenchant(cardID: "sv10-1", tier: .rare, count: 1), 0)
+        XCTAssertEqual(s.cardCount("sv10-1"), 1)
+    }
+
+    /// 환급은 잔액을 늘리되 누적 사용량은 건드리지 않는다 — 그건 통계다.
+    func testRefundRaisesBalanceWithoutTouchingUsage() {
+        let s = makeStore()
+        s.update(todayTokensByProvider: ["a": 0], todayDate: "2026-08-27", hasUsageData: true)
+        s.update(todayTokensByProvider: ["a": 1_000_000], todayDate: "2026-08-27", hasUsageData: true)
+        s.collect(["sv10-2", "sv10-2"])
+
+        let before = s.availableTokens
+        let refund = s.disenchant(cardID: "sv10-2", tier: .ultraRare, count: 1)
+        XCTAssertEqual(s.availableTokens, before + refund)
+        XCTAssertEqual(s.usedSinceInstall, 1_000_000, "사용량 통계는 그대로여야 한다")
+    }
+
+    /// 갈고 나면 그 결과가 저장된다.
+    func testSurvivesReload() {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("dust-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let file = dir.appendingPathComponent("game-state.json")
+
+        let first = WalletStore(fileURL: file)
+        first.collect(["sv10-3", "sv10-3"])
+        let refund = first.disenchant(cardID: "sv10-3", tier: .doubleRare, count: 1)
+
+        let reloaded = WalletStore(fileURL: file)
+        XCTAssertEqual(reloaded.cardCount("sv10-3"), 1)
+        XCTAssertEqual(reloaded.availableTokens, refund)
+        XCTAssertEqual(reloaded.state.cardsDisenchanted, 1)
+    }
+}
