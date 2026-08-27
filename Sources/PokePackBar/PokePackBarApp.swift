@@ -26,6 +26,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 조립된 .app 이 리소스를 실제로 여는지 확인하고 끝내는 모드. build-app.sh 가 쓴다.
+        //
+        // 파일이 있는지 스크립트가 확인하는 것만으로는 부족하다. 앱이 보는 위치와
+        // 스크립트가 검사하는 위치가 어긋나면 둘 다 통과하고 배포된 뒤에만 죽는다 —
+        // 실제로 그렇게 나갔다. 앱에게 직접 물어보는 것만이 그 어긋남을 잡는다.
+        if CommandLine.arguments.contains("--verify-resources") {
+            if let problem = AppResources.verify() {
+                FileHandle.standardError.write(Data("리소스 확인 실패: \(problem)\n".utf8))
+                exit(1)
+            }
+            print("리소스 확인 통과: \(AppResources.bundle?.bundlePath ?? "?")")
+            exit(0)
+        }
+
         // 로그인 에이전트 등록(plist 의 RunAtLoad)이 이미 떠 있는 앱을 한 번 더 실행한다 — 나중에 뜬
         // 쪽이 물러난다. 메뉴바 항목을 만들기 전에 판정해 아이콘이 떴다 사라지는 깜빡임을 없애고,
         // **`CrashReporter.install` 보다도 앞**에 둔다: 뒤면 물러나는 인스턴스가 running 마커를 덮어쓰고

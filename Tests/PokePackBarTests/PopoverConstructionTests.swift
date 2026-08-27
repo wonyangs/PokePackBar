@@ -115,3 +115,48 @@ final class NotificationGuardTests: XCTestCase {
         XCTAssertFalse(AppEnv.canUseNotifications)
     }
 }
+
+/// 리소스 번들을 찾는 경로. 여기가 어긋나면 빌드한 컴퓨터에서만 동작하고
+/// 배포된 앱은 첫 클릭에 죽는다 — 실제로 v0.1.0 이 그렇게 나갔다.
+final class AppResourcesTests: XCTestCase {
+
+    func testResourceBundleResolves() throws {
+        XCTAssertNotNil(AppResources.bundle, "리소스 번들을 찾지 못했다")
+        XCTAssertNil(AppResources.verify(), "리소스 확인이 실패했다")
+    }
+
+    /// `Bundle.module` 은 찾지 못하면 fatalError 로 프로세스를 죽인다.
+    /// 게다가 폴백이 빌드 기계의 절대경로라, 빌드한 컴퓨터에서는 통과하고
+    /// 다른 컴퓨터에서만 죽는다. 앱 코드에서 쓰지 않는다.
+    func testSourcesDoNotUseBundleModule() throws {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokePackBar")
+
+        var offenders: [String] = []
+        let files = try XCTUnwrap(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        for case let url as URL in files where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for (i, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
+            where line.contains("Bundle.module")
+                && !line.trimmingCharacters(in: .whitespaces).hasPrefix("//") {
+                offenders.append("\(url.lastPathComponent):\(i + 1)")
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty, """
+            Bundle.module 은 찾지 못하면 앱을 죽이고, 폴백이 빌드 기계 경로라 배포 후에만 드러난다.
+            AppResources.bundle 을 쓸 것: \(offenders.joined(separator: ", "))
+            """)
+    }
+
+    /// `.app` 배치(Contents/Resources)를 가장 먼저 본다.
+    /// 이 순서가 바뀌면 build-app.sh 가 넣는 위치와 어긋난다.
+    func testLooksInAppResourcesFirst() {
+        let paths = AppResources.candidateURLs().map(\.path)
+        let appLayout = Bundle.main.resourceURL?
+            .appendingPathComponent(AppResources.bundleName).path
+        if let appLayout {
+            XCTAssertEqual(paths.first, appLayout, "Contents/Resources 를 먼저 봐야 한다")
+        }
+    }
+}

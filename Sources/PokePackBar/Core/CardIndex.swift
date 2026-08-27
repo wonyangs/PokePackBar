@@ -91,7 +91,7 @@ struct CardIndex: Sendable {
     /// 번들에서 읽는다. 인덱스가 없거나 깨졌으면 nil — 호출부가 실패를 드러내야 한다.
     /// 조용히 빈 인덱스를 돌려주면 상점이 텅 빈 이유를 알 수 없다.
     static func loadBundled() -> CardIndex? {
-        guard let url = Bundle.module.url(forResource: "card-index", withExtension: "json"),
+        guard let url = AppResources.bundle?.url(forResource: "card-index", withExtension: "json"),
               let data = try? Data(contentsOf: url) else {
             AppLog.write("card index missing from bundle")
             return nil

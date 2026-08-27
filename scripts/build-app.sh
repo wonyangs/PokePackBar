@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="0.1.1"
+VERSION="0.1.2"
 APP_NAME="PokePackBar"
 BUILD_DIR="build"
 # 원본과 겹치면 로그인 항목·Keychain ACL·LaunchServices 상태가 섞인다.
@@ -91,6 +91,14 @@ if [ "$PACK_COUNT" != "$EXPECTED_PACKS" ]; then
     exit 1
 fi
 echo "   팩 아트 ${PACK_COUNT}종"
+
+# 조립된 앱에게 직접 물어본다. 위 검사는 "파일이 거기 있나" 이고, 이건 "앱이 그걸 여나" 다.
+# 앱이 보는 위치와 스크립트가 검사하는 위치가 어긋나 배포된 적이 있어 둘 다 둔다.
+if ! VERIFY_OUT=$("$APP/Contents/MacOS/$APP_NAME" --verify-resources 2>&1); then
+    echo "   ✗ 조립된 앱이 리소스를 열지 못한다: $VERIFY_OUT" >&2
+    exit 1
+fi
+echo "   $VERIFY_OUT"
 
 echo "==> codesign"
 SIGN_IDENTITY="${CODESIGN_IDENTITY:-PokePackBar Local}"

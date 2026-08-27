@@ -111,7 +111,7 @@ enum CardImageLoader {
     /// 네트워크도 디스크 캐시도 타지 않아 대기 화면에서 기다릴 것이 없다.
     static func bundledPackImage(setID: String) -> NSImage? {
         if let cached = bundledPacks[setID] { return cached }
-        guard let url = Bundle.module.url(forResource: setID, withExtension: "webp",
+        guard let url = AppResources.bundle?.url(forResource: setID, withExtension: "webp",
                                           subdirectory: "packs"),
               let data = try? Data(contentsOf: url),
               let image = NSImage(data: data) else { return nil }
