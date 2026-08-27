@@ -35,7 +35,12 @@ brew install --cask poke-pack-bar
 가운데 `brew trust` 는 건너뛸 수 없다. Homebrew 가 서드파티 tap 의 cask 를
 기본으로 거부하므로, 없으면 설치가 막힌다.
 
-갱신은 앱의 업데이트 버튼을 누르거나 `brew upgrade --cask poke-pack-bar`.
+갱신은 앱의 업데이트 버튼을 누르거나 아래를 실행한다.
+
+```bash
+brew update
+brew upgrade --cask poke-pack-bar
+```
 
 ## 알아 둘 것
 
@@ -46,6 +51,12 @@ brew install --cask poke-pack-bar
 코드 서명이 깨진다.
 
 **업데이트 버튼은 brew 로 설치했을 때만 brew 를 쓴다.** 그 외에는 릴리스 페이지를 연다.
+
+**갱신 전에 `brew update` 를 반드시 돌린다.** Homebrew 는 tap 을 하루에 한 번만
+다시 받는다. 새 버전을 낸 직후에 `brew upgrade` 만 하면 로컬에 남은 옛 cask 를 보고
+"이미 최신" 이라고 답한다 — 실제로 테스터가 여기서 막혔다. 갱신이 안 먹으면
+`brew info --cask poke-pack-bar` 로 tap 이 어느 버전을 보고 있는지 먼저 확인한다.
+그래도 낡았으면 `git -C "$(brew --repo <소유자>/tap)" pull` 로 직접 당긴다.
 
 **테스터는 `brew trust` 를 한 번 거쳐야 한다.** Homebrew 가 서드파티 tap 의 cask 를
 기본으로 거부한다. tap 전체를 신뢰하는 `brew trust <tap>` 도 되지만 권장되지 않으며

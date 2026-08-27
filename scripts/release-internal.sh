@@ -103,7 +103,8 @@ cat <<NEXT
    brew tap $(dirname "$REPO")/tap
    brew trust --cask $(dirname "$REPO")/tap/poke-pack-bar
    brew install --cask poke-pack-bar
-업데이트:
-   앱의 업데이트 버튼, 또는 brew upgrade --cask poke-pack-bar
+업데이트 (brew update 를 빼면 안 된다 — tap 은 하루에 한 번만 다시 받는다):
+   brew update
+   brew upgrade --cask poke-pack-bar
 ──────────────────────────────────────────────────────────────────
 NEXT

@@ -30,7 +30,15 @@ brew install --cask poke-pack-bar
 
 macOS 14 이상.
 
-업데이트는 앱 안의 업데이트 버튼을 누르거나 `brew upgrade --cask poke-pack-bar`.
+업데이트는 앱 안의 업데이트 버튼을 누르거나 아래를 실행한다.
+
+```bash
+brew update
+brew upgrade --cask poke-pack-bar
+```
+
+`brew update` 를 빼면 안 된다. Homebrew 는 tap 을 하루에 한 번만 다시 받으므로,
+없으면 로컬에 남은 옛 cask 를 보고 "이미 최신" 이라고 답한다.
 
 ## 개발
 
