@@ -140,20 +140,18 @@ enum PackOpening {
         return picked
     }
 
-    /// 팩 1개에서 각 등급이 나올 확률과 기대 장수.
+    /// 카드 한 장이 각 등급일 확률. 모든 등급을 더하면 1 이다.
     ///
-    /// 히트 슬롯만 확률을 매기고 나머지를 "커먼·언커먼" 으로 묶어 두면, 커먼이
-    /// 왜 확률이 없는지 알 수 없다. 모든 등급에 값을 준다 — 고정 슬롯으로 반드시
-    /// 들어오는 등급은 100% 이고, 기대 장수가 그 등급의 실제 비중을 말해 준다.
+    /// "팩에 한 장 이상 들어올 확률" 로 매기면 고정 슬롯 등급이 전부 100% 가 되어
+    /// 등급 사이의 비중을 읽을 수 없다. 한 장 기준이면 커먼 60% · UR 0.1% 처럼
+    /// 서로 견줄 수 있는 하나의 축에 놓인다.
     ///
     /// 뽑기가 만드는 슬롯 구성을 그대로 따라가며 센다. 폴백까지 반영하므로
     /// 표시한 값과 실제 결과가 갈라지지 않는다.
     struct TierOdds: Equatable {
         let tier: CardTier
-        /// 팩 1개에 한 장 이상 들어올 확률 (0~1).
-        let packProbability: Double
-        /// 팩 1개당 기대 장수.
-        let expectedPerPack: Double
+        /// 카드 한 장이 이 등급일 확률 (0~1).
+        let probability: Double
     }
 
     static func packOdds(setID: String, index: CardIndex) -> [TierOdds] {
@@ -161,14 +159,12 @@ enum PackOpening {
         guard !pool.isEmpty else { return [] }
 
         var expected: [CardTier: Double] = [:]
-        var missChance: [CardTier: Double] = [:]   // 한 장도 안 나올 확률(곱해 나간다)
 
         func addFixed(_ requested: CardTier) {
             // 폴백까지 따라가 실제로 어느 등급이 나오는지 확정한다.
             guard let actual = requested.fallbackChain.first(where: { !(pool[$0] ?? []).isEmpty })
             else { return }
             expected[actual, default: 0] += 1
-            missChance[actual] = 0            // 고정 슬롯은 반드시 들어온다
         }
 
         func addWeighted(_ weights: [(tier: CardTier, weight: Int)], slots: Int) {
@@ -178,8 +174,6 @@ enum PackOpening {
             for entry in available {
                 let p = Double(entry.weight) / Double(total)
                 expected[entry.tier, default: 0] += p * Double(slots)
-                let miss = missChance[entry.tier] ?? 1
-                missChance[entry.tier] = miss * pow(1 - p, Double(slots))
             }
         }
 
@@ -196,10 +190,10 @@ enum PackOpening {
             addWeighted(PackConfig.hitWeights, slots: PackConfig.hitSlots)
         }
 
+        let cardsPerPack = expected.values.reduce(0, +)
+        guard cardsPerPack > 0 else { return [] }
         return expected.keys
-            .map { TierOdds(tier: $0,
-                            packProbability: 1 - (missChance[$0] ?? 0),
-                            expectedPerPack: expected[$0] ?? 0) }
+            .map { TierOdds(tier: $0, probability: (expected[$0] ?? 0) / cardsPerPack) }
             .sorted { $0.tier.rank > $1.tier.rank }
     }
 

@@ -467,7 +467,6 @@ final class CollectionFilterTests: XCTestCase {
 final class PackOddsTests: XCTestCase {
 
     /// 세트에 있는 등급은 하나도 빠짐없이 확률을 받는다.
-    /// 히트 슬롯만 확률을 주고 나머지를 문구로 넘기면 커먼이 왜 없는지 알 수 없다.
     func testEveryTierInTheSetGetsOdds() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         for set in index.sets {
@@ -477,47 +476,50 @@ final class PackOddsTests: XCTestCase {
         }
     }
 
-    /// 기대 장수의 합이 그 팩의 장수와 같아야 한다.
-    func testExpectedCountsSumToPackSize() throws {
+    /// 확률의 합은 항상 1 이다 — 카드 한 장이 어느 등급인지의 분포이므로.
+    func testProbabilitiesSumToOne() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         for set in index.sets {
             let total = PackOpening.packOdds(setID: set.id, index: index)
-                .reduce(0) { $0 + $1.expectedPerPack }
-            XCTAssertEqual(total, Double(PackPricing.cardCount(setID: set.id, index: index)),
-                           accuracy: 0.0001, "\(set.id) 기대 장수 합이 팩 장수와 다르다")
+                .reduce(0) { $0 + $1.probability }
+            XCTAssertEqual(total, 1.0, accuracy: 0.0001, "\(set.id) 확률 합이 1 이 아니다")
         }
     }
 
-    /// 고정 슬롯으로 반드시 들어오는 등급은 100% 다.
-    func testGuaranteedTiersAreCertain() throws {
+    /// 희귀할수록 확률이 낮다. 뒤집히면 등급 체계가 의미를 잃는다.
+    /// 에너지는 등급 축이 아니라 별도 슬롯이므로 뺀다.
+    func testRarerTiersAreNotMoreLikely() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
-        let odds = PackOpening.packOdds(setID: "sv10", index: index)
-        let common = try XCTUnwrap(odds.first { $0.tier == .common })
-        XCTAssertEqual(common.packProbability, 1.0, accuracy: 0.0001)
-        XCTAssertGreaterThan(common.expectedPerPack, 1)
-
-        let ultra = try XCTUnwrap(odds.first { $0.tier == .ultraRare })
-        XCTAssertLessThan(ultra.packProbability, 0.05, "UR 이 흔하면 안 된다")
+        for set in index.sets {
+            let odds = PackOpening.packOdds(setID: set.id, index: index)
+                .filter { $0.tier != .energy }
+            for (a, b) in zip(odds, odds.dropFirst()) {
+                XCTAssertLessThanOrEqual(a.probability, b.probability,
+                                         "\(set.id): \(a.tier.rawValue) 가 \(b.tier.rawValue) 보다 흔하다")
+            }
+        }
     }
 
-    /// 표시한 기대 장수가 실제 뽑기 결과와 맞아야 한다.
-    func testExpectedCountsMatchActualDraws() throws {
+    /// 표시한 확률이 실제 뽑기에서 나오는 비율과 맞아야 한다.
+    /// 표시용 계산을 따로 두면 둘이 조용히 갈라진다.
+    func testOddsMatchActualDraws() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         let setID = "sv10"
         let expected = Dictionary(uniqueKeysWithValues:
-            PackOpening.packOdds(setID: setID, index: index).map { ($0.tier, $0.expectedPerPack) })
+            PackOpening.packOdds(setID: setID, index: index).map { ($0.tier, $0.probability) })
 
         var observed: [CardTier: Int] = [:]
-        let packs = 4_000
-        for seed in 1...packs {
+        var drawn = 0
+        for seed in 1...4_000 {
             var g = SeededGenerator(seed: UInt64(seed))
             for card in PackOpening.draw(setID: setID, index: index, alreadyOwned: [], using: &g) {
                 observed[card.tier, default: 0] += 1
+                drawn += 1
             }
         }
         for (tier, want) in expected {
-            let got = Double(observed[tier] ?? 0) / Double(packs)
-            XCTAssertEqual(got, want, accuracy: 0.06, "\(tier.rawValue) 표시 \(want) 실제 \(got)")
+            let got = Double(observed[tier] ?? 0) / Double(drawn)
+            XCTAssertEqual(got, want, accuracy: 0.01, "\(tier.rawValue) 표시 \(want) 실제 \(got)")
         }
     }
 }
@@ -538,12 +540,12 @@ final class CardDustTests: XCTestCase {
     func testGrindingAPackNeverPaysForItself() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         for set in index.sets {
+            let cards = Double(PackPricing.cardCount(setID: set.id, index: index))
             let dust = PackOpening.packOdds(setID: set.id, index: index)
-                .reduce(0.0) { $0 + $1.expectedPerPack * Double(CardDust.value(for: $1.tier)) }
+                .reduce(0.0) { $0 + $1.probability * cards * Double(CardDust.value(for: $1.tier)) }
             let price = Double(PackPricing.price(setID: set.id, index: index))
             XCTAssertLessThan(dust, price * 0.6,
                               "\(set.id): 기대 환급 \(Int(dust)) 이 팩 값 \(Int(price)) 의 60% 를 넘는다")
         }
     }
 }
-

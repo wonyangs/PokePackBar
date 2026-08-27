@@ -165,8 +165,7 @@ private struct PackDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 7))
     }
 
-    /// 모든 등급에 확률을 매긴다. 고정 슬롯으로 반드시 들어오는 등급은 100% 이고,
-    /// 기대 장수가 그 등급이 실제로 얼마나 차지하는지 말해 준다.
+    /// 카드 한 장이 각 등급일 확률. 합은 100% 다.
     private func oddsTable(_ l: L) -> some View {
         let odds = PackOpening.packOdds(setID: set.id, index: index)
         let pool = index.pools[set.id] ?? [:]
@@ -190,12 +189,9 @@ private struct PackDetailView: View {
                     Text("\(owned)/\(all)")
                         .font(.system(size: 10)).foregroundStyle(.tertiary).monospacedDigit()
                     Spacer()
-                    Text(percentText(entry.packProbability))
+                    Text(percentText(entry.probability))
                         .font(.system(size: 10, weight: .semibold)).monospacedDigit()
-                        .frame(width: 44, alignment: .trailing)
-                    Text(String(format: "%.2f", entry.expectedPerPack))
-                        .font(.system(size: 10)).foregroundStyle(.secondary).monospacedDigit()
-                        .frame(width: 32, alignment: .trailing)
+                        .frame(width: 48, alignment: .trailing)
                 }
             }
         }

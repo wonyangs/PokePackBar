@@ -91,9 +91,8 @@ extension L {
     var packCollected: String { t2("수집률", "Collected", "収集率", "Recolectadas", "Collectées", "Coletadas") }
     var packOdds: String { t2("등급별 확률", "Odds by rarity", "レアリティ別確率",
                               "Probabilidad por rareza", "Probabilité par rareté", "Chance por raridade") }
-    var packOddsColumns: String { t2("팩당 확률 · 기대 장수", "Per pack · expected",
-                                     "1パックあたり · 期待枚数", "Por sobre · esperado",
-                                     "Par booster · attendu", "Por pacote · esperado") }
+    var packOddsColumns: String { t2("카드 한 장 기준", "Per card", "カード1枚あたり",
+                                     "Por carta", "Par carte", "Por carta") }
     var packQuantity: String { t2("수량", "Quantity", "数量", "Cantidad", "Quantité", "Quantidade") }
     func buyCount(_ n: Int) -> String {
         t2("\(n)개 구매", "Buy \(n)", "\(n)個 購入", "Comprar \(n)", "Acheter \(n)", "Comprar \(n)")
@@ -153,9 +152,6 @@ extension L {
            "Recycle \(count) pour \(tokens) tokens. Un exemplaire reste.",
            "Recicle \(count) por \(tokens) tokens. Uma cópia fica.")
     }
-    var disenchantNeedsSpare: String { t2("두 장부터 갈 수 있어요", "Needs a spare copy",
-                                          "2枚目から分解できます", "Necesitas una repetida",
-                                          "Il faut un double", "Precisa de uma repetida") }
     func disenchantDone(_ tokens: String) -> String {
         t2("+\(tokens) 토큰", "+\(tokens) tokens", "+\(tokens) トークン",
            "+\(tokens) tokens", "+\(tokens) tokens", "+\(tokens) tokens")

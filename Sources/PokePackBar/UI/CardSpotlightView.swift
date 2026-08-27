@@ -98,7 +98,7 @@ struct CardSpotlightView: View {
     /// 중복분을 갈아 토큰으로 돌려받는다.
     ///
     /// 마지막 한 장은 남긴다 — 수집한 카드가 컬렉션에서 사라지는 것은 되돌릴 수 없다.
-    /// 그래서 한 장뿐이면 버튼 자체가 뜨지 않고, 왜 못 가는지만 알려 준다.
+    /// 한 장뿐이면 아무것도 뜨지 않는다.
     /// 확인은 인라인이다(`.alert` 금지 — 팝오버가 닫히면 고아 시트가 남는다).
     @ViewBuilder
     private func disenchantControls(_ l: L) -> some View {
@@ -110,10 +110,9 @@ struct CardSpotlightView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.green)
         } else if spare <= 0 {
-            if ownedCount > 0 {
-                Text(l.disenchantNeedsSpare)
-                    .font(.caption2).foregroundStyle(.tertiary)
-            }
+            // 갈 것이 없으면 아무것도 보여주지 않는다. 못 하는 이유를 적어 두면
+            // 대부분의 카드에서 쓸모없는 줄만 남는다.
+            EmptyView()
         } else if confirmingDisenchant {
             VStack(spacing: 5) {
                 Text(l.disenchantConfirm(spare, TokenFormatter.grouped(refund)))
