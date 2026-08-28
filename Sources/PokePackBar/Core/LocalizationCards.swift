@@ -244,6 +244,9 @@ extension L {
                                "Une boîte de 100 cartes tirées de tous les sets. Chaque tirage retire la carte.",
                                "Uma caixa de 100 cartas de todos os sets. Cada tiragem remove a carta.") }
     var oripaPull: String { t2("뽑기", "Pull", "引く", "Tirar", "Tirer", "Tirar") }
+    var oripaDrawing: String { t2("뽑는 중", "Drawing", "抽選中", "Sacando", "Tirage", "Sorteando") }
+    var oripaSeeDetail: String { t2("자세히 보기", "See details", "詳しく見る",
+                                    "Ver detalles", "Voir la carte", "Ver detalhes") }
     var oripaContents: String { t2("박스에 남은 카드", "Left in the box", "箱の残り",
                                    "Quedan en la caja", "Reste dans la boîte", "Resta na caixa") }
     func oripaRemaining(_ left: Int, _ total: Int) -> String {

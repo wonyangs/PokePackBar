@@ -263,7 +263,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             popover.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
             store.requestNotificationAuthorizationIfNeeded()   // 알림 권한은 사용자가 앱을 처음 열 때 요청
-            Task { await updater.check() }   // 팝오버 열 때 재확인(내부 minInterval 디바운스)
+            // 팝오버를 열 때마다 확인한다. 하한은 1분 — GitHub 무인증 한도가 시간당 60회라
+            // 이보다 짧게 잡을 수 없다(UpdateChecker.minimumCheckInterval).
+            Task { await updater.check() }
         }
     }
 

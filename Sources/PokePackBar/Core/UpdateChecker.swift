@@ -16,24 +16,49 @@ final class UpdateChecker {
     private let clock: () -> Date
     private var lastChecked: Date?
 
-    init(currentVersion: String? = nil, clock: @escaping () -> Date = Date.init) {
+    /// 릴리스 조회. 테스트가 실패를 재현할 수 있게 주입받는다 —
+    /// 실패했을 때 잠금이 걸리는지가 이 클래스에서 가장 잘 틀리는 부분이다.
+    private let fetch: (URLRequest) async -> (Data, URLResponse)?
+
+    init(currentVersion: String? = nil, clock: @escaping () -> Date = Date.init,
+         fetch: @escaping (URLRequest) async -> (Data, URLResponse)? = {
+             try? await URLSession.shared.data(for: $0)
+         }) {
         self.currentVersion = currentVersion
             ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "0"
         self.clock = clock
+        self.fetch = fetch
     }
+
+    /// 조회 간격(초). 팝오버를 열 때 이보다 오래됐으면 다시 확인한다.
+    ///
+    /// GitHub REST API 는 **인증 없이 IP 당 시간당 60회**다. 1분 간격이 그 한도와 정확히
+    /// 같아 여유가 0 이므로 5분으로 둔다 — 최악에도 시간당 12회라 한도의 20% 만 쓴다.
+    /// 여유가 필요한 이유는 같은 IP 를 쓰는 다른 것들 때문이다. 공유 회선이나 사무실 NAT
+    /// 뒤에서는 60회를 한 사람이 다 쓰지 않는다. 한도를 넘기면 403 이 돌아오고 그 시간 동안
+    /// 업데이트 확인이 통째로 죽는다 — 자주 확인하려다 아예 못 하게 된다.
+    ///
+    /// 조건부 요청(ETag)으로 아끼는 방법은 **인증한 요청에만** 적용돼서 토큰이 없는 앱에는
+    /// 소용이 없다(304 도 한도를 깎는다).
+    ///
+    /// 배경 타이머는 두지 않는다. 업데이트 배지는 팝오버 안에만 있어서 닫혀 있는 동안 조회해도
+    /// 보여 줄 곳이 없고, 상시 네트워크 깨우기는 메뉴바 앱의 idle 규율과도 어긋난다.
+    nonisolated static let minimumCheckInterval: TimeInterval = 300
+
+    /// GitHub 무인증 한도가 정하는 절대 하한(초). 이보다 짧으면 403 을 맞는다.
+    nonisolated static let rateLimitFloor: TimeInterval = 60
 
     /// 최신 릴리스 조회 → 새 버전이고 사용자가 그 버전을 'skip' 하지 않았으면 available 설정.
     /// minInterval 보다 자주 호출되면 무시(레이트리밋 보호).
-    func check(minInterval: TimeInterval = 1800) async {
+    func check(minInterval: TimeInterval = UpdateChecker.minimumCheckInterval) async {
         // 저장소가 정해지기 전에는 확인하지 않는다. 켜 두면 없는 곳에 30분마다 요청만 나가고,
         // 실패해도 조용히 no-op 이라 증상이 드러나지 않는다.
         guard AppLinks.updatesConfigured else { return }
         if let last = lastChecked, clock().timeIntervalSince(last) < minInterval { return }
-        lastChecked = clock()
         guard let url = AppLinks.latestReleaseAPI else { return }
         var req = URLRequest(url: url, timeoutInterval: 15)
         req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+        guard let (data, resp) = await fetch(req),
               (resp as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let tag = json["tag_name"] as? String,
@@ -41,6 +66,13 @@ final class UpdateChecker {
               // 응답 필드가 NSWorkspace.open 으로 가므로 https + github.com 만 허용(스킴 하이재킹 방지)
               let htmlURL = URL(string: html), htmlURL.scheme == "https", htmlURL.host == "github.com"
         else { return }
+
+        // **성공했을 때만** 시각을 기록한다. 요청 전에 찍으면 실패한 확인도 30분 잠금을 걸어,
+        // 기동 직후 네트워크가 아직 안 올라온 한 번의 실패로 그 뒤 팝오버를 열어도 30분간
+        // 아무 일이 없다. 테스터가 메인 화면에 업데이트가 안 뜬다고 보고한 것이 이 경로다
+        // (설정의 수동 확인은 minInterval 0 이라 잠금을 지나쳐 그때만 떴다).
+        lastChecked = clock()
+
         let latest = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
         let skipped = UserDefaults.standard.string(forKey: "skippedUpdateVersion")
         if Self.isNewer(latest, than: currentVersion), latest != skipped {

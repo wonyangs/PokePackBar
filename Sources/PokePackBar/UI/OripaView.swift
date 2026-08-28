@@ -12,6 +12,8 @@ struct OripaView: View {
 
     /// 크게 보고 있는 카드. 방금 뽑은 것일 수도, 박스에서 눌러 본 것일 수도 있다.
     @State private var focused: String?
+    /// 방금 뽑은 카드. 연출이 끝날 때까지 이 화면이 덮는다.
+    @State private var drawn: PulledCard?
     /// 박스를 다 비웠는가. 새 박스가 들어왔다는 안내를 한 번 띄운다.
     @State private var refilled = false
     /// 교체를 누른 직후. 확인을 인라인으로 받는다(`.alert` 금지 — 팝오버가 닫히면 고아 시트가 남는다).
@@ -20,7 +22,11 @@ struct OripaView: View {
     private var box: OripaBox { wallet.oripaBox(index: index) }
 
     var body: some View {
-        if let focused, let entry = index.card(focused) {
+        if let drawn {
+            OripaDrawView(wallet: wallet, card: drawn,
+                          onDetail: { focused = drawn.id; self.drawn = nil },
+                          onDone: { self.drawn = nil })
+        } else if let focused, let entry = index.card(focused) {
             CardSpotlightView(wallet: wallet, cardID: entry.id, name: entry.name,
                               tier: entry.tier, setID: entry.setID,
                               setName: index.set(entry.setID)?.name ?? entry.setID,
@@ -178,6 +184,88 @@ struct OripaView: View {
         confirmingReplace = false
         guard let result = wallet.pullOripa(index: index) else { return }
         refilled = wallet.oripaBox(index: index).remaining == OripaConfig.slotsPerBox
-        focused = result.card.id
+        drawn = result.card
+    }
+}
+
+/// 뽑는 순간. 카드가 바로 뜨면 무엇을 뽑았다는 감각이 없어서, 잠깐 가려 두었다가 연다.
+///
+/// 팩 개봉과 같은 장치를 쓴다 — 등급 후광이 먼저 부풀고 카드가 튀어나온다.
+/// 다만 오리파는 한 장짜리라 연출이 끝나면 바로 결과를 읽을 수 있게 둔다.
+@MainActor
+private struct OripaDrawView: View {
+    let wallet: WalletStore
+    let card: PulledCard
+    let onDetail: () -> Void
+    let onDone: () -> Void
+
+    /// 가림막이 걷혔는가. 걷히기 전까지는 카드가 보이지 않는다.
+    @State private var opened = false
+    @State private var pulse = false
+
+    private static let suspense = Duration.milliseconds(650)
+
+    var body: some View {
+        let l = wallet.l
+        VStack(spacing: 10) {
+            Spacer(minLength: 0)
+
+            ZStack {
+                TierGlow(tier: card.tier, width: 170)
+                    .opacity(opened ? 1 : 0)
+
+                if opened {
+                    CardImageView(cardID: card.id, hires: true, width: 170)
+                        .shadow(radius: 10, y: 4)
+                        .transition(.scale(scale: 0.55).combined(with: .opacity))
+                } else {
+                    // 가림막. 등급을 알 수 없게 두어 열리기 전까지 긴장을 남긴다.
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color.orange.opacity(0.22))
+                        .overlay {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 34)).foregroundStyle(Color.orange)
+                        }
+                        .frame(width: 170, height: (170 / 0.717).rounded())
+                        .scaleEffect(pulse ? 1.04 : 0.96)
+                        .shadow(color: .orange.opacity(0.5), radius: pulse ? 22 : 8)
+                }
+            }
+
+            if opened {
+                VStack(spacing: 2) {
+                    Text(l.tierBadge(card.tier))
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(tierColor(card.tier))
+                    Text(l.tierName(card.tier)).font(.caption2).foregroundStyle(.secondary)
+                    if card.isNew { NewBadge(text: l.newCardBadge).padding(.top, 2) }
+                }
+                .transition(.opacity)
+            } else {
+                Text(l.oripaDrawing).font(.caption).foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+
+            if opened {
+                HStack(spacing: 8) {
+                    Button(l.oripaSeeDetail, action: onDetail)
+                        .buttonStyle(.bordered).controlSize(.small)
+                    Button(l.done, action: onDone)
+                        .buttonStyle(.borderedProminent).controlSize(.small)
+                }
+                .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: card.id) {
+            opened = false
+            withAnimation(.easeInOut(duration: 0.32).repeatForever(autoreverses: true)) {
+                pulse = true
+            }
+            try? await Task.sleep(for: Self.suspense)
+            guard !Task.isCancelled else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.62)) { opened = true }
+        }
     }
 }
