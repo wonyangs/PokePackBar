@@ -281,6 +281,64 @@ final class WalletStore {
         save()
     }
 
+    // MARK: 오리파
+
+    /// 지금 걸려 있는 박스. 없으면 새로 채운다.
+    ///
+    /// 화면을 그릴 때마다 호출되므로 이미 있으면 그대로 돌려준다. 박스를 새로 채우는 것은
+    /// 처음 열 때와 다 팔렸을 때뿐이다.
+    func oripaBox(index: CardIndex) -> OripaBox {
+        if let box = state.oripa, !box.isEmpty { return box }
+        var generator = SystemRandomNumberGenerator()
+        let box = Oripa.makeBox(index: index, serial: (state.oripa?.serial ?? 0) + 1,
+                                using: &generator)
+        state.oripa = box
+        save()
+        return box
+    }
+
+    /// 박스를 버리고 새로 받는다. 값은 받지 않는다.
+    ///
+    /// 마음에 안 드는 박스를 비우려면 100슬롯을 다 사야 한다면, 그건 30억을 태워야 진열이
+    /// 바뀐다는 뜻이라 기능이 아니라 함정이다. 실제 오리파 사이트도 박스를 여러 개 늘어놓고
+    /// 고르게 한다.
+    ///
+    /// 무료로 둬도 기댓값이 오르지 않는다 — 뽑기는 남은 슬롯에서 균등 추첨이라 새 박스든
+    /// 뽑던 박스든 한 번 뽑기의 기댓값이 같다. 교체로 얻는 것은 "원하는 카드가 든 박스를
+    /// 고를 수 있다" 는 것뿐이고, 그 카드를 실제로 뽑으려면 여전히 100슬롯을 헤쳐야 한다.
+    func replaceOripaBox(index: CardIndex) {
+        var generator = SystemRandomNumberGenerator()
+        let serial = (state.oripa?.serial ?? 0) + 1
+        state.oripa = Oripa.makeBox(index: index, serial: serial, using: &generator)
+        save()
+        AppLog.write("oripa box replaced serial=\(serial)")
+    }
+
+    /// 오리파 슬롯 값. 팩 할인 혜택이 여기에도 걸린다 — 같은 상점에서 사는 물건이다.
+    func oripaPrice() -> Int {
+        let base = OripaConfig.slotPrice
+        guard perks.packDiscount > 0 else { return base }
+        return max(1, Int((Double(base) * (1 - perks.packDiscount)).rounded()))
+    }
+
+    /// 한 슬롯을 뽑는다. 잔액이 모자라면 아무것도 하지 않고 nil.
+    ///
+    /// 차감을 먼저 한다. 뽑기가 먼저면 실패했을 때 카드만 나가고 값을 못 받는다.
+    @discardableResult
+    func pullOripa(index: CardIndex) -> (card: PulledCard, completions: [DexCompletion])? {
+        var box = oripaBox(index: index)
+        guard !box.isEmpty, spend(oripaPrice()) else { return nil }
+
+        var generator = SystemRandomNumberGenerator()
+        guard let id = Oripa.pull(from: &box, using: &generator) else { return nil }
+        let isNew = cardCount(id) == 0
+        state.oripa = box
+        let completions = collect([id])   // 저장까지 여기서 한다
+        AppLog.write("oripa pulled \(id) box=\(box.serial) remaining=\(box.remaining)")
+        return (PulledCard(id: id, tier: index.card(id)?.tier ?? .doubleRare, isNew: isNew),
+                completions)
+    }
+
     // MARK: 조합 도감
 
     /// 보상까지 받은 도감. 혜택은 이 목록에서만 나온다.

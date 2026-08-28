@@ -129,10 +129,10 @@ final class BundledDexTests: XCTestCase {
 /// 진행·완성 판정은 순수 함수다. 화면 없이 전부 검증한다.
 final class DexProgressTests: XCTestCase {
 
-    private func dex(_ id: String, _ cards: [String], tier: Int = 2,
+    private func dex(_ id: String, _ cards: [String], tier: Int = 2, packs: Int = 10,
                      perk: DexPerk? = nil) -> Dex {
         Dex(id: id, name: DexText(ko: id, en: id), blurb: DexText(ko: "", en: ""),
-            homeSet: "s", cards: cards, tier: tier, medianPacks: 10,
+            homeSet: "s", cards: cards, tier: tier, medianPacks: packs,
             reward: DexReward(packs: 3, perks: perk.map { [$0] } ?? []))
     }
 
@@ -196,16 +196,30 @@ final class DexProgressTests: XCTestCase {
         XCTAssertEqual(fresh.map(\.id), ["hard", "mid", "easy"])
     }
 
-    /// 목록 순서 — 받을 것이 맨 위, 받은 것이 맨 아래, 나머지는 완성에 가까운 순.
-    func testSortedPutsClaimableFirstAndClaimedLast() {
-        let owned: Set<String> = ["a", "b"]
+    /// 목록 순서 — 어려운 것부터, 같은 난이도면 카드가 적은 것부터.
+    func testSortedRunsHardestFirstThenShortest() {
         let statuses = DexProgress.statuses(
-            dexes: [dex("done", ["a"]), dex("far", ["x", "y", "z"]),
-                    dex("ready", ["a", "b"]), dex("oneAway", ["a", "b", "z"]),
-                    dex("twoAway", ["a", "x", "y"])],
-            owned: { owned.contains($0) }, claimed: ["done"])
+            dexes: [dex("hard", ["a"], tier: 4, packs: 200),
+                    dex("easy", ["a"], tier: 1, packs: 9),
+                    dex("midLong", ["a", "b", "c"], tier: 2, packs: 20),
+                    dex("midShort", ["a", "b"], tier: 2, packs: 40)],
+            owned: { _ in false }, claimed: [])
         XCTAssertEqual(DexProgress.sorted(statuses).map(\.id),
-                       ["ready", "oneAway", "twoAway", "far", "done"])
+                       ["hard", "midShort", "midLong", "easy"],
+                       "같은 난이도면 팩 수보다 카드 장수가 먼저다")
+    }
+
+    /// 진행 상태는 순서를 바꾸지 않는다. 카드를 얻을 때마다 목록이 재배열되면
+    /// 어제 보던 도감을 매번 다시 찾아야 한다.
+    func testProgressDoesNotReorderTheList() {
+        let dexes = [dex("a", ["x"], tier: 2, packs: 20),
+                     dex("b", ["y"], tier: 2, packs: 30),
+                     dex("c", ["z"], tier: 2, packs: 40)]
+        let empty = DexProgress.sorted(DexProgress.statuses(dexes: dexes,
+                                                            owned: { _ in false }, claimed: []))
+        let mixed = DexProgress.sorted(DexProgress.statuses(dexes: dexes,
+                                                            owned: { $0 == "z" }, claimed: ["a"]))
+        XCTAssertEqual(empty.map(\.id), mixed.map(\.id))
     }
 }
 
@@ -631,5 +645,129 @@ final class DexPerkRoutingTests: XCTestCase {
             도감 혜택을 전달하지 않는 호출부가 있다. 표시와 실제 동작이 갈라진다.
             perks: wallet.perks 를 넘긴다: \(offenders.joined(separator: ", "))
             """)
+    }
+}
+
+/// 오리파 — 재고가 유한한 뽑기.
+@MainActor
+final class OripaTests: XCTestCase {
+
+    private var dir: URL!
+
+    override func setUp() {
+        super.setUp()
+        dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("oripa-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        super.tearDown()
+    }
+
+    private func makeStore() -> WalletStore {
+        WalletStore(fileURL: dir.appendingPathComponent("game-state.json"), dexes: [])
+    }
+
+    /// 박스는 구성표대로 채워지고 같은 카드가 두 번 들어가지 않는다.
+    /// 중복이 섞이면 "100슬롯을 다 사면 박스 안의 것을 전부 갖는다" 는 약속이 깨진다.
+    func testBoxMatchesTheCompositionWithoutDuplicates() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        var g = SeededGenerator(seed: 11)
+        let box = Oripa.makeBox(index: index, serial: 1, using: &g)
+
+        XCTAssertEqual(box.slots.count, OripaConfig.slotsPerBox)
+        XCTAssertEqual(Set(box.slots).count, box.slots.count, "같은 카드가 두 번 들어갔다")
+        for entry in OripaConfig.composition {
+            let actual = box.slots.filter { index.card($0)?.tier == entry.tier }.count
+            XCTAssertEqual(actual, entry.count, "\(entry.tier) 장수가 구성과 다르다")
+        }
+        XCTAssertTrue(box.slots.allSatisfy { (index.card($0)?.tier.rank ?? 0) >= CardTier.doubleRare.rank },
+                      "RR 미만이 섞였다")
+    }
+
+    /// 뽑으면 그 카드가 박스에서 빠진다. 재고가 줄지 않으면 오리파가 아니라 그냥 비싼 팩이다.
+    func testPullRemovesTheSlot() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        var g = SeededGenerator(seed: 3)
+        var box = Oripa.makeBox(index: index, serial: 1, using: &g)
+        let before = box.remaining
+
+        let pulled = try XCTUnwrap(Oripa.pull(from: &box, using: &g))
+        XCTAssertEqual(box.remaining, before - 1)
+        XCTAssertFalse(box.slots.contains(pulled))
+    }
+
+    /// 박스를 끝까지 비우면 처음 들어 있던 것을 전부 얻는다.
+    func testEmptyingTheBoxYieldsEverythingInIt() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        var g = SeededGenerator(seed: 7)
+        var box = Oripa.makeBox(index: index, serial: 1, using: &g)
+        let planted = Set(box.slots)
+
+        var got: Set<String> = []
+        while let id = Oripa.pull(from: &box, using: &g) { got.insert(id) }
+        XCTAssertEqual(got, planted)
+        XCTAssertNil(Oripa.pull(from: &box, using: &g), "빈 박스에서 더 나오면 안 된다")
+    }
+
+    /// 값을 못 내면 카드도 나가지 않는다.
+    func testPullRejectedWithoutTokens() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let s = makeStore()
+        XCTAssertNil(s.pullOripa(index: index))
+        XCTAssertEqual(s.totalCardCount, 0)
+        XCTAssertEqual(s.oripaBox(index: index).remaining, OripaConfig.slotsPerBox)
+    }
+
+    /// 뽑은 카드는 수집함에 들어가고 값은 차감된다. 박스는 재시작해도 남아 있어야 한다 —
+    /// 매번 새로 채워지면 UR 이 남을 때까지 앱을 껐다 켜는 것이 최적 전략이 된다.
+    func testPullSpendsCollectsAndPersists() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let s = makeStore()
+        s.update(todayTokensByProvider: ["p": 0], todayDate: "2026-08-28", hasUsageData: true)
+        s.update(todayTokensByProvider: ["p": 500_000_000], todayDate: "2026-08-28", hasUsageData: true)
+
+        let before = s.availableTokens
+        let result = try XCTUnwrap(s.pullOripa(index: index))
+        XCTAssertEqual(s.availableTokens, before - OripaConfig.slotPrice)
+        XCTAssertEqual(s.cardCount(result.card.id), 1)
+
+        let remaining = s.oripaBox(index: index).slots
+        let reloaded = WalletStore(fileURL: dir.appendingPathComponent("game-state.json"), dexes: [])
+        XCTAssertEqual(reloaded.oripaBox(index: index).slots, remaining, "박스가 재시작에 살아남지 않았다")
+    }
+
+    /// 마음에 안 드는 박스는 값 없이 버릴 수 있어야 한다.
+    ///
+    /// 100슬롯을 다 사야 진열이 바뀐다면 30억을 태워야 한다는 뜻이라 함정이 된다.
+    /// 교체가 기댓값을 올리지 않는 근거: 뽑기는 남은 슬롯에서 균등 추첨이라
+    /// 새 박스든 뽑던 박스든 한 번 뽑기의 기대 등급 분포가 같다.
+    func testBoxCanBeReplacedForFree() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let s = makeStore()
+        let before = s.oripaBox(index: index)
+        let tokens = s.availableTokens
+
+        s.replaceOripaBox(index: index)
+        let after = s.oripaBox(index: index)
+        XCTAssertEqual(after.serial, before.serial + 1)
+        XCTAssertEqual(after.remaining, OripaConfig.slotsPerBox, "새 박스는 가득 차 있어야 한다")
+        XCTAssertEqual(s.availableTokens, tokens, "교체에 값을 받으면 안 된다")
+        XCTAssertNotEqual(after.slots, before.slots, "내용이 그대로면 교체가 아니다")
+    }
+
+    /// 갈아서 버는 경로가 되면 안 된다. 오리파 한 슬롯의 기대 환급이 값보다 한참 낮아야 한다.
+    func testOripaIsNeverWorthGrinding() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let dust = OripaConfig.composition.reduce(0) {
+            $0 + Double($1.count) * Double(CardDust.value(for: $1.tier, perks: DexPerks.caps))
+        }
+        let paid = Double(OripaConfig.slotsPerBox * OripaConfig.slotPrice)
+            * (1 - DexPerks.caps.packDiscount)
+        XCTAssertLessThan(dust / paid, 0.5,
+                          "혜택 최대일 때 환급이 값의 절반을 넘으면 오리파가 수익원이 된다")
+        _ = index
     }
 }

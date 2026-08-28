@@ -65,6 +65,21 @@ enum PackConfig {
     /// 특별 팩의 장수. 전 슬롯이 가중 추첨이라 혜택은 장수를 늘리는 것으로 나타난다.
     static func specialPackSize(_ perks: DexPerks) -> Int { specialPackSize + perks.extraHitSlot }
 
+    /// 갓팩 — 이 확률로 팩 전체가 레어 이상이 된다. `1/godPackOneIn`.
+    ///
+    /// 실물 일본판은 1/600~1/2000 으로 추정되고 포켓몬 TCG 포켓은 0.05%(1/2000)다.
+    /// 그보다 후하게 잡은 이유는 규모 때문이다 — 이 앱은 하루 스무 팩 남짓이라
+    /// 1/2000 이면 백 일에 한 번이고, 그건 있는 줄도 모르는 기능이 된다.
+    static let godPackOneIn = 300
+
+    /// 갓팩의 등급 가중치. 하한만 올리는 것이 아니라 **상한 쪽도 함께 올린다** —
+    /// 포켓몬 TCG 포켓도 갓팩에서 최상위 등급 확률을 0.05% 에서 5% 로 끌어올린다.
+    /// 전 칸이 레어 이상이면서 위쪽이 두꺼워야 "터졌다" 는 느낌이 난다.
+    static let godWeights: [(tier: CardTier, weight: Int)] = [
+        (.rare, 25), (.doubleRare, 30), (.artRare, 15), (.tripleRare, 12),
+        (.superRare, 10), (.specialArtRare, 5), (.ultraRare, 3),
+    ]
+
     /// 천장 — 레어 이상 칸에서 이 횟수만큼 연속으로 레어만 나오면 다음은 RR 이상을 보장한다.
     ///
     /// 기본 확률로는 RR 이상이 45% 라 다섯 번 연속 레어만 나올 확률이 5% 다. 드물지만
@@ -167,6 +182,15 @@ enum CardDust {
     }
 }
 
+/// 팩 개봉 결과. 카드와 함께 이 팩이 갓팩이었는지 알려 준다.
+struct OpenedCards: Equatable, Sendable {
+    let cards: [PulledCard]
+    /// 전 칸이 레어 이상으로 나온 팩. 개봉 연출이 이걸 보고 다르게 움직인다.
+    let isGodPack: Bool
+
+    static let empty = OpenedCards(cards: [], isGodPack: false)
+}
+
 /// 팩 개봉 결과 카드 1장.
 struct PulledCard: Equatable, Sendable, Identifiable {
     let id: String        // 카드 ID
@@ -196,7 +220,7 @@ enum PackOpening {
     ) -> [PulledCard] {
         var ignored = 0
         return draw(setID: setID, index: index, alreadyOwned: alreadyOwned, perks: perks,
-                    pity: &ignored, using: &generator)
+                    pity: &ignored, using: &generator).cards
     }
 
     /// - Parameter pity: 레어 이상 칸에서 연속으로 레어만 나온 횟수. 이 값이 상한에 닿으면
@@ -209,8 +233,8 @@ enum PackOpening {
         perks: DexPerks = .none,
         pity: inout Int,
         using generator: inout some RandomNumberGenerator
-    ) -> [PulledCard] {
-        guard let pool = index.pools[setID], !pool.isEmpty else { return [] }
+    ) -> OpenedCards {
+        guard let pool = index.pools[setID], !pool.isEmpty else { return .empty }
 
         // common 이 없는 세트는 일반 팩 구성을 쓸 수 없다. 전 슬롯을 가중 추첨한다.
         if (pool[.common] ?? []).isEmpty {
@@ -224,25 +248,38 @@ enum PackOpening {
                 picked.append(PulledCard(id: id, tier: index.card(id)?.tier ?? tier,
                                          isNew: !alreadyOwned.contains(id)))
             }
-            return picked
+            // 특별 세트는 원래 전 칸이 레어 이상이라 갓팩 개념이 없다.
+            return OpenedCards(cards: picked, isGodPack: false)
         }
 
-        // 모든 칸을 추첨한다. 칸 종류마다 확률표가 다를 뿐, 어떤 칸에서도 상위 등급이 나온다.
+        // 갓팩 판정을 먼저 한다. 걸리면 전 칸이 갓팩 표에서 나온다.
+        let isGod = generator.next(upperBound: UInt64(PackConfig.godPackOneIn)) == 0
         var requests: [CardTier] = []
-        for (weights, count) in [(PackConfig.generalWeights, PackConfig.generalSlots),
-                                 (PackConfig.upperWeights, PackConfig.upperSlots),
-                                 (PackConfig.foilWeights, PackConfig.foilSlots)] {
-            for _ in 0..<count {
-                requests.append(weightedTier(PackConfig.weights(weights, perks: perks),
-                                             available: pool, using: &generator))
-            }
-        }
 
-        // 마지막 칸은 레어 이상만 뽑는다. 천장이 걸려 있으면 RR 이상으로 올린다.
-        for _ in 0..<PackConfig.hitSlotCount(perks) {
-            requests.append(hitTier(available: pool, perks: perks, pity: pity, using: &generator))
+        if isGod {
+            let weights = PackConfig.weights(PackConfig.godWeights, perks: perks)
+            for _ in 0..<PackPricing.cardCount(setID: setID, index: index, perks: perks) {
+                requests.append(weightedTier(weights, available: pool, using: &generator))
+            }
+            // 갓팩은 레어 이상만 나오므로 천장을 다시 채울 이유가 없다.
+            pity = 0
+        } else {
+            // 모든 칸을 추첨한다. 칸 종류마다 확률표가 다를 뿐, 어떤 칸에서도 상위 등급이 나온다.
+            for (weights, count) in [(PackConfig.generalWeights, PackConfig.generalSlots),
+                                     (PackConfig.upperWeights, PackConfig.upperSlots),
+                                     (PackConfig.foilWeights, PackConfig.foilSlots)] {
+                for _ in 0..<count {
+                    requests.append(weightedTier(PackConfig.weights(weights, perks: perks),
+                                                 available: pool, using: &generator))
+                }
+            }
+
+            // 마지막 칸은 레어 이상만 뽑는다. 천장이 걸려 있으면 RR 이상으로 올린다.
+            for _ in 0..<PackConfig.hitSlotCount(perks) {
+                requests.append(hitTier(available: pool, perks: perks, pity: pity, using: &generator))
+            }
+            pity = Self.nextPity(after: requests.suffix(PackConfig.hitSlotCount(perks)), from: pity)
         }
-        pity = Self.nextPity(after: requests.suffix(PackConfig.hitSlotCount(perks)), from: pity)
 
         var picked: [PulledCard] = []
         var usedInThisPack: Set<String> = []
@@ -252,7 +289,8 @@ enum PackOpening {
             // 중복 회피 — 레어 이상 칸에서 이미 가진 카드가 나오면 한 번 다시 뽑는다.
             // 카드 장수도 등급 분포도 그대로라 가루 경제에 영향이 없고, 안 가진 카드가
             // 나올 확률만 오른다. 방금 나온 카드는 후보에서 빼 같은 카드가 다시 나오지 않게 한다.
-            if perks.duplicateGuard, slot >= requests.count - PackConfig.hitSlotCount(perks),
+            let guardedSlot = isGod || slot >= requests.count - PackConfig.hitSlotCount(perks)
+            if perks.duplicateGuard, guardedSlot,
                alreadyOwned.contains(id),
                let retry = pick(tier: tier, from: pool,
                                 avoiding: usedInThisPack.union([id]), using: &generator) {
@@ -262,7 +300,7 @@ enum PackOpening {
             let actualTier = index.card(id)?.tier ?? tier
             picked.append(PulledCard(id: id, tier: actualTier, isNew: !alreadyOwned.contains(id)))
         }
-        return picked
+        return OpenedCards(cards: picked, isGodPack: isGod)
     }
 
     /// 카드 한 장이 각 등급일 확률. 모든 등급을 더하면 1 이다.
@@ -285,24 +323,30 @@ enum PackOpening {
 
         var expected: [CardTier: Double] = [:]
 
-        func addWeighted(_ weights: [(tier: CardTier, weight: Int)], slots: Int) {
+        func addWeighted(_ weights: [(tier: CardTier, weight: Int)], slots: Double) {
             let available = weights.filter { !(pool[$0.tier] ?? []).isEmpty }
             let total = available.reduce(0) { $0 + $1.weight }
             guard total > 0, slots > 0 else { return }
             for entry in available {
                 let p = Double(entry.weight) / Double(total)
-                expected[entry.tier, default: 0] += p * Double(slots)
+                expected[entry.tier, default: 0] += p * slots
             }
         }
 
         if (pool[.common] ?? []).isEmpty {
             // 특별 세트 — 전 슬롯이 가중 추첨이다.
             addWeighted(PackConfig.weights(PackConfig.specialWeights, perks: perks),
-                        slots: PackConfig.specialPackSize(perks))
+                        slots: Double(PackConfig.specialPackSize(perks)))
         } else {
+            // 갓팩을 섞는다. 표시된 확률이 실제 결과와 갈라지지 않으려면 여기에도 들어가야 한다.
+            // 도감 난이도도 이 값에서 나오므로 빼먹으면 난이도가 조용히 어긋난다.
+            let godChance = 1.0 / Double(PackConfig.godPackOneIn)
+            let cards = PackPricing.cardCount(setID: setID, index: index, perks: perks)
             for (weights, count) in Self.standardSlotTables(perks: perks) {
-                addWeighted(weights, slots: count)
+                addWeighted(weights, slots: Double(count) * (1 - godChance))
             }
+            addWeighted(PackConfig.weights(PackConfig.godWeights, perks: perks),
+                        slots: Double(cards) * godChance)
         }
 
         let cardsPerPack = expected.values.reduce(0, +)

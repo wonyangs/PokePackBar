@@ -42,16 +42,23 @@ enum DexProgress {
         dexes.map { status(for: $0, owned: owned, claimed: claimed.contains($0.id)) }
     }
 
-    /// 표시 순서.
+    /// 표시 순서 — 어려운 것부터. 같은 난이도면 카드가 적고 빨리 끝나는 것이 먼저다.
     ///
-    /// 받을 보상이 있는 것을 맨 위로 올린다. 그 다음은 완성에 가까운 순서다 —
-    /// 다음에 무엇을 노려야 하는지가 위에서부터 읽혀야 한다. 수령까지 끝난 것은 맨 아래.
+    /// 목표가 되는 조합이 위에 있어야 한다. 최고 난도는 두 개뿐이라 아래로 내려가면
+    /// 스크롤 끝에 묻힌다.
+    ///
+    /// 진행 상태로는 정렬하지 않는다. 카드를 얻을 때마다 목록이 재배열되면 어제 보던
+    /// 도감이 어디 갔는지 매번 다시 찾아야 한다. 받을 보상이 있는 도감은 자리를 옮기는
+    /// 대신 테두리와 수령 버튼으로 드러낸다.
     static func sorted(_ statuses: [DexStatus]) -> [DexStatus] {
         statuses.sorted { a, b in
-            if a.isClaimable != b.isClaimable { return a.isClaimable }
-            if a.claimed != b.claimed { return b.claimed }
-            if a.missing.count != b.missing.count { return a.missing.count < b.missing.count }
-            if a.dex.tier != b.dex.tier { return a.dex.tier < b.dex.tier }
+            if a.dex.tier != b.dex.tier { return a.dex.tier > b.dex.tier }
+            // 같은 난이도면 구성이 짧은 것이 먼저다 — 두 장짜리와 열여섯 장짜리가
+            // 같은 별을 달고 섞여 있으면 어느 쪽이 만만한지 눈으로 가늠할 수 없다.
+            if a.total != b.total { return a.total < b.total }
+            if a.dex.medianPacks != b.dex.medianPacks {
+                return a.dex.medianPacks < b.dex.medianPacks
+            }
             return a.dex.id < b.dex.id
         }
     }

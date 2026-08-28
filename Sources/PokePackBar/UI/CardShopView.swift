@@ -9,8 +9,13 @@ struct CardShopView: View {
     let wallet: WalletStore
     let index: CardIndex?
 
+    /// 상점의 두 갈래. 파는 물건이 아예 다르므로 한 격자에 섞지 않는다 —
+    /// 팩은 세트를 고르는 것이고 오리파는 박스 하나에서 뽑는 것이다.
+    enum Section: CaseIterable { case packs, oripa }
+
     /// 상세를 보고 있는 세트. nil 이면 격자.
     @State private var selectedSet: String?
+    @State private var section: Section = .packs
 
     @Environment(PopoverNavigation.self) private var nav
 
@@ -18,11 +23,18 @@ struct CardShopView: View {
         Group {
             if let index {
                 if let selectedSet, let set = index.set(selectedSet) {
+                    // 상세는 한 단계 들어간 화면이라 갈래 선택을 감춘다.
                     PackDetailView(wallet: wallet, index: index, set: set) {
                         self.selectedSet = nil
                     }
                 } else {
-                    grid(index)
+                    VStack(spacing: 8) {
+                        sectionPicker
+                        switch section {
+                        case .packs: grid(index)
+                        case .oripa: OripaView(wallet: wallet, index: index)
+                        }
+                    }
                 }
             } else {
                 Text(wallet.l.cardIndexMissing)
@@ -43,8 +55,20 @@ struct CardShopView: View {
         .onChange(of: nav.shopSet) { consumeRequestedSet() }
     }
 
+    private var sectionPicker: some View {
+        Picker("", selection: $section) {
+            Text(wallet.l.shopPacksSection).tag(Section.packs)
+            Text(wallet.l.oripaTitle).tag(Section.oripa)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        // 폭을 명시한다 — 상단 탭과 같은 이유다(OS 판마다 기본 크기 정책이 다르다).
+        .frame(maxWidth: .infinity)
+    }
+
     private func consumeRequestedSet() {
         guard let requested = nav.shopSet else { return }
+        section = .packs
         selectedSet = requested
         nav.shopSet = nil
     }
@@ -91,8 +115,9 @@ private struct PackGridCell: View {
                 .font(.caption.weight(.semibold))
                 .lineLimit(2).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(TokenFormatter.grouped(price))
+            Text(TokenFormatter.readable(price, language: wallet.language))
                 .font(.caption2).monospacedDigit()
+                .lineLimit(1).minimumScaleFactor(0.75)
                 .foregroundStyle(wallet.availableTokens >= price ? .secondary : .tertiary)
         }
         .frame(maxWidth: .infinity)
@@ -211,11 +236,14 @@ private struct PackDetailView: View {
                 }
             }
 
-            Text(l.packGuaranteeNote(PackConfig.hitSlotCount(wallet.perks),
-                                     pity: PackConfig.pityThreshold))
-                .font(.system(size: 9)).foregroundStyle(.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(l.packGuaranteeNote(PackConfig.hitSlotCount(wallet.perks),
+                                         pity: PackConfig.pityThreshold))
+                Text(l.godPackNote(PackConfig.godPackOneIn))
+            }
+            .font(.system(size: 9)).foregroundStyle(.tertiary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.top, 2)
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
         .background(Color.secondary.opacity(0.06))
@@ -239,8 +267,9 @@ private struct PackDetailView: View {
                 }
                 .fixedSize()
                 Spacer()
-                Text(TokenFormatter.grouped(total))
+                Text(TokenFormatter.readable(total, language: wallet.language))
                     .font(.caption.weight(.semibold)).monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.75)
                     .foregroundStyle(canBuy ? .primary : .secondary)
             }
             Button(canBuy ? l.buyCount(quantity) : l.notEnoughTokens) { buy() }

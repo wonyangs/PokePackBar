@@ -58,6 +58,10 @@ struct GameState: Codable, Sendable {
     /// 도감 기능이 생기기 전에 이미 모아 둔 카드도 그래야 완성으로 잡힌다.
     var claimedDex: [String] = []
 
+    /// 오리파 박스. 남은 슬롯이 곧 재고라 반드시 영속이어야 한다 —
+    /// 재시작마다 새로 채워지면 UR 이 남을 때까지 앱을 껐다 켜는 것이 최적 전략이 된다.
+    var oripa: OripaBox? = nil
+
     /// 세트별 천장 카운터 — 레어 이상 칸에서 연속으로 레어만 나온 횟수.
     ///
     /// 영속이어야 한다. 재시작마다 0 으로 돌아가면 보장이 사실상 없는 것과 같다.
@@ -119,6 +123,7 @@ struct GameState: Codable, Sendable {
         claimedDex = claimed
         perkTokens = value(.perkTokens, 0)
         packPity = value(.packPity, [:])
+        oripa = try? c.decodeIfPresent(OripaBox.self, forKey: .oripa)
         packGrantTier = value(.packGrantTier, [:])
         packGrantSeeded = value(.packGrantSeeded, false)
         language = value(.language, AppLanguage.systemDefault)

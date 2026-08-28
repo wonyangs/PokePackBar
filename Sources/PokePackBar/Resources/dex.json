@@ -2,30 +2,6 @@
  "version": 1,
  "dexes": [
   {
-   "id": "base1-energy",
-   "name": {
-    "ko": "그 시절 에너지",
-    "en": "Energy of the Era"
-   },
-   "blurb": {
-    "ko": "덱을 굴리려면 이것부터 있어야 했다. 팩마다 한 장씩 들어온다.",
-    "en": "Every deck started here. One comes in every pack."
-   },
-   "homeSet": "base1",
-   "cards": [
-    "base1-100",
-    "base1-101",
-    "base1-102"
-   ],
-   "tier": 1,
-   "medianPacks": 15,
-   "hardPacks": 32,
-   "reward": {
-    "packs": 1,
-    "perks": []
-   }
-  },
-  {
    "id": "cel25-celebration",
    "name": {
     "ko": "25주년 축하",
@@ -66,8 +42,8 @@
     "base1-46"
    ],
    "tier": 2,
-   "medianPacks": 32,
-   "hardPacks": 98,
+   "medianPacks": 31,
+   "hardPacks": 94,
    "reward": {
     "packs": 3,
     "perks": [
@@ -76,6 +52,30 @@
       "value": 0.01
      }
     ]
+   }
+  },
+  {
+   "id": "base1-energy",
+   "name": {
+    "ko": "그 시절 에너지",
+    "en": "Energy of the Era"
+   },
+   "blurb": {
+    "ko": "덱을 굴리려면 이것부터 있어야 했다. 팩마다 한 장씩 들어온다.",
+    "en": "Every deck started here. One comes in every pack."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "base1-100",
+    "base1-101",
+    "base1-102"
+   ],
+   "tier": 2,
+   "medianPacks": 16,
+   "hardPacks": 33,
+   "reward": {
+    "packs": 3,
+    "perks": []
    }
   },
   {
@@ -125,8 +125,8 @@
     "neo1-53"
    ],
    "tier": 2,
-   "medianPacks": 37,
-   "hardPacks": 116,
+   "medianPacks": 36,
+   "hardPacks": 111,
    "reward": {
     "packs": 3,
     "perks": [
@@ -153,8 +153,8 @@
     "neo1-25"
    ],
    "tier": 2,
-   "medianPacks": 21,
-   "hardPacks": 49,
+   "medianPacks": 20,
+   "hardPacks": 48,
    "reward": {
     "packs": 3,
     "perks": [
@@ -212,7 +212,7 @@
     "sv10-174"
    ],
    "tier": 2,
-   "medianPacks": 30,
+   "medianPacks": 31,
    "hardPacks": 64,
    "reward": {
     "packs": 3,
@@ -363,7 +363,7 @@
    ],
    "tier": 2,
    "medianPacks": 19,
-   "hardPacks": 39,
+   "hardPacks": 40,
    "reward": {
     "packs": 3,
     "perks": []
@@ -388,8 +388,8 @@
     "base1-63"
    ],
    "tier": 3,
-   "medianPacks": 67,
-   "hardPacks": 143,
+   "medianPacks": 64,
+   "hardPacks": 137,
    "reward": {
     "packs": 8,
     "perks": [
@@ -418,8 +418,8 @@
     "base1-44"
    ],
    "tier": 3,
-   "medianPacks": 57,
-   "hardPacks": 181,
+   "medianPacks": 56,
+   "hardPacks": 175,
    "reward": {
     "packs": 8,
     "perks": [
@@ -460,8 +460,8 @@
     "base1-16"
    ],
    "tier": 3,
-   "medianPacks": 134,
-   "hardPacks": 213,
+   "medianPacks": 128,
+   "hardPacks": 204,
    "reward": {
     "packs": 8,
     "perks": [
@@ -490,8 +490,8 @@
     "base1-29"
    ],
    "tier": 3,
-   "medianPacks": 67,
-   "hardPacks": 143,
+   "medianPacks": 64,
+   "hardPacks": 137,
    "reward": {
     "packs": 8,
     "perks": [
@@ -520,8 +520,8 @@
     "base1-63"
    ],
    "tier": 3,
-   "medianPacks": 57,
-   "hardPacks": 181,
+   "medianPacks": 56,
+   "hardPacks": 175,
    "reward": {
     "packs": 8,
     "perks": [
@@ -549,8 +549,8 @@
     "sv10-150"
    ],
    "tier": 3,
-   "medianPacks": 81,
-   "hardPacks": 173,
+   "medianPacks": 79,
+   "hardPacks": 168,
    "reward": {
     "packs": 8,
     "perks": [
@@ -577,8 +577,8 @@
     "swsh45-18"
    ],
    "tier": 3,
-   "medianPacks": 108,
-   "hardPacks": 315,
+   "medianPacks": 102,
+   "hardPacks": 294,
    "reward": {
     "packs": 8,
     "perks": [
@@ -606,8 +606,8 @@
     "sv3pt5-146"
    ],
    "tier": 4,
-   "medianPacks": 228,
-   "hardPacks": 757,
+   "medianPacks": 211,
+   "hardPacks": 697,
    "reward": {
     "packs": 20,
     "perks": [
@@ -644,8 +644,8 @@
     "sv8pt5-60"
    ],
    "tier": 4,
-   "medianPacks": 187,
-   "hardPacks": 326,
+   "medianPacks": 181,
+   "hardPacks": 315,
    "reward": {
     "packs": 20,
     "perks": [
@@ -678,8 +678,8 @@
     "swsh45-51"
    ],
    "tier": 4,
-   "medianPacks": 250,
-   "hardPacks": 497,
+   "medianPacks": 234,
+   "hardPacks": 463,
    "reward": {
     "packs": 20,
     "perks": [
@@ -713,8 +713,8 @@
     "xy12-11"
    ],
    "tier": 5,
-   "medianPacks": 512,
-   "hardPacks": 1696,
+   "medianPacks": 478,
+   "hardPacks": 1584,
    "reward": {
     "packs": 50,
     "perks": [
@@ -747,8 +747,8 @@
     "sv10-174"
    ],
    "tier": 5,
-   "medianPacks": 635,
-   "hardPacks": 1534,
+   "medianPacks": 585,
+   "hardPacks": 1413,
    "reward": {
     "packs": 50,
     "perks": [

@@ -19,6 +19,8 @@ struct PacksView: View {
         let setID: String
         let setName: String
         let cards: [PulledCard]
+        /// 전 칸이 레어 이상으로 나온 팩. 대기 화면과 개봉 화면이 다르게 움직인다.
+        let isGodPack: Bool
         /// 이 개봉으로 새로 완성된 도감. 요약 화면에서 알린다.
         let completions: [DexCompletion]
     }
@@ -30,6 +32,7 @@ struct PacksView: View {
         /// 미리 받아 둔 그림. 표시 시점에 네트워크를 타지 않는다.
         let hires: [String: NSImage]
         let thumbs: [String: NSImage]
+        let isGodPack: Bool
         let completions: [DexCompletion]
     }
 
@@ -90,9 +93,10 @@ struct PacksView: View {
                                       perks: wallet.perks, pity: &pity, using: &generator)
         wallet.setPity(pity, setID: set.id)
         // 수집이 도감 완성까지 처리하고 그 목록을 돌려준다.
-        let completions = wallet.collect(pulled.map(\.id))
+        let completions = wallet.collect(pulled.cards.map(\.id))
         preparing = PendingPack(setID: set.id, setName: set.name,
-                                cards: PackOpening.revealOrder(pulled),
+                                cards: PackOpening.revealOrder(pulled.cards),
+                                isGodPack: pulled.isGodPack,
                                 completions: completions)
     }
 }
@@ -109,21 +113,50 @@ private struct PreparingView: View {
 
     private static let minimumDisplay = Duration.milliseconds(1000)
 
+    /// 갓팩일 때 부풀어 오르는 빛. 대기 화면에서 미리 터뜨려 개봉 전에 알린다 —
+    /// 카드가 다 지나간 뒤에 알면 기대할 시간이 없다.
+    @State private var glow = false
+
     var body: some View {
-        VStack(spacing: 12) {
+        let l = wallet.l
+        let god = pending.isGodPack
+        return VStack(spacing: 12) {
             Spacer(minLength: 0)
             // 기다리는 동안 무엇을 뜯고 있는지 보여준다. 팩 아트는 상점에서 이미 받아 둔
             // 경우가 많아 여기서는 대개 즉시 뜬다.
             PackImageView(setID: pending.setID, width: 150)
                 .shadow(radius: 8, y: 3)
+                .background {
+                    if god {
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(Color.orange)
+                            .blur(radius: 44)
+                            .opacity(glow ? 0.85 : 0.2)
+                            .scaleEffect(glow ? 1.2 : 0.8)
+                    }
+                }
+                .scaleEffect(god && glow ? 1.06 : 1)
             VStack(spacing: 3) {
-                Text(wallet.l.packPreparing).font(.callout.weight(.semibold))
-                Text(pending.setName).font(.caption).foregroundStyle(.secondary)
+                if god {
+                    Text(l.godPackTitle)
+                        .font(.title2.weight(.heavy))
+                        .foregroundStyle(Color.orange)
+                    Text(l.godPackHint).font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Text(l.packPreparing).font(.callout.weight(.semibold))
+                    Text(pending.setName).font(.caption).foregroundStyle(.secondary)
+                }
             }
             ProgressView().controlSize(.small)
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear {
+            guard god else { return }
+            withAnimation(.easeOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                glow = true
+            }
+        }
         .task(id: pending.id) {
             let ids = pending.cards.map(\.id)
             // 큰 그림과 요약용 작은 그림을 함께 받는다. 요약에서 또 기다리지 않게 한다.
@@ -135,6 +168,7 @@ private struct PreparingView: View {
             guard !Task.isCancelled else { return }
             onReady(PacksView.OpenedPack(id: pending.id, setName: pending.setName,
                                          cards: pending.cards, hires: big, thumbs: small,
+                                         isGodPack: pending.isGodPack,
                                          completions: pending.completions))
         }
     }
@@ -246,6 +280,13 @@ private struct RevealView: View {
         let isLast = position + 1 >= opened.cards.count
         return VStack(spacing: 8) {
             HStack {
+                if opened.isGodPack {
+                    Text(l.godPackBadge)
+                        .font(.system(size: 9, weight: .heavy))
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(Color.orange, in: Capsule())
+                        .foregroundStyle(.white)
+                }
                 Text(opened.setName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 Text("\(position + 1) / \(opened.cards.count)")
@@ -292,7 +333,9 @@ private struct RevealView: View {
         let l = wallet.l
         return VStack(spacing: 8) {
             VStack(spacing: 2) {
-                Text(l.packOpened).font(.callout.weight(.semibold))
+                Text(opened.isGodPack ? l.godPackTitle : l.packOpened)
+                    .font(.callout.weight(opened.isGodPack ? .heavy : .semibold))
+                    .foregroundStyle(opened.isGodPack ? Color.orange : Color.primary)
                 Text("\(opened.setName)  ·  \(l.packOpenSummary(new: newCount, total: opened.cards.count))")
                     .font(.caption).foregroundStyle(.secondary)
             }

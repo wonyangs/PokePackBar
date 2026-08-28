@@ -74,7 +74,7 @@ struct PopoverView: View {
                     Text(l.walletBalance).font(.caption).foregroundStyle(.secondary)
                     // 앱 안에서는 실제 숫자를 쓴다. 요약 표기(95.2M)는 메뉴바 전용이다 —
                     // 팩 값과 잔액을 비교하려면 자리수가 그대로 보여야 한다.
-                    Text(TokenFormatter.grouped(wallet.availableTokens))
+                    Text(TokenFormatter.readable(wallet.availableTokens, language: wallet.language))
                         .font(.system(size: 22, weight: .bold)).monospacedDigit()
                         .lineLimit(1).minimumScaleFactor(0.6)
                 }
@@ -111,7 +111,7 @@ struct PopoverView: View {
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 HStack(spacing: 5) {
-                    Text("\(l.todayTokens) \(TokenFormatter.grouped(store.todayTotalTokens))")
+                    Text("\(l.todayTokens) \(TokenFormatter.readable(store.todayTotalTokens, language: wallet.language))")
                         .monospacedDigit()
                     if let top = topWindow {
                         Text("·")
@@ -177,6 +177,10 @@ struct PopoverView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        // 폭을 명시한다. 안 적으면 세그먼트 컨트롤이 제 내용 크기로 줄어 왼쪽에 몰리는
+        // macOS 가 있다(테스터 보고). 어느 쪽이 기본인지는 OS 판마다 다르고, 내 기기에서만
+        // 꽉 차게 보이면 이 차이를 영영 못 본다.
+        .frame(maxWidth: .infinity)
     }
 
     /// 미개봉 팩이 있으면 개수를 붙인다 — 뜯을 것이 있는지 탭을 열지 않고 알 수 있어야 한다.

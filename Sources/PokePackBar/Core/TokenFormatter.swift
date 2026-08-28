@@ -30,6 +30,37 @@ enum TokenFormatter {
         return f.string(from: NSNumber(value: value)) ?? "\(value)"
     }
 
+    /// 만 단위로 끊어 읽는 표기. 122_331_111 → "1억 2233만 1111"
+    ///
+    /// 세 자리 쉼표는 thousand·million 에 맞춰 끊는 방식이라, 억·만으로 읽는 사람은
+    /// 자릿수를 하나씩 세어야 한다. 잔액과 팩 값이 억 단위로 상시 떠 있는 화면이라
+    /// 이 차이가 크다. 한국어·일본어만 이 표기를 쓰고, 나머지 언어는 쉼표를 그대로 둔다.
+    ///
+    /// 0 인 자리는 건너뛴다 — 100_000_000 은 "1억" 이지 "1억 0000만 0000" 이 아니다.
+    static func readable(_ value: Int, language: AppLanguage, locale: Locale = .current) -> String {
+        let units: [String]
+        switch language {
+        case .ko: units = ["조", "억", "만"]
+        case .ja: units = ["兆", "億", "万"]
+        default: return grouped(value, locale: locale)
+        }
+        guard value != 0 else { return "0" }
+
+        // Int.min 은 부호를 뒤집을 수 없다. magnitude 로 다뤄 그 한 값만 예외가 되지 않게 한다.
+        var remaining = value.magnitude
+        var parts: [String] = []
+        for (scale, unit) in zip(myriadScales, units) {
+            let chunk = remaining / scale
+            guard chunk > 0 else { continue }
+            parts.append("\(chunk)\(unit)")
+            remaining %= scale
+        }
+        if remaining > 0 { parts.append("\(remaining)") }
+        return (value < 0 ? "-" : "") + parts.joined(separator: " ")
+    }
+
+    private static let myriadScales: [UInt] = [1_000_000_000_000, 100_000_000, 10_000]
+
     static func cost(_ usd: Double) -> String {
         String(format: "$%.2f", usd)
     }

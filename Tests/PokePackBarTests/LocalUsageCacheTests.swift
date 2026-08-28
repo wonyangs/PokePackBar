@@ -781,6 +781,31 @@ final class LocalUsageCacheTests: XCTestCase {
         XCTAssertEqual(TokenFormatter.percent(88.35), "88.3%")
     }
 
+    /// 만 단위 표기 — 잔액·오늘 사용량·팩 값이 쓰는 계약.
+    ///
+    /// 0 인 자리를 건너뛰는 것이 핵심이다. "1억 0000만 0000" 은 한국어가 아니고,
+    /// 자리를 채워 쓰면 쉼표 표기보다 오히려 길어져 바꾼 이유가 사라진다.
+    func testReadableKoreanMyriad() {
+        XCTAssertEqual(TokenFormatter.readable(122_331_111, language: .ko), "1억 2233만 1111")
+        XCTAssertEqual(TokenFormatter.readable(100_000_000, language: .ko), "1억")
+        XCTAssertEqual(TokenFormatter.readable(100_001_111, language: .ko), "1억 1111")
+        XCTAssertEqual(TokenFormatter.readable(10_000, language: .ko), "1만")
+        XCTAssertEqual(TokenFormatter.readable(9_999, language: .ko), "9999")
+        XCTAssertEqual(TokenFormatter.readable(0, language: .ko), "0")
+        XCTAssertEqual(TokenFormatter.readable(1_234_500_000_000, language: .ko), "1조 2345억")
+        XCTAssertEqual(TokenFormatter.readable(-12_340_000, language: .ko), "-1234만")
+        XCTAssertEqual(TokenFormatter.readable(122_331_111, language: .ja), "1億 2233万 1111")
+    }
+
+    /// 만 단위로 읽지 않는 언어는 쉼표 표기를 그대로 쓴다.
+    func testReadableFallsBackOutsideKoreanAndJapanese() {
+        for language in [AppLanguage.en, .es, .fr, .pt] {
+            XCTAssertEqual(TokenFormatter.readable(253_412_890, language: language,
+                                                   locale: Locale(identifier: "en_US")),
+                           "253,412,890", "\(language) 는 쉼표 표기여야 한다")
+        }
+    }
+
     /// 날짜 유틸 — 주/월 경계와 monthKey (집계 윈도우 계산의 기반).
     func testDateHelpers() {
         var c = Calendar.current

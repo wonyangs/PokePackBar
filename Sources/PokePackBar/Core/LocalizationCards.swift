@@ -229,6 +229,72 @@ extension L {
                                       "カードリストを読み込めません。", "No se pudo cargar la lista de cartas.",
                                       "Impossible de charger la liste des cartes.", "Não foi possível carregar a lista de cartas.") }
 
+    var shopPacksSection: String { t2("일반 팩", "Packs", "通常パック",
+                                      "Sobres", "Boosters", "Pacotes") }
+
+    // MARK: 오리파
+    var oripaTitle: String { t2("오리파", "Oripa", "オリパ", "Oripa", "Oripa", "Oripa") }
+    var oripaSubtitle: String { t2("상위 등급만 담은 뽑기", "A draw of high rarities only",
+                                   "上位レアだけの一発勝負", "Solo cartas de alta rareza",
+                                   "Uniquement des hautes raretés", "Só cartas de alta raridade") }
+    var oripaHint: String { t2("여러 세트에서 골라 담은 100장짜리 박스예요. 한 장씩 뽑으면 그 카드는 박스에서 빠집니다.",
+                               "A 100-card box drawn from every set. Each pull removes that card from the box.",
+                               "全セットから選んだ100枚の箱です。引いたカードは箱から抜けます。",
+                               "Una caja de 100 cartas de todos los sets. Cada tirada retira esa carta.",
+                               "Une boîte de 100 cartes tirées de tous les sets. Chaque tirage retire la carte.",
+                               "Uma caixa de 100 cartas de todos os sets. Cada tiragem remove a carta.") }
+    var oripaPull: String { t2("뽑기", "Pull", "引く", "Tirar", "Tirer", "Tirar") }
+    var oripaContents: String { t2("박스에 남은 카드", "Left in the box", "箱の残り",
+                                   "Quedan en la caja", "Reste dans la boîte", "Resta na caixa") }
+    func oripaRemaining(_ left: Int, _ total: Int) -> String {
+        t2("남은 슬롯 \(left) / \(total)", "\(left) of \(total) slots left", "残り \(left) / \(total)",
+           "\(left) de \(total) ranuras", "\(left) sur \(total) restantes", "\(left) de \(total) restantes")
+    }
+    func oripaBoxNumber(_ serial: Int) -> String {
+        t2("\(serial)번 박스", "Box #\(serial)", "\(serial)番の箱",
+           "Caja n.º \(serial)", "Boîte n° \(serial)", "Caixa nº \(serial)")
+    }
+    var oripaReplace: String { t2("새 박스로", "New box", "新しい箱に",
+                                  "Caja nueva", "Nouvelle boîte", "Caixa nova") }
+    /// 확인 문구는 한 줄을 넘기지 않는다. 버튼이 「새 박스로 / 취소」라 질문은 짧아도 통하고,
+    /// 길면 줄바꿈이 생겨 확인을 누를 때마다 화면이 덜컹거린다. 자세한 설명은 툴팁에 둔다.
+    var oripaReplaceConfirm: String { t2("버릴까요?", "Discard?", "捨てますか？",
+                                         "¿Descartar?", "Jeter ?", "Descartar?") }
+    var oripaReplaceHelp: String { t2("지금 박스를 버리고 새 박스를 받아요. 값은 들지 않아요.",
+                                      "Discard this box for a fresh one. It costs nothing.",
+                                      "今の箱を捨てて新しい箱を受け取ります。無料です。",
+                                      "Descarta esta caja por una nueva. Es gratis.",
+                                      "Remplace cette boîte par une neuve. C'est gratuit.",
+                                      "Troca esta caixa por uma nova. É grátis.") }
+    func oripaOwnedCount(_ count: Int) -> String {
+        t2("이미 가진 카드 \(count)장", "\(count) you already own", "所持済み \(count)枚",
+           "\(count) que ya tienes", "\(count) déjà possédées", "\(count) que você já tem")
+    }
+    var oripaRefilled: String { t2("박스를 다 비웠어요. 새 박스가 들어왔습니다.",
+                                   "You cleared the box. A fresh one is in.",
+                                   "箱を空にしました。新しい箱が入りました。",
+                                   "Vaciaste la caja. Ha llegado una nueva.",
+                                   "Tu as vidé la boîte. Une nouvelle est arrivée.",
+                                   "Você esvaziou a caixa. Chegou uma nova.") }
+
+    // MARK: 갓팩
+    var godPackTitle: String { t2("갓팩!", "God Pack!", "神引き！", "¡Sobre dorado!",
+                                  "Booster divin !", "Pacote divino!") }
+    var godPackHint: String { t2("이 팩은 전부 레어 이상이에요.", "Every card in this pack is rare or better.",
+                                 "このパックは全てレア以上です。", "Todas las cartas son raras o mejores.",
+                                 "Toutes les cartes sont rares ou mieux.", "Todas as cartas são raras ou melhores.") }
+    var godPackBadge: String { t2("갓팩", "God Pack", "神引き", "Dorado", "Divin", "Divino") }
+
+    /// 갓팩 확률 공시. 숨기면 지금까지 맞춰 온 원칙과 어긋난다.
+    func godPackNote(_ oneIn: Int) -> String {
+        t2("\(oneIn)팩에 한 번꼴로 전 칸이 레어 이상인 갓팩이 나와요.",
+           "About one pack in \(oneIn) is a God Pack — every card rare or better.",
+           "約\(oneIn)パックに1回、全てレア以上の神引きが出ます。",
+           "Uno de cada \(oneIn) sobres es dorado: todas las cartas raras o mejores.",
+           "Environ 1 booster sur \(oneIn) est divin — toutes les cartes rares ou mieux.",
+           "Cerca de 1 em \(oneIn) pacotes é divino — todas as cartas raras ou melhores.")
+    }
+
     // MARK: 조합 도감
     var dexTab: String { t2("도감", "Dex", "図鑑", "Dex", "Dex", "Dex") }
     var dexHint: String { t2("카드를 묶어 도감을 완성하면 팩과 영구 혜택을 받아요.",

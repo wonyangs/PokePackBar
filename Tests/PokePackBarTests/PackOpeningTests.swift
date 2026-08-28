@@ -164,6 +164,69 @@ final class PackOpeningTests: XCTestCase {
                        "한 팩에 확정 칸이 둘이면 마지막 결과가 카운터를 정한다")
     }
 
+    // MARK: 갓팩
+
+    /// 갓팩은 전 칸이 레어 이상이다. 한 장이라도 커먼이 섞이면 갓팩이 아니다.
+    func testGodPackHoldsOnlyRareOrBetter() {
+        let index = makeIndex("s", [.common: 30, .uncommon: 20, .rare: 10,
+                                    .doubleRare: 6, .ultraRare: 3])
+        var found = 0
+        for seed in UInt64(1)...3000 {
+            var g = SeededGenerator(seed: seed)
+            var pity = 0
+            let pack = PackOpening.draw(setID: "s", index: index, alreadyOwned: [],
+                                        pity: &pity, using: &g)
+            guard pack.isGodPack else { continue }
+            found += 1
+            XCTAssertEqual(pack.cards.count, PackConfig.cardsPerPack)
+            XCTAssertTrue(pack.cards.allSatisfy { $0.tier.rank >= CardTier.rare.rank },
+                          "seed \(seed): 갓팩에 레어 미만이 섞였다")
+            XCTAssertEqual(pity, 0, "갓팩은 천장을 초기화한다")
+        }
+        XCTAssertGreaterThan(found, 0, "3000번 뽑는 동안 갓팩이 한 번도 안 나왔다")
+    }
+
+    /// 공시한 확률과 실제 등장 빈도가 맞아야 한다. 표시만 하고 다르게 굴리면 그게 조작이다.
+    func testGodPackRateMatchesTheDisclosedNumber() {
+        let index = makeIndex("s", [.common: 30, .uncommon: 20, .rare: 10, .doubleRare: 6])
+        let trials = 30_000
+        var gods = 0
+        var g = SeededGenerator(seed: 20260828)
+        var pity = 0
+        for _ in 0..<trials {
+            if PackOpening.draw(setID: "s", index: index, alreadyOwned: [],
+                                pity: &pity, using: &g).isGodPack { gods += 1 }
+        }
+        let expected = Double(trials) / Double(PackConfig.godPackOneIn)
+        // 30,000번이면 표준편차가 10 남짓이라 ±40% 밖으로 벗어나면 확률이 어긋난 것이다.
+        XCTAssertGreaterThan(Double(gods), expected * 0.6, "갓팩이 공시보다 드물다 (\(gods)회)")
+        XCTAssertLessThan(Double(gods), expected * 1.4, "갓팩이 공시보다 잦다 (\(gods)회)")
+    }
+
+    /// 확률표에도 갓팩이 섞여 있어야 한다. 뽑기에만 넣으면 표가 실제보다 짜게 나온다.
+    func testOddsAccountForGodPacks() {
+        let index = makeIndex("s", [.common: 30, .uncommon: 20, .rare: 10,
+                                    .doubleRare: 6, .ultraRare: 3])
+        let odds = PackOpening.packOdds(setID: "s", index: index)
+        let ultra = odds.first { $0.tier == .ultraRare }?.probability ?? 0
+
+        // 갓팩을 뺀 값 — 확정 칸의 UR 몫만 남는다.
+        let hitTotal = PackConfig.hitWeights.reduce(0) { $0 + $1.weight }
+        let hitOnly = Double(1) / Double(hitTotal) / Double(PackConfig.cardsPerPack)
+        XCTAssertGreaterThan(ultra, hitOnly, "확률표가 갓팩을 세지 않았다")
+    }
+
+    /// 특별 세트에는 갓팩이 없다. 원래 전 칸이 레어 이상이라 구분이 성립하지 않는다.
+    func testSpecialSetsHaveNoGodPack() {
+        let index = makeIndex("c", [.rare: 8, .doubleRare: 6, .superRare: 3])
+        for seed in UInt64(1)...200 {
+            var g = SeededGenerator(seed: seed)
+            var pity = 0
+            XCTAssertFalse(PackOpening.draw(setID: "c", index: index, alreadyOwned: [],
+                                            pity: &pity, using: &g).isGodPack)
+        }
+    }
+
     /// 에너지는 그 계층이 있는 세트에서만 나온다. 없는 세트에 억지로 끼워 넣지 않는다.
     ///
     /// 확정 슬롯이 아니라 일반 칸의 추첨 결과이므로 장수는 팩마다 다르다.

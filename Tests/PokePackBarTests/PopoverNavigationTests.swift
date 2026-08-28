@@ -51,3 +51,38 @@ final class PopoverNavigationTests: XCTestCase {
         }
     }
 }
+
+/// 세그먼트 컨트롤은 폭을 반드시 명시해야 한다.
+///
+/// 적지 않으면 OS 판에 따라 제 내용 크기로 줄어 왼쪽에 몰린다 — 실제로 테스터 기기에서만
+/// 그렇게 나왔다. 개발 기기에서 꽉 차게 보이는 한 이 차이는 눈으로 잡히지 않으므로
+/// 소스를 훑어 막는다.
+final class SegmentedPickerWidthTests: XCTestCase {
+    func testEverySegmentedPickerDeclaresItsWidth() throws {
+        let ui = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokePackBar/UI")
+        let enumerator = try XCTUnwrap(FileManager.default.enumerator(at: ui,
+                                                                     includingPropertiesForKeys: nil))
+        var offenders: [String] = []
+        for case let url as URL in enumerator where url.pathExtension == "swift" {
+            let lines = try String(contentsOf: url, encoding: .utf8)
+                .split(separator: "\n", omittingEmptySubsequences: false)
+            for (offset, line) in lines.enumerated() where line.contains(".pickerStyle(.segmented)") {
+                // 뒤따르는 몇 줄 안에 폭 선언이 있어야 한다(주석이 사이에 낄 수 있다).
+                // 같은 줄에 붙는 경우도 있어 앞뒤를 함께 본다.
+                let start = max(0, offset - 1)
+                let window = lines[start..<min(offset + 8, lines.count)].joined()
+                // 꽉 채우든(.infinity) 내용에 맞추든(.fixedSize) 명시만 하면 된다.
+                // 금지하는 것은 "아무것도 안 적어 OS 기본에 맡기는 것" 이다.
+                let declared = window.contains("maxWidth: .infinity")
+                    || window.contains("width:") || window.contains("fixedSize()")
+                if !declared { offenders.append("\(url.lastPathComponent):\(offset + 1)") }
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty, """
+            세그먼트 컨트롤에 폭 선언이 없다. OS 에 따라 왼쪽으로 몰린다.
+            .frame(maxWidth: .infinity) 를 붙인다: \(offenders.joined(separator: ", "))
+            """)
+    }
+}
