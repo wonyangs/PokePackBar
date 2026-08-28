@@ -19,6 +19,8 @@ struct PacksView: View {
         let setID: String
         let setName: String
         let cards: [PulledCard]
+        /// 이 개봉으로 새로 완성된 도감. 요약 화면에서 알린다.
+        let completions: [DexCompletion]
     }
 
     struct OpenedPack: Identifiable {
@@ -28,6 +30,7 @@ struct PacksView: View {
         /// 미리 받아 둔 그림. 표시 시점에 네트워크를 타지 않는다.
         let hires: [String: NSImage]
         let thumbs: [String: NSImage]
+        let completions: [DexCompletion]
     }
 
     var body: some View {
@@ -82,11 +85,15 @@ struct PacksView: View {
         guard wallet.consumePack(setID: set.id) else { return }
         var generator = SystemRandomNumberGenerator()
         let owned = Set(wallet.state.cards.keys)
-        let pulled = PackOpening.draw(setID: set.id, index: index,
-                                      alreadyOwned: owned, using: &generator)
-        wallet.collect(pulled.map(\.id))
+        var pity = wallet.pity(setID: set.id)
+        let pulled = PackOpening.draw(setID: set.id, index: index, alreadyOwned: owned,
+                                      perks: wallet.perks, pity: &pity, using: &generator)
+        wallet.setPity(pity, setID: set.id)
+        // 수집이 도감 완성까지 처리하고 그 목록을 돌려준다.
+        let completions = wallet.collect(pulled.map(\.id))
         preparing = PendingPack(setID: set.id, setName: set.name,
-                                cards: PackOpening.revealOrder(pulled))
+                                cards: PackOpening.revealOrder(pulled),
+                                completions: completions)
     }
 }
 
@@ -127,7 +134,8 @@ private struct PreparingView: View {
             let (big, small, _) = await (hires, thumbs, floor)
             guard !Task.isCancelled else { return }
             onReady(PacksView.OpenedPack(id: pending.id, setName: pending.setName,
-                                         cards: pending.cards, hires: big, thumbs: small))
+                                         cards: pending.cards, hires: big, thumbs: small,
+                                         completions: pending.completions))
         }
     }
 }
@@ -149,7 +157,7 @@ private struct OwnedPackRow: View {
                 Text(l.packName(set.name))
                     .font(.callout.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
-                Text("\(l.packContents(PackPricing.cardCount(setID: set.id, index: index)))  ·  ×\(count)")
+                Text("\(l.packContents(PackPricing.cardCount(setID: set.id, index: index, perks: wallet.perks)))  ·  ×\(count)")
                     .font(.caption).foregroundStyle(.secondary).monospacedDigit()
             }
             Spacer(minLength: 0)
@@ -290,6 +298,16 @@ private struct RevealView: View {
             }
             .padding(.top, 2)
 
+            // 우연히 완성된 도감을 이 자리에서 알린다. 나중에 도감 탭을 열어야 알게 되면
+            // 개봉과 완성이 이어지지 않아 "우연히 됐네" 가 성립하지 않는다.
+            if !opened.completions.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(opened.completions) { done in
+                        DexCompletionBanner(wallet: wallet, completion: done)
+                    }
+                }
+            }
+
             ScrollView {
                 LazyVGrid(columns: Array(repeating: GridItem(spacing: 8), count: 4), spacing: 8) {
                     // 요약은 희귀한 것부터 — 무엇을 건졌는지 먼저 보인다.
@@ -336,6 +354,43 @@ private struct SpotlightCard: View {
         .opacity(landed ? 1 : 0)
         .onAppear {
             withAnimation(.spring(response: 0.34, dampingFraction: 0.7)) { landed = true }
+        }
+    }
+}
+
+/// 도감 완성 알림. 개봉 요약 위에 붙는다.
+///
+/// 어려운 것을 위에 둔다(`DexProgress.newlyCompleted` 가 그 순서로 준다) —
+/// 쉬운 것 여러 개에 묻히면 힘들게 완성한 것이 눈에 안 들어온다.
+@MainActor
+private struct DexCompletionBanner: View {
+    let wallet: WalletStore
+    let completion: DexCompletion
+
+    @State private var landed = false
+
+    var body: some View {
+        let l = wallet.l
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.system(size: 13)).foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 5) {
+                    Text(completion.name.text(wallet.language))
+                        .font(.caption.weight(.bold)).lineLimit(1)
+                    DexStars(tier: completion.tier)
+                }
+                Text(l.dexCompletedBanner)
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 5).padding(.horizontal, 8)
+        .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 7))
+        .scaleEffect(landed ? 1 : 0.94)
+        .opacity(landed ? 1 : 0)
+        .onAppear {
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.72)) { landed = true }
         }
     }
 }

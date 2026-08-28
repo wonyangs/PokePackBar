@@ -12,6 +12,8 @@ struct CardShopView: View {
     /// 상세를 보고 있는 세트. nil 이면 격자.
     @State private var selectedSet: String?
 
+    @Environment(PopoverNavigation.self) private var nav
+
     var body: some View {
         Group {
             if let index {
@@ -35,6 +37,16 @@ struct CardShopView: View {
             guard let index else { return }
             await CardImageLoader.prefetchPacks(setIDs: index.setIDs)
         }
+        // 도감의 「이 팩 사러 가기」로 들어온 경우 그 팩 상세를 바로 연다.
+        // 한 번 읽고 지운다 — 남겨 두면 다음에 상점 탭을 눌렀을 때 또 그 팩이 뜬다.
+        .onAppear(perform: consumeRequestedSet)
+        .onChange(of: nav.shopSet) { consumeRequestedSet() }
+    }
+
+    private func consumeRequestedSet() {
+        guard let requested = nav.shopSet else { return }
+        selectedSet = requested
+        nav.shopSet = nil
     }
 
     private func grid(_ index: CardIndex) -> some View {
@@ -61,7 +73,7 @@ private struct PackGridCell: View {
 
     var body: some View {
         let l = wallet.l
-        let price = PackPricing.price(setID: set.id, index: index)
+        let price = PackPricing.price(setID: set.id, index: index, perks: wallet.perks)
         let owned = wallet.packCount(setID: set.id)
         return VStack(spacing: 5) {
             ZStack(alignment: .topTrailing) {
@@ -100,8 +112,8 @@ private struct PackDetailView: View {
 
     @State private var quantity = 1
 
-    private var price: Int { PackPricing.price(setID: set.id, index: index) }
-    private var cardsPerPack: Int { PackPricing.cardCount(setID: set.id, index: index) }
+    private var price: Int { PackPricing.price(setID: set.id, index: index, perks: wallet.perks) }
+    private var cardsPerPack: Int { PackPricing.cardCount(setID: set.id, index: index, perks: wallet.perks) }
     private var members: [CardEntry] { index.cards.filter { $0.setID == set.id } }
     private var ownedCount: Int { members.filter { wallet.cardCount($0.id) > 0 }.count }
 
@@ -166,8 +178,12 @@ private struct PackDetailView: View {
     }
 
     /// 카드 한 장이 각 등급일 확률. 합은 100% 다.
+    ///
+    /// 칸별로 나눠 적어 봤더니 표가 네 덩이가 되어 읽히지 않았다. 구조가 궁금한 사람보다
+    /// "이 팩에서 UR 이 얼마나 나오나" 를 보려는 사람이 훨씬 많다. 대신 확정 한 장과
+    /// 천장은 표 아래 한 줄로 적는다 — 보장을 숨기지는 않는다.
     private func oddsTable(_ l: L) -> some View {
-        let odds = PackOpening.packOdds(setID: set.id, index: index)
+        let odds = PackOpening.packOdds(setID: set.id, index: index, perks: wallet.perks)
         let pool = index.pools[set.id] ?? [:]
 
         return VStack(alignment: .leading, spacing: 2) {
@@ -194,6 +210,12 @@ private struct PackDetailView: View {
                         .frame(width: 48, alignment: .trailing)
                 }
             }
+
+            Text(l.packGuaranteeNote(PackConfig.hitSlotCount(wallet.perks),
+                                     pity: PackConfig.pityThreshold))
+                .font(.system(size: 9)).foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 2)
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
         .background(Color.secondary.opacity(0.06))

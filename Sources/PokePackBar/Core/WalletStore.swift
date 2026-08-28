@@ -21,6 +21,16 @@ struct PackGrant: Equatable, Sendable {
     let count: Int
 }
 
+/// 이번 개봉으로 다 모인 도감 1건. 개봉 결과 화면이 이걸 받아 알린다.
+/// 보상은 여기서 주지 않는다 — 수령은 도감 화면에서 사용자가 직접 누른다.
+struct DexCompletion: Equatable, Sendable, Identifiable {
+    let dexID: String
+    let name: DexText
+    let tier: Int
+
+    var id: String { dexID }
+}
+
 /// 재화(토큰) 지갑과 카드·팩 보유량을 관리한다.
 ///
 /// 사용량 적립 로직은 기존 컴패니언 저장소의 것을 그대로 옮겼다. 프로바이더별 장부,
@@ -37,9 +47,20 @@ final class WalletStore {
     var lastGrant: PackGrant?
     func consumeGrant() { lastGrant = nil }
 
-    init(fileURL: URL? = nil) {
+    /// 조합 도감 목록. 테스트가 갈아 끼울 수 있게 주입받는다.
+    let dexes: [Dex]
+
+    /// 완성한 도감에서 나온 영구 혜택.
+    ///
+    /// 매번 다시 모으지 않고 캐시한다 — 팩 가격과 확률표가 화면을 그릴 때마다 읽고,
+    /// 사용량 적립도 매 새로고침마다 읽는다.
+    private(set) var perks: DexPerks = .none
+
+    init(fileURL: URL? = nil, dexes: [Dex]? = nil) {
         self.fileURL = fileURL ?? Self.defaultURL()
+        self.dexes = dexes ?? DexIndex.loadBundled().dexes
         load()
+        perks = DexPerks.total(completed: claimedDexIDs, dexes: self.dexes)
     }
 
     static func defaultURL() -> URL {
@@ -64,9 +85,9 @@ final class WalletStore {
 
     // MARK: 재화
 
-    /// 상점에서 쓸 수 있는 토큰 = 누적 사용량 − 지출 + 카드를 갈아 돌려받은 것.
+    /// 상점에서 쓸 수 있는 토큰 = 누적 사용량 − 지출 + 갈아 돌려받은 것 + 도감 혜택 적립분.
     var availableTokens: Int {
-        max(0, state.usedSinceInstall - state.spentTokens + state.refundedTokens)
+        max(0, state.usedSinceInstall - state.spentTokens + state.refundedTokens + state.perkTokens)
     }
 
     var usedSinceInstall: Int { state.usedSinceInstall }
@@ -134,7 +155,7 @@ final class WalletStore {
             }
             state.claimedTodayTokensByProvider = newLedger
             let delta = todayTokensByProvider.values.reduce(0, +)
-            if delta > 0 { state.usedSinceInstall += delta }
+            if delta > 0 { accrue(delta) }
         } else {
             var ledger = state.claimedTodayTokensByProvider ?? [:]
             var delta = 0
@@ -156,10 +177,21 @@ final class WalletStore {
                 ledger[providerID] = current
             }
             state.claimedTodayTokensByProvider = ledger
-            if delta > 0 { state.usedSinceInstall += delta }
+            if delta > 0 { accrue(delta) }
         }
 
         save()
+    }
+
+    /// 사용량 증가분을 장부에 넣는다. 도감 혜택이 있으면 그만큼 별도로 더 쌓는다.
+    ///
+    /// `usedSinceInstall` 에 배수를 곱하지 않는 이유: 그 값은 실제 사용량이라
+    /// 곱해 버리면 사용량 표시가 거짓이 된다. 잔액에만 반영한다.
+    private func accrue(_ delta: Int) {
+        state.usedSinceInstall += delta
+        guard perks.tokenGain > 0 else { return }
+        let bonus = Int((Double(delta) * perks.tokenGain).rounded())
+        if bonus > 0 { state.perkTokens += bonus }
     }
 
     // MARK: 팩 보유량
@@ -208,7 +240,7 @@ final class WalletStore {
         guard amount > 0 else { return 0 }
 
         state.cards[cardID] = cardCount(cardID) - amount
-        let refund = CardDust.value(for: tier) * amount
+        let refund = CardDust.value(for: tier, perks: perks) * amount
         state.refundedTokens += refund
         state.cardsDisenchanted += amount
         save()
@@ -225,10 +257,64 @@ final class WalletStore {
     var totalCardCount: Int { state.cards.values.reduce(0, +) }
 
     /// 개봉 결과를 수집함에 넣는다. 같은 카드가 여러 장 나오면 그만큼 쌓인다.
-    func collect(_ cardIDs: [String]) {
-        guard !cardIDs.isEmpty else { return }
+    ///
+    /// 새로 완성된 도감을 함께 처리하고 그 목록을 돌려준다. 카드가 들어오는 경로가
+    /// 여기뿐이라 판정을 여기 두면 호출부가 잊을 수 없다 — 화면마다 판정을 심으면
+    /// 언젠가 한 곳이 빠지고, 그 화면으로 얻은 카드는 도감을 완성시키지 못한다.
+    @discardableResult
+    func collect(_ cardIDs: [String]) -> [DexCompletion] {
+        guard !cardIDs.isEmpty else { return [] }
+        let before = Set(state.cards.keys)
         for id in cardIDs { state.cards[id, default: 0] += 1 }
         save()
+
+        return DexProgress.newlyFilled(dexes: dexes, owned: { (state.cards[$0] ?? 0) > 0 },
+                                       claimed: claimedDexIDs, before: before)
+            .map { DexCompletion(dexID: $0.id, name: $0.name, tier: $0.tier) }
+    }
+
+    /// 세트의 천장 카운터. 개봉이 이 값을 읽고, 개봉 후 `setPity` 로 되돌려 준다.
+    func pity(setID: String) -> Int { state.packPity[setID] ?? 0 }
+
+    func setPity(_ value: Int, setID: String) {
+        if value == 0 { state.packPity.removeValue(forKey: setID) } else { state.packPity[setID] = value }
+        save()
+    }
+
+    // MARK: 조합 도감
+
+    /// 보상까지 받은 도감. 혜택은 이 목록에서만 나온다.
+    var claimedDexIDs: Set<String> { Set(state.claimedDex) }
+
+    var claimedDexCount: Int { state.claimedDex.count }
+
+    /// 지금 보유 카드로 다 모였고 아직 수령하지 않은 도감.
+    ///
+    /// 완성 여부를 저장하지 않고 매번 보유 카드에서 계산한다 — 도감 기능이 생기기 전에
+    /// 모아 둔 카드도 그래야 완성으로 잡힌다. 이벤트로만 기록하면 그런 도감은 영영 안 뜬다.
+    var claimableDexes: [Dex] {
+        dexes.filter { dex in
+            !claimedDexIDs.contains(dex.id) && dex.cards.allSatisfy { (state.cards[$0] ?? 0) > 0 }
+        }
+    }
+
+    /// 보상을 수령한다. 팩을 주고 혜택을 켠다.
+    ///
+    /// 두 번 주면 도감으로 팩을 무한히 만들 수 있으므로 이미 수령한 것은 거른다.
+    /// 다 모으지 못한 도감도 거른다 — 화면이 잘못 눌러도 지급되지 않아야 한다.
+    @discardableResult
+    func claim(_ dexID: String) -> Dex? {
+        guard let dex = dexes.first(where: { $0.id == dexID }),
+              !claimedDexIDs.contains(dexID),
+              dex.cards.allSatisfy({ (state.cards[$0] ?? 0) > 0 }) else { return nil }
+
+        state.claimedDex.append(dexID)
+        if dex.reward.packs > 0 { state.packs[dex.homeSet, default: 0] += dex.reward.packs }
+        // 혜택은 즉시 반영한다 — 수령 직후의 구매·개봉부터 적용되어야 보상으로 읽힌다.
+        perks = DexPerks.total(completed: claimedDexIDs, dexes: dexes)
+        save()
+        AppLog.write("dex claimed \(dexID) tier=\(dex.tier) packs=\(dex.reward.packs)")
+        return dex
     }
 
     // MARK: 보너스 팩 (한도 달성 보상)
@@ -244,6 +330,7 @@ final class WalletStore {
         windows: [BonusWindow],
         grantTier: inout [String: Int],
         availableSets: [String],
+        bonusPacks: Int = 0,
         using generator: inout some RandomNumberGenerator
     ) -> [PackGrant] {
         guard !availableSets.isEmpty else { return [] }
@@ -256,7 +343,7 @@ final class WalletStore {
             // 주간에 가중을 주면 보상이 세션 쪽으로 쏠린다.
             let setID = availableSets[Int(generator.next(upperBound: UInt64(availableSets.count)))]
             grants.append(PackGrant(windowKey: w.key, windowName: w.name,
-                                    setID: setID, count: PackConfig.bonusPackCount))
+                                    setID: setID, count: PackConfig.bonusPackCount + bonusPacks))
         }
         return grants
     }
@@ -281,7 +368,8 @@ final class WalletStore {
         let before = state.packGrantTier
         var generator = SystemRandomNumberGenerator()
         let grants = Self.evaluateGrants(windows: windows, grantTier: &state.packGrantTier,
-                                         availableSets: availableSets, using: &generator)
+                                         availableSets: availableSets,
+                                         bonusPacks: perks.bonusPacks, using: &generator)
         for g in grants {
             state.packs[g.setID, default: 0] += g.count
             lastGrant = g

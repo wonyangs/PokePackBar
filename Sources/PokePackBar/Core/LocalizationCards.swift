@@ -91,6 +91,16 @@ extension L {
     var packCollected: String { t2("수집률", "Collected", "収集率", "Recolectadas", "Collectées", "Coletadas") }
     var packOdds: String { t2("등급별 확률", "Odds by rarity", "レアリティ別確率",
                               "Probabilidad por rareza", "Probabilité par rareté", "Chance por raridade") }
+    /// 확정 한 장과 천장을 한 줄로. 표를 칸별로 쪼개는 대신 이 줄로 보장을 알린다.
+    func packGuaranteeNote(_ guaranteed: Int, pity: Int) -> String {
+        t2("팩마다 레어 이상 \(guaranteed)장 확정 · 레어만 \(pity)팩 연속이면 다음은 RR 이상 보장",
+           "\(guaranteed) rare or better guaranteed per pack · RR+ guaranteed after \(pity) plain-rare packs",
+           "パックごとにレア以上\(guaranteed)枚確定・レアのみ\(pity)パック連続で次はRR以上保証",
+           "\(guaranteed) rara o mejor por sobre · RR+ garantizado tras \(pity) sobres",
+           "\(guaranteed) rare ou mieux par booster · RR+ garanti après \(pity) boosters",
+           "\(guaranteed) rara ou melhor por pacote · RR+ garantido após \(pity) pacotes")
+    }
+
     var packOddsColumns: String { t2("카드 한 장 기준", "Per card", "カード1枚あたり",
                                      "Por carta", "Par carte", "Por carta") }
     var packQuantity: String { t2("수량", "Quantity", "数量", "Cantidad", "Quantité", "Quantidade") }
@@ -218,6 +228,174 @@ extension L {
     var cardIndexMissing: String { t2("카드 목록을 불러올 수 없어요.", "Couldn't load the card list.",
                                       "カードリストを読み込めません。", "No se pudo cargar la lista de cartas.",
                                       "Impossible de charger la liste des cartes.", "Não foi possível carregar a lista de cartas.") }
+
+    // MARK: 조합 도감
+    var dexTab: String { t2("도감", "Dex", "図鑑", "Dex", "Dex", "Dex") }
+    var dexHint: String { t2("카드를 묶어 도감을 완성하면 팩과 영구 혜택을 받아요.",
+                             "Complete a dex to earn packs and a permanent perk.",
+                             "図鑑を完成させるとパックと永続ボーナスがもらえます。",
+                             "Completa un dex para ganar sobres y una ventaja permanente.",
+                             "Complète un dex pour gagner des boosters et un bonus permanent.",
+                             "Complete um dex para ganhar pacotes e um bônus permanente.") }
+    var dexComplete: String { t2("완성", "Complete", "コンプリート", "Completo", "Complet", "Completo") }
+    var dexClaim: String { t2("보상 수령", "Claim reward", "報酬を受け取る",
+                              "Reclamar", "Récupérer", "Resgatar") }
+    var dexClaimed: String { t2("수령 완료", "Claimed", "受取済み", "Reclamado", "Récupéré", "Resgatado") }
+    var dexPerksNone: String { t2("아직 없음", "None yet", "まだなし", "Ninguna", "Aucun", "Nenhum") }
+    var dexBlurbHeader: String { t2("이 조합은", "About this dex", "この図鑑は",
+                                    "Sobre este dex", "À propos", "Sobre este dex") }
+    var dexGoBuyPack: String { t2("이 팩 사러 가기", "Buy this pack", "このパックを買う",
+                                  "Comprar este sobre", "Acheter ce booster", "Comprar este pacote") }
+    var dexReward: String { t2("완성 보상", "Reward", "完成報酬", "Recompensa", "Récompense", "Recompensa") }
+    var dexPerksHeader: String { t2("누적 혜택", "Perks", "累積ボーナス", "Ventajas", "Bonus", "Bônus") }
+    var dexCompletedBanner: String { t2("도감 완성!", "Dex complete!", "図鑑コンプリート！",
+                                        "¡Dex completo!", "Dex complété !", "Dex completo!") }
+    var dexCardBelongsTo: String { t2("이 카드가 들어가는 도감", "Dexes using this card",
+                                      "このカードが入る図鑑", "Dexes con esta carta",
+                                      "Dex avec cette carte", "Dexes com esta carta") }
+    var dexEmpty: String { t2("도감 목록을 불러올 수 없어요.", "Couldn't load the dex list.",
+                              "図鑑リストを読み込めません。", "No se pudo cargar la lista de dex.",
+                              "Impossible de charger la liste des dex.", "Não foi possível carregar a lista.") }
+
+    func dexProgress(_ owned: Int, _ total: Int) -> String { "\(owned) / \(total)" }
+
+    func dexCountSummary(_ done: Int, _ total: Int) -> String {
+        t2("완성 \(done) / \(total)", "\(done) of \(total) complete", "\(total) 中 \(done) 完成",
+           "\(done) de \(total) completos", "\(done) sur \(total) complétés", "\(done) de \(total) completos")
+    }
+
+    func dexRewardPacks(_ count: Int) -> String {
+        t2("팩 \(count)개", "\(count) packs", "パック \(count)個",
+           "\(count) sobres", "\(count) boosters", "\(count) pacotes")
+    }
+
+    /// 한 팩에서 이 카드가 나올 확률. 없는 카드를 눌렀을 때 보여준다 —
+    /// 얼마나 먼 카드인지 알아야 계속 살지 판단할 수 있다.
+    func dexPullChance(_ percent: String) -> String {
+        t2("한 팩에서 \(percent)", "\(percent) per pack", "1パックあたり \(percent)",
+           "\(percent) por sobre", "\(percent) par booster", "\(percent) por pacote")
+    }
+
+    /// 혜택 한 줄. 종류 이름과 부호 붙은 값을 함께 적는다.
+    func dexPerkText(_ perk: DexPerk) -> String {
+        switch perk.kind {
+        case .tokenGain:    return "\(dexPerkTokenGain) +\(Self.percent(perk.value))"
+        case .packDiscount: return "\(dexPerkPackDiscount) −\(Self.percent(perk.value))"
+        case .dustBonus:    return "\(dexPerkDustBonus) +\(Self.percent(perk.value))"
+        case .hitOdds:      return "\(dexPerkHitOdds) +\(Self.percent(perk.value))"
+        case .bonusPacks:   return "\(dexPerkBonusPacks) +\(Int(perk.value.rounded()))"
+        case .extraHitSlot: return "\(dexPerkExtraHit) +\(Int(perk.value.rounded()))"
+        case .duplicateGuard: return dexPerkDuplicateGuard
+        }
+    }
+
+    /// 누적 혜택 한 항목. 0 이면 nil — 화면이 그 칸을 아예 만들지 않게 한다.
+    func dexPerkSummaryItem(_ kind: DexPerkKind, _ perks: DexPerks) -> String? {
+        switch kind {
+        case .tokenGain:
+            return perks.tokenGain > 0 ? "\(dexPerkTokenGain) +\(Self.percent(perks.tokenGain))" : nil
+        case .packDiscount:
+            return perks.packDiscount > 0 ? "\(dexPerkPackDiscount) −\(Self.percent(perks.packDiscount))" : nil
+        case .dustBonus:
+            return perks.dustBonus > 0 ? "\(dexPerkDustBonus) +\(Self.percent(perks.dustBonus))" : nil
+        case .hitOdds:
+            return perks.hitOdds > 0 ? "\(dexPerkHitOdds) +\(Self.percent(perks.hitOdds))" : nil
+        case .bonusPacks:
+            return perks.bonusPacks > 0 ? "\(dexPerkBonusPacks) +\(perks.bonusPacks)" : nil
+        case .extraHitSlot:
+            return perks.extraHitSlot > 0 ? "\(dexPerkExtraHit) +\(perks.extraHitSlot)" : nil
+        case .duplicateGuard:
+            return perks.duplicateGuard ? dexPerkDuplicateGuard : nil
+        }
+    }
+
+    /// 지금까지 모은 혜택 요약. 0 인 항목은 적지 않는다.
+    func dexPerksSummary(_ perks: DexPerks) -> String {
+        var parts: [String] = []
+        if perks.tokenGain > 0 { parts.append("\(dexPerkTokenGain) +\(Self.percent(perks.tokenGain))") }
+        if perks.packDiscount > 0 { parts.append("\(dexPerkPackDiscount) −\(Self.percent(perks.packDiscount))") }
+        if perks.dustBonus > 0 { parts.append("\(dexPerkDustBonus) +\(Self.percent(perks.dustBonus))") }
+        if perks.hitOdds > 0 { parts.append("\(dexPerkHitOdds) +\(Self.percent(perks.hitOdds))") }
+        if perks.bonusPacks > 0 { parts.append("\(dexPerkBonusPacks) +\(perks.bonusPacks)") }
+        if perks.extraHitSlot > 0 { parts.append("\(dexPerkExtraHit) +\(perks.extraHitSlot)") }
+        if perks.duplicateGuard { parts.append(dexPerkDuplicateGuard) }
+        return parts.joined(separator: "  ·  ")
+    }
+
+    var dexPerkTokenGain: String { t2("적립 토큰", "Token earning", "獲得トークン",
+                                      "Tokens ganados", "Tokens gagnés", "Tokens ganhos") }
+    var dexPerkPackDiscount: String { t2("팩 가격", "Pack price", "パック価格", "Precio", "Prix", "Preço") }
+    var dexPerkDustBonus: String { t2("갈갈 환급", "Recycle", "分解還元", "Reciclaje", "Recyclage", "Reciclagem") }
+    var dexPerkHitOdds: String { t2("상위 등급 확률", "Higher rarity odds", "上位レア確率",
+                                    "Prob. de rareza alta", "Chance de haute rareté",
+                                    "Chance de raridade alta") }
+    var dexPerkBonusPacks: String { t2("보너스 팩", "Bonus packs", "ボーナスパック",
+                                       "Sobres extra", "Boosters bonus", "Pacotes bônus") }
+    var dexPerkExtraHit: String { t2("레어 이상 확정", "Guaranteed rare+", "レア以上確定",
+                                     "Rara garantizada", "Rare garantie", "Rara garantida") }
+    var dexPerkDuplicateGuard: String { t2("중복 회피", "Duplicate guard", "重複回避",
+                                            "Evita duplicados", "Anti-doublon", "Evita duplicadas") }
+
+    /// 혜택이 실제로 무엇을 바꾸는지 한 줄로. 이름 위에 마우스를 올리면 뜬다.
+    func dexPerkHelp(_ kind: DexPerkKind) -> String {
+        switch kind {
+        case .tokenGain:
+            return t2("코딩으로 쌓이는 토큰을 그만큼 더 받아요.",
+                      "You earn that much more from the tokens you burn while coding.",
+                      "コーディングで貯まるトークンをその分多く受け取れます。",
+                      "Ganas ese porcentaje extra de tokens al programar.",
+                      "Tu gagnes ce pourcentage de tokens en plus en codant.",
+                      "Você ganha essa porcentagem extra de tokens ao programar.")
+        case .packDiscount:
+            return t2("모든 팩을 그만큼 싸게 살 수 있어요.",
+                      "Every pack costs that much less.",
+                      "すべてのパックがその分安くなります。",
+                      "Todos los sobres cuestan menos.",
+                      "Tous les boosters coûtent moins cher.",
+                      "Todos os pacotes ficam mais baratos.")
+        case .dustBonus:
+            return t2("중복 카드를 갈 때 돌려받는 토큰이 늘어요.",
+                      "Recycling duplicates gives back more tokens.",
+                      "重複カードを分解したときの還元が増えます。",
+                      "Reciclar duplicados devuelve más tokens.",
+                      "Recycler les doublons rapporte plus de tokens.",
+                      "Reciclar duplicatas devolve mais tokens.")
+        case .hitOdds:
+            return t2("팩마다 하나씩 들어오는 레어 이상 자리에서 더 높은 등급이 나올 확률이 올라가요.",
+                      "The guaranteed rare slot rolls higher rarities more often.",
+                      "パックごとの確定レア枠で上位レアが出やすくなります。",
+                      "La carta rara garantizada sale con más rareza.",
+                      "La carte rare garantie monte plus souvent en rareté.",
+                      "A carta rara garantida sobe de raridade com mais frequência.")
+        case .bonusPacks:
+            return t2("사용 한도를 다 채웠을 때 받는 보너스 팩이 늘어요.",
+                      "You get more bonus packs when you max a usage limit.",
+                      "使用上限を使い切ったときのボーナスパックが増えます。",
+                      "Recibes más sobres extra al alcanzar el límite de uso.",
+                      "Tu reçois plus de boosters bonus en atteignant la limite.",
+                      "Você recebe mais pacotes bônus ao atingir o limite de uso.")
+        case .extraHitSlot:
+            return t2("팩마다 레어 이상 확정 칸이 하나 늘어요. 10장 팩이 11장이 됩니다.",
+                      "Every pack holds one more rare-or-better card.",
+                      "パックごとにレア以上のカードが1枚増えます。",
+                      "Cada sobre trae una carta rara adicional.",
+                      "Chaque booster contient une carte rare de plus.",
+                      "Cada pacote traz mais uma carta rara.")
+        case .duplicateGuard:
+            return t2("레어 이상 자리에서 이미 가진 카드가 나오면 한 번 다시 뽑아요.",
+                      "The rare-or-better slot rerolls once when it hits a card you own.",
+                      "レア以上の枠で所持済みが出たら一度引き直します。",
+                      "La carta rara se vuelve a tirar si ya la tienes.",
+                      "La carte rare est retirée une fois si tu l'as déjà.",
+                      "A carta rara é sorteada de novo se você já a tem.")
+        }
+    }
+
+    /// 0.005 → "0.5%". 소수점은 필요할 때만 쓴다.
+    private static func percent(_ value: Double) -> String {
+        let scaled = value * 100
+        return scaled == scaled.rounded() ? "\(Int(scaled))%" : String(format: "%.1f%%", scaled)
+    }
 
     /// 기존 파일의 `t` 가 private 이라 확장에서 쓸 수 없다. 같은 형태로 하나 더 둔다.
     private func t2(_ ko: String, _ en: String, _ ja: String, _ es: String, _ fr: String, _ pt: String) -> String {

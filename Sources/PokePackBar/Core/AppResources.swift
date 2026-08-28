@@ -59,6 +59,12 @@ enum AppResources {
         guard CardIndex.loadBundled() != nil else {
             return "card-index.json 을 읽지 못했다"
         }
+        guard bundle.url(forResource: "dex", withExtension: "json") != nil else {
+            return "번들은 찾았으나 dex.json 이 없다: \(bundle.bundlePath)"
+        }
+        guard !DexIndex.loadBundled().dexes.isEmpty else {
+            return "dex.json 을 읽지 못했거나 도감이 비어 있다"
+        }
         return nil
     }
 }

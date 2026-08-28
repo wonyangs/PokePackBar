@@ -3,7 +3,7 @@ import SwiftUI
 
 /// 기획에 필요한 탭만 둔다 — 팩을 사고, 팩을 열고, 카드를 본다.
 /// 잔액과 사용량은 탭이 아니라 상단 고정 영역이 맡는다.
-enum PopoverTab: CaseIterable { case shop, packs, collection }
+enum PopoverTab: CaseIterable { case shop, packs, collection, dex }
 
 /// 팝오버 치수의 단일 소스. 자식이 쓸 수 있는 폭을 알아야 할 때 이 값을 쓴다 — 넘치는 자식이
 /// 부모 폭을 부풀리므로 GeometryReader 로 재면 순환한다.
@@ -23,9 +23,18 @@ final class PopoverNavigation {
     var showSettings = false
     var tab: PopoverTab = .shop
 
+    /// 상점에서 바로 열어야 할 팩. 도감의 「이 팩 사러 가기」가 채운다.
+    /// 상점이 한 번 읽고 지운다 — 남겨 두면 다음에 상점을 열 때 또 그 팩이 뜬다.
+    var shopSet: String?
+
+    /// 도감 탭에서 바로 열어야 할 도감. 카드 상세의 도감 배지가 채운다.
+    var dexID: String?
+
     func reset() {
         showSettings = false
         tab = .shop
+        shopSet = nil
+        dexID = nil
     }
 }
 
@@ -164,6 +173,7 @@ struct PopoverView: View {
             Text(l.shop).tag(PopoverTab.shop)
             Text(packsLabel).tag(PopoverTab.packs)
             Text(l.collection).tag(PopoverTab.collection)
+            Text(l.dexTab).tag(PopoverTab.dex)
         }
         .pickerStyle(.segmented)
         .labelsHidden()
@@ -181,6 +191,7 @@ struct PopoverView: View {
         case .shop:       CardShopView(wallet: wallet, index: Self.index)
         case .packs:      PacksView(wallet: wallet, index: Self.index)
         case .collection: CardCollectionView(wallet: wallet, index: Self.index)
+        case .dex:        DexView(wallet: wallet, index: Self.index)
         }
     }
 }

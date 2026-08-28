@@ -1,0 +1,767 @@
+{
+ "version": 1,
+ "dexes": [
+  {
+   "id": "base1-energy",
+   "name": {
+    "ko": "그 시절 에너지",
+    "en": "Energy of the Era"
+   },
+   "blurb": {
+    "ko": "덱을 굴리려면 이것부터 있어야 했다. 팩마다 한 장씩 들어온다.",
+    "en": "Every deck started here. One comes in every pack."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "base1-100",
+    "base1-101",
+    "base1-102"
+   ],
+   "tier": 1,
+   "medianPacks": 15,
+   "hardPacks": 32,
+   "reward": {
+    "packs": 1,
+    "perks": []
+   }
+  },
+  {
+   "id": "cel25-celebration",
+   "name": {
+    "ko": "25주년 축하",
+    "en": "Twenty-Five Years"
+   },
+   "blurb": {
+    "ko": "기념 세트의 전설 셋. 팩이 네 장뿐이라 금방 모인다.",
+    "en": "Three legends from the anniversary set. Its packs hold only four cards."
+   },
+   "homeSet": "cel25",
+   "cards": [
+    "cel25-1",
+    "cel25-2",
+    "cel25-4"
+   ],
+   "tier": 1,
+   "medianPacks": 9,
+   "hardPacks": 18,
+   "reward": {
+    "packs": 1,
+    "perks": []
+   }
+  },
+  {
+   "id": "base1-charmander-line",
+   "name": {
+    "ko": "불꽃도마뱀의 성장기",
+    "en": "How the Lizard Grew Up"
+   },
+   "blurb": {
+    "ko": "1999년 초판. 도마뱀 한 마리가 날개를 얻기까지 세 장.",
+    "en": "Base Set, 1999. Three cards from lizard to dragon."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "base1-4",
+    "base1-24",
+    "base1-46"
+   ],
+   "tier": 2,
+   "medianPacks": 32,
+   "hardPacks": 98,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "packDiscount",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "neo1-bugs",
+   "name": {
+    "ko": "풀숲의 벌레들",
+    "en": "Bugs in the Tall Grass"
+   },
+   "blurb": {
+    "ko": "거미 둘, 무당벌레 둘. 넷 다 흔해서 금방 모인다.",
+    "en": "Two spiders, two ladybugs. All common, all quick."
+   },
+   "homeSet": "neo1",
+   "cards": [
+    "neo1-27",
+    "neo1-39",
+    "neo1-63",
+    "neo1-75"
+   ],
+   "tier": 2,
+   "medianPacks": 16,
+   "hardPacks": 33,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "dustBonus",
+      "value": 0.02
+     }
+    ]
+   }
+  },
+  {
+   "id": "neo1-chikorita-line",
+   "name": {
+    "ko": "금은 시절 새싹",
+    "en": "A Sprout from the Gold Era"
+   },
+   "blurb": {
+    "ko": "2000년, 두 번째 지방에서 온 첫 풀 타입 세 장.",
+    "en": "The year 2000, and a new region's first grass line."
+   },
+   "homeSet": "neo1",
+   "cards": [
+    "neo1-10",
+    "neo1-28",
+    "neo1-53"
+   ],
+   "tier": 2,
+   "medianPacks": 37,
+   "hardPacks": 116,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "dustBonus",
+      "value": 0.02
+     }
+    ]
+   }
+  },
+  {
+   "id": "neo1-night",
+   "name": {
+    "ko": "밤에 나오는 둘",
+    "en": "Two That Come Out at Night"
+   },
+   "blurb": {
+    "ko": "까마귀와 족제비. 두 장뿐이지만 둘 다 레어다.",
+    "en": "A crow and a weasel. Only two cards, both rare."
+   },
+   "homeSet": "neo1",
+   "cards": [
+    "neo1-24",
+    "neo1-25"
+   ],
+   "tier": 2,
+   "medianPacks": 21,
+   "hardPacks": 49,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "dustBonus",
+      "value": 0.02
+     }
+    ]
+   }
+  },
+  {
+   "id": "pikachu-eras",
+   "name": {
+    "ko": "네 시대의 피카츄",
+    "en": "Pikachu, Four Eras"
+   },
+   "blurb": {
+    "ko": "1999년, 2000년, 2016년, 2023년. 같은 쥐가 네 번 그려졌다.",
+    "en": "1999, 2000, 2016, 2023 — the same mouse, drawn four times."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "sv3pt5-25",
+    "xy12-35",
+    "base1-58",
+    "neo1-70"
+   ],
+   "tier": 2,
+   "medianPacks": 23,
+   "hardPacks": 70,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "tokenGain",
+      "value": 0.005
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv10-rocket-admins",
+   "name": {
+    "ko": "로켓단 간부 3인",
+    "en": "Three Rocket Admins"
+   },
+   "blurb": {
+    "ko": "총수와 그 밑의 둘. 조직도는 여기서 시작한다.",
+    "en": "The boss and his two lieutenants."
+   },
+   "homeSet": "sv10",
+   "cards": [
+    "sv10-170",
+    "sv10-171",
+    "sv10-174"
+   ],
+   "tier": 2,
+   "medianPacks": 30,
+   "hardPacks": 64,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "packDiscount",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv10-rocket-alley",
+   "name": {
+    "ko": "로켓단 뒷골목",
+    "en": "The Rocket Back Alley"
+   },
+   "blurb": {
+    "ko": "쥐 둘과 고양이 하나. 조무래기라 쉽게 모인다.",
+    "en": "Two rats and a cat. Small fry, quick to find."
+   },
+   "homeSet": "sv10",
+   "cards": [
+    "sv10-147",
+    "sv10-148",
+    "sv10-149"
+   ],
+   "tier": 2,
+   "medianPacks": 24,
+   "hardPacks": 51,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "packDiscount",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv10-rocket-poison",
+   "name": {
+    "ko": "로켓단 독가스반",
+    "en": "Rocket Poison Division"
+   },
+   "blurb": {
+    "ko": "가스와 진흙. 로켓단에서 가장 냄새나는 부서.",
+    "en": "Gas and sludge. The smelliest desk at Team Rocket."
+   },
+   "homeSet": "sv10",
+   "cards": [
+    "sv10-124",
+    "sv10-126",
+    "sv10-123",
+    "sv10-125"
+   ],
+   "tier": 2,
+   "medianPacks": 32,
+   "hardPacks": 63,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "packDiscount",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv3pt5-plants",
+   "name": {
+    "ko": "식물 친구들",
+    "en": "The Plant Ones"
+   },
+   "blurb": {
+    "ko": "포켓몬인지 화분인지 헷갈리는 다섯.",
+    "en": "Five that could pass for houseplants."
+   },
+   "homeSet": "sv3pt5",
+   "cards": [
+    "sv3pt5-1",
+    "sv3pt5-43",
+    "sv3pt5-69",
+    "sv3pt5-102",
+    "sv3pt5-114"
+   ],
+   "tier": 2,
+   "medianPacks": 24,
+   "hardPacks": 45,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "packDiscount",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv3pt5-red",
+   "name": {
+    "ko": "빨간 친구들",
+    "en": "The Red Ones"
+   },
+   "blurb": {
+    "ko": "이유는 없다. 그냥 다 빨갛다.",
+    "en": "No deeper reason. They are all just red."
+   },
+   "homeSet": "sv3pt5",
+   "cards": [
+    "sv3pt5-4",
+    "sv3pt5-46",
+    "sv3pt5-98",
+    "sv3pt5-100",
+    "sv3pt5-126"
+   ],
+   "tier": 2,
+   "medianPacks": 24,
+   "hardPacks": 45,
+   "reward": {
+    "packs": 3,
+    "perks": [
+     {
+      "kind": "packDiscount",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv3pt5-starters",
+   "name": {
+    "ko": "우리가 처음 만난 세 마리",
+    "en": "The First Three"
+   },
+   "blurb": {
+    "ko": "연구소 책상 위에 놓여 있던 셋. 누구를 골랐었나.",
+    "en": "The three on the lab table. Which one did you pick?"
+   },
+   "homeSet": "sv3pt5",
+   "cards": [
+    "sv3pt5-1",
+    "sv3pt5-4",
+    "sv3pt5-7"
+   ],
+   "tier": 2,
+   "medianPacks": 19,
+   "hardPacks": 39,
+   "reward": {
+    "packs": 3,
+    "perks": []
+   }
+  },
+  {
+   "id": "base1-arita",
+   "name": {
+    "ko": "그 사람의 붓",
+    "en": "By That One Hand"
+   },
+   "blurb": {
+    "ko": "초판 리자몽을 그린 아리타 미츠히로의 그림 다섯 장.",
+    "en": "Five cards drawn by Mitsuhiro Arita, who painted the 1999 Charizard."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "base1-4",
+    "base1-6",
+    "base1-15",
+    "base1-58",
+    "base1-63"
+   ],
+   "tier": 3,
+   "medianPacks": 67,
+   "hardPacks": 143,
+   "reward": {
+    "packs": 8,
+    "perks": [
+     {
+      "kind": "tokenGain",
+      "value": 0.005
+     }
+    ]
+   }
+  },
+  {
+   "id": "base1-bulbasaur-line",
+   "name": {
+    "ko": "씨앗에서 꽃까지",
+    "en": "From Seed to Bloom"
+   },
+   "blurb": {
+    "ko": "1999년의 씨앗에서 2023년의 ex 까지. 두 시대를 건너야 끝난다.",
+    "en": "From the 1999 bulb to the 2023 ex. Two eras to finish."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "sv3pt5-3",
+    "base1-15",
+    "base1-30",
+    "base1-44"
+   ],
+   "tier": 3,
+   "medianPacks": 57,
+   "hardPacks": 181,
+   "reward": {
+    "packs": 8,
+    "perks": [
+     {
+      "kind": "tokenGain",
+      "value": 0.005
+     }
+    ]
+   }
+  },
+  {
+   "id": "base1-holo",
+   "name": {
+    "ko": "1999년의 홀로 전부",
+    "en": "Every 1999 Holo"
+   },
+   "blurb": {
+    "ko": "초판 홀로 16장. 하나도 빠뜨릴 수 없다.",
+    "en": "All sixteen Base Set holos. No substitutions."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "base1-1",
+    "base1-2",
+    "base1-3",
+    "base1-4",
+    "base1-5",
+    "base1-6",
+    "base1-7",
+    "base1-8",
+    "base1-9",
+    "base1-10",
+    "base1-11",
+    "base1-12",
+    "base1-13",
+    "base1-14",
+    "base1-15",
+    "base1-16"
+   ],
+   "tier": 3,
+   "medianPacks": 134,
+   "hardPacks": 213,
+   "reward": {
+    "packs": 8,
+    "perks": [
+     {
+      "kind": "hitOdds",
+      "value": 0.03
+     }
+    ]
+   }
+  },
+  {
+   "id": "base1-mean-faces",
+   "name": {
+    "ko": "험상궂은 얼굴들",
+    "en": "The Mean-Looking Crew"
+   },
+   "blurb": {
+    "ko": "눈매만 봐도 시비 걸릴 것 같은 넷. 초판 홀로 셋이 섞여 있다.",
+    "en": "Four faces you would not want to meet. Three of them are holos."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "base1-6",
+    "base1-8",
+    "base1-11",
+    "base1-29"
+   ],
+   "tier": 3,
+   "medianPacks": 67,
+   "hardPacks": 143,
+   "reward": {
+    "packs": 8,
+    "perks": [
+     {
+      "kind": "tokenGain",
+      "value": 0.005
+     }
+    ]
+   }
+  },
+  {
+   "id": "base1-squirtle-line",
+   "name": {
+    "ko": "물총에서 대포까지",
+    "en": "From Squirt to Cannon"
+   },
+   "blurb": {
+    "ko": "물총 하나로 시작해 2023년의 ex 로 끝난다. 두 시대를 건너야 한다.",
+    "en": "One water gun in 1999, an ex in 2023. Two eras to finish."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "base1-2",
+    "sv3pt5-9",
+    "base1-42",
+    "base1-63"
+   ],
+   "tier": 3,
+   "medianPacks": 57,
+   "hardPacks": 181,
+   "reward": {
+    "packs": 8,
+    "perks": [
+     {
+      "kind": "tokenGain",
+      "value": 0.005
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv10-rocket-elite",
+   "name": {
+    "ko": "로켓단 정예",
+    "en": "The Rocket Elite"
+   },
+   "blurb": {
+    "ko": "간부가 직접 데리고 다니는 ex 세 마리.",
+    "en": "The three ex Pokemon the admins keep close."
+   },
+   "homeSet": "sv10",
+   "cards": [
+    "sv10-119",
+    "sv10-122",
+    "sv10-150"
+   ],
+   "tier": 3,
+   "medianPacks": 81,
+   "hardPacks": 173,
+   "reward": {
+    "packs": 8,
+    "perks": [
+     {
+      "kind": "tokenGain",
+      "value": 0.005
+     }
+    ]
+   }
+  },
+  {
+   "id": "swsh45-cinderace",
+   "name": {
+    "ko": "불꽃 축구 선수",
+    "en": "The Striker"
+   },
+   "blurb": {
+    "ko": "V 와 VMAX 두 장. 같은 선수의 전반과 후반.",
+    "en": "V and VMAX. The same striker, two halves."
+   },
+   "homeSet": "swsh45",
+   "cards": [
+    "swsh45-19",
+    "swsh45-18"
+   ],
+   "tier": 3,
+   "medianPacks": 108,
+   "hardPacks": 315,
+   "reward": {
+    "packs": 8,
+    "perks": [
+     {
+      "kind": "bonusPacks",
+      "value": 2
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv3pt5-birds",
+   "name": {
+    "ko": "전설의 새 세 마리",
+    "en": "Three Legendary Birds"
+   },
+   "blurb": {
+    "ko": "얼음과 번개와 불꽃. 셋 중 번개만 스페셜아트라 그 한 장이 전부를 결정한다.",
+    "en": "Ice, lightning, fire. The lightning one is special art, and it decides everything."
+   },
+   "homeSet": "sv3pt5",
+   "cards": [
+    "sv3pt5-202",
+    "sv3pt5-144",
+    "sv3pt5-146"
+   ],
+   "tier": 4,
+   "medianPacks": 228,
+   "hardPacks": 757,
+   "reward": {
+    "packs": 20,
+    "perks": [
+     {
+      "kind": "bonusPacks",
+      "value": 4
+     },
+     {
+      "kind": "tokenGain",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv8pt5-eeveelutions",
+   "name": {
+    "ko": "이브이의 여덟 갈래",
+    "en": "Eight Ways to Evolve"
+   },
+   "blurb": {
+    "ko": "한 마리가 갈라진 여덟 모습. 전부 ex 라 한 세트만 파도 오래 걸린다.",
+    "en": "One Pokemon, eight endings. All ex, all from one set."
+   },
+   "homeSet": "sv8pt5",
+   "cards": [
+    "sv8pt5-6",
+    "sv8pt5-14",
+    "sv8pt5-23",
+    "sv8pt5-26",
+    "sv8pt5-30",
+    "sv8pt5-34",
+    "sv8pt5-41",
+    "sv8pt5-60"
+   ],
+   "tier": 4,
+   "medianPacks": 187,
+   "hardPacks": 326,
+   "reward": {
+    "packs": 20,
+    "perks": [
+     {
+      "kind": "packDiscount",
+      "value": 0.03
+     },
+     {
+      "kind": "tokenGain",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "swsh45-vmax",
+   "name": {
+    "ko": "거대화한 것들",
+    "en": "The Ones That Got Huge"
+   },
+   "blurb": {
+    "ko": "몸집을 키운 VMAX 넷. 전부 최상위 등급이라 한 세트만 파도 오래 걸린다.",
+    "en": "Four VMAX cards, all top rarity. One set, but a long haul."
+   },
+   "homeSet": "swsh45",
+   "cards": [
+    "swsh45-10",
+    "swsh45-19",
+    "swsh45-45",
+    "swsh45-51"
+   ],
+   "tier": 4,
+   "medianPacks": 250,
+   "hardPacks": 497,
+   "reward": {
+    "packs": 20,
+    "perks": [
+     {
+      "kind": "hitOdds",
+      "value": 0.05
+     },
+     {
+      "kind": "tokenGain",
+      "value": 0.01
+     }
+    ]
+   }
+  },
+  {
+   "id": "hall-of-fame-charizard",
+   "name": {
+    "ko": "명예의 전당 · 리자몽",
+    "en": "Hall of Fame: Charizard"
+   },
+   "blurb": {
+    "ko": "1999년 초판부터 2023년 스페셜아트까지, 다섯 시대의 리자몽. 다섯 세트의 팩을 모두 사야 한다.",
+    "en": "Five eras of Charizard, 1999 to 2023. Five sets, five packs to buy."
+   },
+   "homeSet": "base1",
+   "cards": [
+    "sv3pt5-199",
+    "swsh12pt5-19",
+    "base1-4",
+    "sm115-9",
+    "xy12-11"
+   ],
+   "tier": 5,
+   "medianPacks": 512,
+   "hardPacks": 1696,
+   "reward": {
+    "packs": 50,
+    "perks": [
+     {
+      "kind": "extraHitSlot",
+      "value": 1
+     },
+     {
+      "kind": "hitOdds",
+      "value": 0.05
+     }
+    ]
+   }
+  },
+  {
+   "id": "sv10-rocket-boss",
+   "name": {
+    "ko": "로켓단 총수",
+    "en": "The Rocket Boss"
+   },
+   "blurb": {
+    "ko": "총수와 그가 만든 병기. 스페셜아트 한 장이 이 조합의 전부를 결정한다.",
+    "en": "The boss and the weapon he made. One special-art card decides this whole dex."
+   },
+   "homeSet": "sv10",
+   "cards": [
+    "sv10-231",
+    "sv10-213",
+    "sv10-119",
+    "sv10-174"
+   ],
+   "tier": 5,
+   "medianPacks": 635,
+   "hardPacks": 1534,
+   "reward": {
+    "packs": 50,
+    "perks": [
+     {
+      "kind": "duplicateGuard",
+      "value": 1
+     },
+     {
+      "kind": "tokenGain",
+      "value": 0.05
+     }
+    ]
+   }
+  }
+ ]
+}

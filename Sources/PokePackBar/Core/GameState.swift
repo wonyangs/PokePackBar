@@ -49,6 +49,26 @@ struct GameState: Codable, Sendable {
     /// 개봉한 팩 누적 개수. 통계용.
     var packsOpened = 0
 
+    // MARK: 조합 도감
+
+    /// 보상을 수령한 도감 id. **영구 기록이다** — 나중에 도감 구성이 바뀌어도 이미 준 혜택을
+    /// 회수하지 않고, 보상을 두 번 주지 않는 근거도 이 목록이다.
+    ///
+    /// 완성 여부 자체는 저장하지 않는다. 보유 카드에서 매번 계산하는 편이 정확하다 —
+    /// 도감 기능이 생기기 전에 이미 모아 둔 카드도 그래야 완성으로 잡힌다.
+    var claimedDex: [String] = []
+
+    /// 세트별 천장 카운터 — 레어 이상 칸에서 연속으로 레어만 나온 횟수.
+    ///
+    /// 영속이어야 한다. 재시작마다 0 으로 돌아가면 보장이 사실상 없는 것과 같다.
+    var packPity: [String: Int] = [:]
+
+    /// 도감 혜택(`tokenGain`)으로 추가 적립된 토큰 누적.
+    ///
+    /// `usedSinceInstall` 에 배수를 곱하지 않는다. 그 값은 실제 사용량이라
+    /// 곱해 버리면 화면에 보이는 사용량이 거짓이 된다. 잔액에만 더한다.
+    var perkTokens = 0
+
     // MARK: 보너스 팩 (한도 달성 보상)
 
     /// 한도 창별 지급 상태(창 key → 지급 여부). 영속이어야 한다 —
@@ -70,6 +90,9 @@ struct GameState: Codable, Sendable {
     ///
     /// 한 필드가 깨졌다고 상태 전체(수집한 카드)를 날리지 않기 위한 것이다.
     /// 최상위가 JSON 객체가 아니면 디코딩을 실패시켜 호출부의 손상 복구 경로로 넘긴다.
+    /// 저장 키 — `claimedDex` 는 예전에 `completedDex` 였다. 옛 세이브를 읽으려면 둘 다 필요하다.
+    private enum LegacyKeys: String, CodingKey { case completedDex }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func value<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
@@ -87,6 +110,15 @@ struct GameState: Codable, Sendable {
         packs = value(.packs, [:])
         cards = value(.cards, [:])
         packsOpened = value(.packsOpened, 0)
+        // 이전 이름(completedDex)으로 저장된 값도 읽는다.
+        var claimed = value(.claimedDex, [String]())
+        if claimed.isEmpty, let legacy = try? decoder.container(keyedBy: LegacyKeys.self),
+           let previous = try? legacy.decode([String].self, forKey: .completedDex) {
+            claimed = previous
+        }
+        claimedDex = claimed
+        perkTokens = value(.perkTokens, 0)
+        packPity = value(.packPity, [:])
         packGrantTier = value(.packGrantTier, [:])
         packGrantSeeded = value(.packGrantSeeded, false)
         language = value(.language, AppLanguage.systemDefault)

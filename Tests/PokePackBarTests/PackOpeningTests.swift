@@ -110,18 +110,82 @@ final class PackOpeningTests: XCTestCase {
         XCTAssertNil(PackOpening.pick(tier: .common, from: [:], avoiding: [], using: &g))
     }
 
-    /// 에너지는 다른 계층으로 대체하지 않는다. 없으면 그 슬롯을 일반 카드로 채운다.
-    func testEnergySlotOnlyAppearsWhenSetHasEnergy() {
+    /// **어떤 칸도 상위 등급을 못 뽑는 칸이어서는 안 된다.**
+    ///
+    /// 예전 구조는 아홉 칸이 커먼·언커먼 확정이었다. 그러면 확률을 정직하게 공시할수록
+    /// "열 장 중 아홉 장은 절대 레어가 아니다" 가 드러나 불쾌해진다. 실물 팩도 포일 칸이
+    /// 세 개라 레어가 나올 자리가 여럿이다.
+    func testEverySlotCanRollRareOrBetter() {
+        for (weights, count) in PackOpening.standardSlotTables(perks: .none) {
+            XCTAssertGreaterThan(count, 0)
+            let total = weights.reduce(0) { $0 + $1.weight }
+            let rareOrBetter = weights
+                .filter { $0.tier.rank >= CardTier.rare.rank }
+                .reduce(0) { $0 + $1.weight }
+            XCTAssertGreaterThan(Double(rareOrBetter) / Double(total), 0,
+                                 "상위 등급을 못 뽑는 칸이 있다: \(weights)")
+        }
+    }
+
+    /// 마지막 칸 하나는 레어 이상만 뽑는다. 팩마다 최소 한 장을 보장하는 자리다.
+    func testTheLastSlotIsAlwaysRareOrBetter() {
+        let tables = PackOpening.standardSlotTables(perks: .none)
+        let hit = try! XCTUnwrap(tables.last)
+        XCTAssertEqual(hit.count, PackConfig.hitSlots)
+        XCTAssertTrue(hit.weights.allSatisfy { $0.tier.rank >= CardTier.rare.rank },
+                      "확정 칸에 커먼·언커먼이 섞였다")
+        XCTAssertEqual(tables.reduce(0) { $0 + $1.count }, PackConfig.cardsPerPack)
+    }
+
+    /// 천장 — 연속으로 레어만 나오면 다음은 RR 이상을 보장한다.
+    func testPityForcesDoubleRareOrBetter() {
+        let pool: [CardTier: [String]] = [.rare: ["r"], .doubleRare: ["rr"], .ultraRare: ["ur"]]
+        for seed in UInt64(1)...30 {
+            var g = SeededGenerator(seed: seed)
+            let tier = PackOpening.hitTier(available: pool, pity: PackConfig.pityThreshold, using: &g)
+            XCTAssertGreaterThan(tier.rank, CardTier.rare.rank, "seed \(seed): 천장이 안 걸렸다")
+        }
+    }
+
+    /// 세트에 RR 이상이 아예 없으면 천장을 걸지 않는다 — 걸면 슬롯이 비어 버린다.
+    func testPityDoesNotEmptyASetWithoutHigherTiers() {
+        let pool: [CardTier: [String]] = [.rare: ["r"]]
+        var g = SeededGenerator(seed: 3)
+        XCTAssertEqual(PackOpening.hitTier(available: pool, pity: 99, using: &g), .rare)
+    }
+
+    /// 카운터는 레어에서 오르고 RR 이상에서 0 으로 돌아간다.
+    func testPityCounterRisesAndResets() {
+        XCTAssertEqual(PackOpening.nextPity(after: [.rare], from: 0), 1)
+        XCTAssertEqual(PackOpening.nextPity(after: [.rare], from: 4), 5)
+        XCTAssertEqual(PackOpening.nextPity(after: [.doubleRare], from: 4), 0)
+        XCTAssertEqual(PackOpening.nextPity(after: [.ultraRare], from: 99), 0)
+        XCTAssertEqual(PackOpening.nextPity(after: [.rare, .doubleRare], from: 2), 0,
+                       "한 팩에 확정 칸이 둘이면 마지막 결과가 카운터를 정한다")
+    }
+
+    /// 에너지는 그 계층이 있는 세트에서만 나온다. 없는 세트에 억지로 끼워 넣지 않는다.
+    ///
+    /// 확정 슬롯이 아니라 일반 칸의 추첨 결과이므로 장수는 팩마다 다르다.
+    /// 여기서 잠그는 것은 "없는 세트에서 나오지 않는다" 와 "장수가 줄지 않는다" 두 가지다.
+    func testEnergyOnlyAppearsWhenSetHasEnergy() {
         let withEnergy = makeIndex("e", [.common: 20, .uncommon: 20, .rare: 10, .doubleRare: 5, .energy: 6])
         let without = makeIndex("n", [.common: 20, .uncommon: 20, .rare: 10, .doubleRare: 5])
-        var g1 = SeededGenerator(seed: 5)
-        var g2 = SeededGenerator(seed: 5)
 
-        let a = PackOpening.draw(setID: "e", index: withEnergy, alreadyOwned: [], using: &g1)
-        let b = PackOpening.draw(setID: "n", index: without, alreadyOwned: [], using: &g2)
-        XCTAssertEqual(a.filter { $0.tier == .energy }.count, 1)
-        XCTAssertEqual(b.filter { $0.tier == .energy }.count, 0)
-        XCTAssertEqual(b.count, PackConfig.cardsPerPack)
+        var sawEnergy = false
+        for seed in UInt64(1)...30 {
+            var g = SeededGenerator(seed: seed)
+            let pack = PackOpening.draw(setID: "e", index: withEnergy, alreadyOwned: [], using: &g)
+            if pack.contains(where: { $0.tier == .energy }) { sawEnergy = true }
+        }
+        XCTAssertTrue(sawEnergy, "에너지가 있는 세트에서는 나와야 한다")
+
+        for seed in UInt64(1)...30 {
+            var g = SeededGenerator(seed: seed)
+            let pack = PackOpening.draw(setID: "n", index: without, alreadyOwned: [], using: &g)
+            XCTAssertEqual(pack.filter { $0.tier == .energy }.count, 0)
+            XCTAssertEqual(pack.count, PackConfig.cardsPerPack)
+        }
     }
 
     // MARK: 신규 판정
@@ -529,7 +593,7 @@ final class CardDustTests: XCTestCase {
     /// 희귀할수록 환급이 크다.
     func testDustRisesWithRarity() {
         let ordered = CardTier.allCases.sorted { $0.rank < $1.rank }
-        let values = ordered.map(CardDust.value(for:))
+        let values = ordered.map { CardDust.value(for: $0) }
         for (a, b) in zip(values, values.dropFirst()) {
             XCTAssertLessThanOrEqual(a, b, "환급액이 뒤집혔다: \(values)")
         }

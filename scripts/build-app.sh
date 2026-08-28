@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="0.1.8"
+VERSION="0.2.0"
 APP_NAME="PokePackBar"
 BUILD_DIR="build"
 # 원본과 겹치면 로그인 항목·Keychain ACL·LaunchServices 상태가 섞인다.
@@ -81,6 +81,15 @@ if [ ! -f "$CARD_INDEX" ]; then
     exit 1
 fi
 echo "   card-index.json $(wc -c < "$CARD_INDEX" | tr -d ' ') bytes"
+
+# 조합 도감 — 빠지면 도감 탭이 통째로 비어 나간다. 앱은 그래도 뜨므로 여기서 잡아야 한다.
+DEX="$APP/Contents/Resources/${APP_NAME}_${APP_NAME}.bundle/dex.json"
+if [ ! -f "$DEX" ]; then
+    echo "   \u2717 도감 목록이 번들에 없다: $DEX" >&2
+    echo "     pokemon-card 저장소에서 scripts/build_dex.py 를 실행했는지 확인한다." >&2
+    exit 1
+fi
+echo "   dex.json $(wc -c < "$DEX" | tr -d ' ') bytes"
 
 # 팩 아트 — 판매 세트 수만큼 있어야 한다. 빠지면 상점이 빈 상자로 뜬다.
 PACK_DIR="$APP/Contents/Resources/${APP_NAME}_${APP_NAME}.bundle/packs"

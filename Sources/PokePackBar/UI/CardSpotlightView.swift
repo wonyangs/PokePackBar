@@ -25,6 +25,8 @@ struct CardSpotlightView: View {
     var preloaded: NSImage?
     let onClose: () -> Void
 
+    @Environment(PopoverNavigation.self) private var nav
+
     @State private var landed = false
     @State private var confirmingDisenchant = false
     /// 방금 돌려받은 액수. 잠깐 보여주고 지운다.
@@ -82,8 +84,11 @@ struct CardSpotlightView: View {
                 }
             }
 
+            dexBadges(l)
+                .padding(.top, 6)
+
             disenchantControls(l)
-                .padding(.top, 8)
+                .padding(.top, 6)
                 .padding(.bottom, 6)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -96,6 +101,55 @@ struct CardSpotlightView: View {
         }
     }
 
+    /// 이 카드가 들어가는 도감. 눌러서 그 도감으로 넘어간다.
+    ///
+    /// 미완성인 것만, 완성에 가까운 것부터 최대 두 개까지 보여준다 — 한 카드가 여덧 도감에
+    /// 걸리는 경우가 있어 전부 늘어놓으면 카드보다 배지가 커진다.
+    private var relatedDexes: [DexStatus] {
+        let claimed = wallet.claimedDexIDs
+        let owned: (String) -> Bool = { wallet.cardCount($0) > 0 }
+        var out: [DexStatus] = []
+        for dex in wallet.dexes where dex.cards.contains(cardID) && !claimed.contains(dex.id) {
+            out.append(DexProgress.status(for: dex, owned: owned, claimed: false))
+        }
+        out.sort { a, b in
+            if a.missing.count != b.missing.count { return a.missing.count < b.missing.count }
+            return a.dex.id < b.dex.id
+        }
+        return Array(out.prefix(2))
+    }
+
+    @ViewBuilder
+    private func dexBadges(_ l: L) -> some View {
+        let related = relatedDexes
+        if !related.isEmpty {
+            VStack(spacing: 3) {
+                Text(l.dexCardBelongsTo)
+                    .font(.system(size: 9)).foregroundStyle(.tertiary)
+                HStack(spacing: 5) {
+                    ForEach(related) { status in
+                        Button {
+                            nav.dexID = status.dex.id
+                            nav.tab = .dex
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(status.dex.name.text(wallet.language))
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .lineLimit(1)
+                                Text(l.dexProgress(status.ownedCount, status.total))
+                                    .font(.system(size: 9)).monospacedDigit()
+                                    .foregroundStyle(status.isFilled ? Color.accentColor : .secondary)
+                            }
+                            .padding(.horizontal, 6).padding(.vertical, 2.5)
+                            .background(Color.secondary.opacity(0.12), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
     /// 중복분을 갈아 토큰으로 돌려받는다.
     ///
     /// 마지막 한 장은 남긴다 — 수집한 카드가 컬렉션에서 사라지는 것은 되돌릴 수 없다.
@@ -104,7 +158,7 @@ struct CardSpotlightView: View {
     @ViewBuilder
     private func disenchantControls(_ l: L) -> some View {
         let spare = wallet.spareCount(cardID)
-        let refund = CardDust.value(for: tier) * spare
+        let refund = CardDust.value(for: tier, perks: wallet.perks) * spare
 
         if let lastRefund {
             Label(l.disenchantDone(TokenFormatter.grouped(lastRefund)), systemImage: "checkmark.circle.fill")
