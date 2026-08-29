@@ -207,7 +207,7 @@ private struct OwnedPackRow: View {
 /// 개봉 결과 — 한 장씩 크게 보여준다.
 ///
 /// 넘기는 것은 사용자가 한다. 자동으로 흘러가면 카드를 보기도 전에 지나가고,
-/// 뜯는 맛도 없다. 카드를 누르거나 아래 버튼을 누르면 다음 장이 나온다.
+/// 뜯는 맛도 없다. 카드를 누르거나 끌어서 넘긴다 — 넘기기 버튼은 두지 않는다.
 @MainActor
 private struct RevealView: View {
     let wallet: WalletStore
@@ -217,8 +217,6 @@ private struct RevealView: View {
 
     /// 지금 보고 있는 장 번호. 카드 수와 같아지면 요약으로 넘어간다.
     @State private var position = 0
-    /// 한번에 열기로 도는 작업. 사용자가 직접 넘기면 취소한다.
-    @State private var autoPlay: Task<Void, Never>?
     /// 결과 화면에서 크게 보고 있는 카드.
     @State private var spotlight: PulledCard?
 
@@ -229,7 +227,7 @@ private struct RevealView: View {
         VStack(spacing: 8) {
             if let focused = spotlight {
                 CardSpotlightView(wallet: wallet, cardID: focused.id,
-                                  name: index?.card(focused.id)?.name ?? focused.id,
+                                  name: index?.card(focused.id)?.displayName(wallet.language) ?? focused.id,
                                   tier: focused.tier,
                                   setID: index?.card(focused.id)?.setID ?? "",
                                   setName: opened.setName,
@@ -244,32 +242,19 @@ private struct RevealView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onChange(of: opened.id) {
-            autoPlay?.cancel()
-            autoPlay = nil
-            position = 0
-        }
-        .onDisappear { autoPlay?.cancel() }
+        .onChange(of: opened.id) { position = 0 }
     }
 
-    /// 직접 넘긴다. 자동 재생 중이었다면 멈춘다 — 둘이 함께 위치를 밀면 카드를 건너뛴다.
     private func advance() {
-        autoPlay?.cancel()
-        autoPlay = nil
         withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { position += 1 }
     }
 
-    /// 남은 카드를 끝까지 자동으로 넘긴다. 등급이 높을수록 오래 머문다.
-    private func openAll() {
-        autoPlay?.cancel()
-        autoPlay = Task { @MainActor in
-            while position < opened.cards.count {
-                try? await Task.sleep(for: RevealTiming.hold)
-                if Task.isCancelled { return }
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { position += 1 }
-            }
-            autoPlay = nil
-        }
+    /// 한번에 열기 — 남은 카드를 한 장씩 넘기지 않고 결과 화면으로 바로 간다.
+    ///
+    /// 예전에는 1초에 한 장씩 자동으로 넘겼다. 그러면 열 장을 다 볼 때까지 10초를 기다려야
+    /// 하고, 그동안 할 수 있는 것도 없다. 결과를 보고 싶다는 뜻이니 결과를 바로 준다.
+    private func skipToSummary() {
+        withAnimation(.easeOut(duration: 0.22)) { position = opened.cards.count }
     }
 
     // MARK: 한 장씩
@@ -295,14 +280,11 @@ private struct RevealView: View {
 
             Spacer(minLength: 0)
 
-            // 카드 자체가 넘기는 버튼이다. 아래 버튼까지 내려가지 않아도 되게 한다.
-            Button(action: advance) {
-                SpotlightCard(card: card, newBadge: l.newCardBadge,
-                              preloaded: opened.hires[card.id])
-            }
-            .buttonStyle(.plain)
-            // 카드가 바뀔 때마다 뷰를 새로 만든다 — 첫 장을 포함해 매번 등장 애니메이션이 돈다.
-            .id(card.id)
+            RevealStack(card: card,
+                        next: position + 1 < opened.cards.count ? opened.cards[position + 1] : nil,
+                        newBadge: l.newCardBadge,
+                        preloaded: opened.hires[card.id],
+                        onAdvance: advance)
 
             VStack(spacing: 2) {
                 Text(l.tierBadge(card.tier))
@@ -313,16 +295,13 @@ private struct RevealView: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 6) {
-                Button(isLast ? l.done : l.revealNext, action: advance)
-                    .buttonStyle(.borderedProminent).controlSize(.small)
-                if !isLast {
-                    Button(autoPlay == nil ? l.openAll : l.stopAuto) {
-                        if autoPlay == nil { openAll() } else { autoPlay?.cancel(); autoPlay = nil }
-                    }
-                    .buttonStyle(.bordered).controlSize(.small)
-                }
-            }
+            // 마지막 장에는 누를 것이 없다 — 카드를 넘기면 결과로 간다.
+            // 자리는 남겨 둔다. 버튼이 사라지면 카드가 아래로 내려앉아 흔들린다.
+            Button(l.openAll, action: skipToSummary)
+                .buttonStyle(.bordered).controlSize(.small)
+                .opacity(isLast ? 0 : 1)
+                .disabled(isLast)
+                .accessibilityHidden(isLast)
         }
         .padding(.vertical, 2)
     }
@@ -368,6 +347,66 @@ private struct RevealView: View {
                 .buttonStyle(.borderedProminent).controlSize(.small)
                 .padding(.bottom, 2)
         }
+    }
+}
+
+/// 한 장씩 넘기는 자리. 카드를 누르거나 끌어서 넘긴다.
+///
+/// 끌면 카드가 손을 따라 들리고 그 아래에서 **다음 장의 등급 후광**이 배어 나온다.
+/// 실물 카드깡에서 위 카드를 살짝 들춰 다음 장의 반사광을 훔쳐보는 동작을 옮긴 것이다.
+/// 커먼·에너지의 후광 세기는 0 이므로 "아무것도 안 비친다" 도 그대로 정보가 된다 —
+/// 빛이 없으면 다음 장은 기대할 것이 없다는 뜻이고, 그 실망까지가 카드깡이다.
+@MainActor
+private struct RevealStack: View {
+    let card: PulledCard
+    let next: PulledCard?
+    let newBadge: String
+    let preloaded: NSImage?
+    let onAdvance: () -> Void
+
+    @State private var drag: CGSize = .zero
+
+    /// 얼마나 들췄는가(0~1). 다음 장 후광의 세기와 그림자에 함께 쓴다.
+    private var peek: Double { RevealPeek.amount(drag) }
+
+    var body: some View {
+        ZStack {
+            // 다음 장은 그림을 보여주지 않는다. 빛만 새어 나와야 다음 장이 기대된다.
+            if let next {
+                TierGlow(tier: next.tier, width: 196)
+                    .opacity(peek)
+                    .scaleEffect(0.94 + 0.06 * peek)
+                    .allowsHitTesting(false)
+            }
+            SpotlightCard(card: card, newBadge: newBadge, preloaded: preloaded)
+                // 카드가 바뀔 때마다 뷰를 새로 만든다 — 첫 장을 포함해 매번 등장 애니메이션이 돈다.
+                .id(card.id)
+                .offset(drag)
+                .rotationEffect(.degrees(RevealPeek.tilt(drag)), anchor: .bottom)
+                .shadow(color: .black.opacity(0.35 * peek), radius: 10 * peek, y: 5 * peek)
+        }
+        .contentShape(Rectangle())
+        // 누르면 바로 넘어간다. 끌기에 최소 거리를 두었으므로 탭과 부딪히지 않는다.
+        .onTapGesture(perform: advance)
+        .gesture(
+            DragGesture(minimumDistance: 6)
+                .onChanged { drag = $0.translation }
+                .onEnded { value in
+                    if RevealPeek.advances(value.translation) {
+                        advance()
+                    } else {
+                        // 덜 들췄으면 제자리로. 다음 장 빛도 함께 사그라든다.
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.7)) {
+                            drag = .zero
+                        }
+                    }
+                }
+        )
+    }
+
+    private func advance() {
+        drag = .zero
+        onAdvance()
     }
 }
 
@@ -452,12 +491,37 @@ struct NewBadge: View {
     }
 }
 
-/// 한번에 열기의 장당 유지 시간.
+/// 카드를 들췄을 때의 반응. 순수 계산만 모아 둔다 — 이 값들이 손맛을 결정하므로
+/// 테스트로 못박는다.
 ///
-/// 등급별로 다르게 줬더니 리듬이 들쭉날쭉해 오히려 어색했다. 일정한 간격이
-/// 넘어가는 흐름을 읽기 쉽다.
-enum RevealTiming {
-    static let hold = Duration.seconds(1)
+/// 거리는 가로·세로를 합친 크기로 잰다. 가로만 보면 위로 들춰 보는 동작이 먹지 않고,
+/// 실물 카드깡에서 카드를 들추는 방향은 사람마다 다르다.
+enum RevealPeek {
+    /// 넘어가는 데 필요한 이동 거리(pt). 짧으면 훔쳐보려다 넘어가고,
+    /// 길면 카드가 손에 붙어 안 떨어진다.
+    static let threshold: CGFloat = 62
+    /// 손을 따라 기울어지는 정도의 한계. 밑변을 축으로 돌려 들어 올리는 느낌을 준다.
+    static let maxTilt = 11.0
+    /// 가로 이동 몇 pt 마다 1도씩 기울일지.
+    static let tiltPerPoint = 16.0
+
+    static func distance(_ translation: CGSize) -> CGFloat {
+        (translation.width * translation.width
+            + translation.height * translation.height).squareRoot()
+    }
+
+    /// 들춘 정도(0~1). 문턱을 넘으면 1 에서 멈춘다 — 더 끌어도 빛이 더 세지지는 않는다.
+    static func amount(_ translation: CGSize) -> Double {
+        min(1, max(0, Double(distance(translation)) / Double(threshold)))
+    }
+
+    static func tilt(_ translation: CGSize) -> Double {
+        max(-maxTilt, min(maxTilt, Double(translation.width) / tiltPerPoint))
+    }
+
+    static func advances(_ translation: CGSize) -> Bool {
+        distance(translation) >= threshold
+    }
 }
 
 /// 카드 뒤에서 은은하게 퍼지는 등급 후광.

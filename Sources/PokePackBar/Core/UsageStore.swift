@@ -81,6 +81,16 @@ final class UsageStore {
     var updateNotificationsEnabled: Bool {
         didSet { defaults.set(updateNotificationsEnabled, forKey: "updateNotificationsEnabled") }
     }
+    /// 메뉴바 아이콘에 내 카드를 쓸지. 끄면 기존 카드 묶음 기호로 돌아간다.
+    /// 메뉴바는 좁아서 취향이 갈리는 자리라 끌 수 있어야 한다.
+    var menuBarCardEnabled: Bool {
+        didSet { defaults.set(menuBarCardEnabled, forKey: "menuBarCardEnabled") }
+    }
+    /// 패치 노트를 마지막으로 본 버전. 이 값과 실행 중인 버전이 다르면 팝오버에 안내 줄이 뜬다.
+    /// 값이 없으면 빈 문자열 — 처음 켠 사람에게도 한 번은 보여 준다.
+    var lastSeenReleaseVersion: String {
+        didSet { defaults.set(lastSeenReleaseVersion, forKey: "lastSeenReleaseVersion") }
+    }
     /// 프로바이더 상태(인시던트) 조회 — 기본 켬. 표시 전용(알림 아님). Claude/OpenAI statuspage.io.
     var statusChecksEnabled: Bool {
         didSet { defaults.set(statusChecksEnabled, forKey: "statusChecksEnabled") }
@@ -469,6 +479,8 @@ final class UsageStore {
         limitNotifications = d.object(forKey: "limitNotifications") as? Bool ?? true
         bonusPackNotifications = d.object(forKey: "bonusPackNotifications") as? Bool ?? true
         updateNotificationsEnabled = d.object(forKey: "updateNotificationsEnabled") as? Bool ?? true
+        menuBarCardEnabled = d.object(forKey: "menuBarCardEnabled") as? Bool ?? true
+        lastSeenReleaseVersion = d.string(forKey: "lastSeenReleaseVersion") ?? ""
         statusChecksEnabled = d.object(forKey: "statusChecksEnabled") as? Bool ?? true
         disableKeychainAccess = d.object(forKey: "disableKeychainAccess") as? Bool ?? false
 

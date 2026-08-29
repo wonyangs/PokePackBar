@@ -252,10 +252,10 @@ private struct DexCardStrip: View {
     /// 마우스를 올리면 카드 이름과, 없으면 한 팩에서 나올 확률을 알려 준다.
     private func helpText(_ cardID: String, entry: CardEntry?, owned: Bool) -> String {
         guard let entry else { return cardID }
-        guard !owned, let index else { return entry.name }
+        guard !owned, let index else { return entry.displayName(wallet.language) }
         let chance = DexDifficulty.pullProbability(cardID: cardID, index: index,
                                                    perks: wallet.perks)
-        return "\(entry.name) — \(wallet.l.dexPullChance(DexFormat.percent(chance)))"
+        return "\(entry.displayName(wallet.language)) — \(wallet.l.dexPullChance(DexFormat.percent(chance)))"
     }
 }
 
@@ -279,7 +279,8 @@ private struct DexDetailView: View {
 
     var body: some View {
         if let spotlight, let entry = index?.card(spotlight) {
-            CardSpotlightView(wallet: wallet, cardID: entry.id, name: entry.name,
+            CardSpotlightView(wallet: wallet, cardID: entry.id,
+                              name: entry.displayName(wallet.language),
                               tier: entry.tier, setID: entry.setID,
                               setName: index?.set(entry.setID)?.name ?? entry.setID,
                               ownedCount: wallet.cardCount(entry.id)) {

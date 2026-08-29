@@ -7,7 +7,8 @@ struct L {
     let lang: AppLanguage
     init(_ lang: AppLanguage) { self.lang = lang }
 
-    private func t(_ ko: String, _ en: String, _ ja: String, _ es: String, _ fr: String, _ pt: String) -> String {
+    /// 언어별 문구 고르기. `L` 을 나눠 담은 다른 파일(카드·패치 노트)도 이걸 쓴다.
+    func t(_ ko: String, _ en: String, _ ja: String, _ es: String, _ fr: String, _ pt: String) -> String {
         switch lang {
         case .ko: return ko
         case .en: return en
@@ -597,6 +598,15 @@ struct L {
     var checkNowButton: String { t("지금 확인", "Check now", "今すぐ確認", "Comprobar ahora", "Vérifier maintenant", "Buscar agora") }
     func updateFound(_ version: String) -> String { t("새 버전 v\(version) 있어요", "Version \(version) is available", "バージョン \(version) が利用可能です", "La versión \(version) está disponible", "La version \(version) est disponible", "A versão \(version) está disponível") }
     func upToDate(_ version: String) -> String { t("최신 버전이에요 (v\(version))", "You're on the latest (v\(version))", "最新です (v\(version))", "Tienes la última versión (v\(version))", "Tu as la dernière version (v\(version))", "Você está na última versão (v\(version))") }
+
+    // MARK: 패치 노트
+    var releaseNotesTitle: String { t("패치 노트", "Release notes", "更新履歴", "Notas de versión", "Notes de version", "Notas de versão") }
+    var releaseNotesOpen: String { t("보기", "View", "見る", "Ver", "Voir", "Ver") }
+    var releaseNotesCurrentBadge: String { t("사용 중", "Installed", "使用中", "Instalada", "Installée", "Instalada") }
+    func releaseNotesWhatsNew(_ version: String) -> String {
+        t("v\(version) 에서 바뀐 것", "What's new in v\(version)", "v\(version) の変更点",
+          "Novedades de la v\(version)", "Nouveautés de la v\(version)", "Novidades da v\(version)")
+    }
 
     // MARK: 알림
     var notifCritical: String { t("한도 임박", "Limit imminent", "上限切迫", "Límite inminente", "Limite imminente", "Limite iminente") }

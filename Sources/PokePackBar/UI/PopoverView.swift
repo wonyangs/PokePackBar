@@ -21,6 +21,7 @@ enum PopoverMetrics {
 @Observable
 final class PopoverNavigation {
     var showSettings = false
+    var showReleaseNotes = false
     var tab: PopoverTab = .shop
 
     /// 상점에서 바로 열어야 할 팩. 도감의 「이 팩 사러 가기」가 채운다.
@@ -32,6 +33,7 @@ final class PopoverNavigation {
 
     func reset() {
         showSettings = false
+        showReleaseNotes = false
         tab = .shop
         shopSet = nil
         dexID = nil
@@ -45,18 +47,23 @@ struct PopoverView: View {
     @Environment(UpdateChecker.self) private var updater
     @Environment(PopoverNavigation.self) private var nav
 
-    /// 카드 목록은 번들 리소스라 한 번만 읽는다.
-    private static let index = CardIndex.loadBundled()
+    private static let index = CardIndex.shared
 
     private var l: L { wallet.l }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if nav.showSettings {
-                SettingsView(onClose: { nav.showSettings = false })
+            // 패치 노트를 먼저 본다 — 설정에서 열었을 때 닫으면 설정으로 돌아가게 하려는 것이다.
+            if nav.showReleaseNotes {
+                ReleaseNotesView(wallet: wallet, store: store,
+                                 onClose: { nav.showReleaseNotes = false })
+            } else if nav.showSettings {
+                SettingsView(onClose: { nav.showSettings = false },
+                             onOpenReleaseNotes: { nav.showReleaseNotes = true })
             } else {
                 walletHeader
                 bonusToast
+                releaseNotesToast
                 tabPicker
                 tabContent
             }
@@ -161,6 +168,33 @@ struct PopoverView: View {
             }
             .padding(8)
             .background(Color.green.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    /// 판올림 안내. 새 버전으로 처음 열었을 때 한 줄만 띄우고, 보거나 닫으면 사라진다.
+    @ViewBuilder
+    private var releaseNotesToast: some View {
+        if let version = ReleaseNotes.runningVersion,
+           store.lastSeenReleaseVersion != version,
+           l.releaseNotes.contains(where: { $0.version == version }) {
+            HStack(spacing: 7) {
+                Image(systemName: "sparkles").foregroundStyle(Color.accentColor)
+                Text(l.releaseNotesWhatsNew(version))
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                Button(l.releaseNotesOpen) { nav.showReleaseNotes = true }
+                    .buttonStyle(.borderless).controlSize(.small)
+                Button {
+                    store.lastSeenReleaseVersion = version
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 9))
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding(8)
+            .background(Color.accentColor.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }

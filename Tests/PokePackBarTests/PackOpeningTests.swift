@@ -537,19 +537,62 @@ final class PackArtAndGlowTests: XCTestCase {
     }
 }
 
-final class RevealTimingTests: XCTestCase {
+/// 카드를 들춰 다음 장을 훔쳐보는 동작. 손맛을 결정하는 값이라 값으로 못박아 둔다.
+final class RevealPeekTests: XCTestCase {
 
-    /// 한번에 열기는 등급과 무관하게 일정한 간격으로 넘긴다.
-    /// 등급별로 다르게 주면 리듬이 들쭉날쭉해 넘어가는 흐름을 읽기 어렵다.
-    func testHoldIsOneSecondForEveryTier() {
-        XCTAssertEqual(RevealTiming.hold, .seconds(1))
+    func testRestShowsNothing() {
+        XCTAssertEqual(RevealPeek.amount(.zero), 0)
+        XCTAssertFalse(RevealPeek.advances(.zero))
     }
 
-    /// 한 팩을 한번에 열 때 총 소요가 현실적인 범위여야 한다.
-    func testWholePackAutoPlayStaysReasonable() {
-        let total = (0..<PackConfig.cardsPerPack)
-            .reduce(Duration.zero) { acc, _ in acc + RevealTiming.hold }
-        XCTAssertLessThanOrEqual(total, .seconds(12))
+    /// 문턱에 닿으면 넘어간다. 그 전에는 제자리로 돌아가야 한다.
+    func testAdvancesOnlyAtThreshold() {
+        let short = CGSize(width: RevealPeek.threshold - 1, height: 0)
+        let exact = CGSize(width: RevealPeek.threshold, height: 0)
+        XCTAssertFalse(RevealPeek.advances(short))
+        XCTAssertTrue(RevealPeek.advances(exact))
+    }
+
+    /// 위로 들춰도 먹어야 한다. 가로만 재면 실물처럼 위로 들추는 사람은 못 넘긴다.
+    func testUpwardDragCounts() {
+        XCTAssertTrue(RevealPeek.advances(CGSize(width: 0, height: -RevealPeek.threshold)))
+    }
+
+    /// 비스듬히 끌면 가로·세로를 합친 거리로 잰다. 44+44 는 62 를 넘는다.
+    func testDiagonalDragUsesMagnitude() {
+        let diagonal = CGSize(width: 44, height: -44)
+        XCTAssertGreaterThan(RevealPeek.distance(diagonal), RevealPeek.threshold)
+        XCTAssertTrue(RevealPeek.advances(diagonal))
+    }
+
+    /// 들출수록 빛이 세지고, 문턱을 넘으면 더 세지지 않는다.
+    func testAmountRisesThenSaturates() {
+        let steps = stride(from: 0.0, through: Double(RevealPeek.threshold), by: 6.0)
+            .map { RevealPeek.amount(CGSize(width: $0, height: 0)) }
+        for (a, b) in zip(steps, steps.dropFirst()) {
+            XCTAssertLessThanOrEqual(a, b, "들출수록 세져야 한다")
+        }
+        XCTAssertEqual(RevealPeek.amount(CGSize(width: RevealPeek.threshold, height: 0)), 1)
+        XCTAssertEqual(RevealPeek.amount(CGSize(width: RevealPeek.threshold * 4, height: 0)), 1,
+                       "문턱을 넘겨 끌어도 1 에서 멈춘다")
+    }
+
+    /// 기울기는 손이 가는 쪽으로, 한계 안에서.
+    func testTiltFollowsHandAndIsCapped() {
+        XCTAssertEqual(RevealPeek.tilt(.zero), 0)
+        XCTAssertGreaterThan(RevealPeek.tilt(CGSize(width: 30, height: 0)), 0)
+        XCTAssertLessThan(RevealPeek.tilt(CGSize(width: -30, height: 0)), 0)
+        XCTAssertEqual(RevealPeek.tilt(CGSize(width: 9999, height: 0)), RevealPeek.maxTilt)
+        XCTAssertEqual(RevealPeek.tilt(CGSize(width: -9999, height: 0)), -RevealPeek.maxTilt)
+    }
+
+    /// 커먼·에너지는 후광 세기가 0 이다 — 들춰도 아무것도 안 비치는 것이 정상이고,
+    /// 그 실망까지가 카드깡이다. 이 값이 0 이 아니게 되면 빛이 등급 신호로 작동하지 않는다.
+    @MainActor
+    func testPeekShowsNothingForCommonNextCard() {
+        XCTAssertEqual(TierGlow.strength(for: .common), 0)
+        XCTAssertEqual(TierGlow.strength(for: .energy), 0)
+        XCTAssertGreaterThan(TierGlow.strength(for: .ultraRare), 0.9)
     }
 }
 

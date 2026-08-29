@@ -36,6 +36,7 @@ struct CardSpotlightView: View {
         let l = wallet.l
         VStack(spacing: 0) {
             HStack {
+                favoriteButton(l)
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
@@ -98,6 +99,23 @@ struct CardSpotlightView: View {
         .onChange(of: cardID) {
             confirmingDisenchant = false
             lastRefund = nil
+        }
+    }
+
+    /// 메뉴바에 올릴 카드로 지정한다. 가진 카드에만 준다 — 없는 카드는 그릴 수 없다.
+    @ViewBuilder
+    private func favoriteButton(_ l: L) -> some View {
+        if ownedCount > 0 {
+            let isFavorite = wallet.favoriteCardID == cardID
+            Button {
+                wallet.setFavorite(isFavorite ? nil : cardID)
+            } label: {
+                Image(systemName: isFavorite ? "star.fill" : "star")
+                    .font(.system(size: 15))
+                    .foregroundStyle(isFavorite ? Color.yellow : Color.secondary)
+            }
+            .buttonStyle(.plain)
+            .help(isFavorite ? l.favoriteCardClear : l.favoriteCardSet)
         }
     }
 

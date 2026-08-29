@@ -82,6 +82,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         popover.delegate = self   // didShow: outside-click monitor; didClose: 호스팅 해제 + 모니터 제거
 
         observeStore()
+        observeMenuBarCard()
+        updateMenuBarIcon()
         applyState()
     }
 
@@ -99,6 +101,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
+
+    /// 메뉴바 카드가 바뀌면 아이콘을 다시 만든다. 사용량 숫자와 달리 카드는 자주 바뀌지 않지만,
+    /// 최애를 지정하거나 새 카드를 뽑은 순간에는 바로 반영돼야 한다.
+    private func observeMenuBarCard() {
+        withObservationTracking {
+            _ = store.menuBarCardEnabled
+            _ = wallet.menuBarCard(index: CardIndex.shared)?.id
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.updateMenuBarIcon()
+                self.observeMenuBarCard()
+            }
+        }
+    }
 
     private func applyState() {
         guard let button = statusItem.button else { return }
@@ -178,11 +195,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     /// 보너스 팩으로 줄 수 있는 세트. 카드 목록은 번들 리소스라 한 번만 읽는다.
-    private static let packSetIDs: [String] = CardIndex.loadBundled()?.setIDs ?? []
+    private static let packSetIDs: [String] = CardIndex.shared?.setIDs ?? []
 
     /// 알림 문구에 쓸 세트 이름.
     private static let setNames: [String: String] = {
-        guard let index = CardIndex.loadBundled() else { return [:] }
+        guard let index = CardIndex.shared else { return [:] }
         return Dictionary(uniqueKeysWithValues: index.sets.map { ($0.id, $0.name) })
     }()
 
@@ -236,7 +253,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         togglePopover()
     }
 
-    /// 메뉴바 아이콘. 스프라이트를 걷어낸 자리에 카드 묶음 기호를 쓴다 —
+    /// 지금 메뉴바에 올려 둔 것. 같은 카드면 이미지를 다시 만들지 않는다 —
+    /// 새로 만들면 매번 다른 객체가 되어 `setStatusImage` 의 diff-gate 를 통과하고,
+    /// 사용량 숫자가 갱신될 때마다 CA 커밋이 한 번씩 더 돌아간다(배터리).
+    private var menuIconKey: String?
+
+    /// 메뉴바 아이콘 갱신. 최애 카드 → 최고 등급 카드 → 기존 기호.
+    ///
+    /// 그림은 번들에 없다. 캐시에 있으면 즉시 붙이고, 없으면 기호로 시작해 받아 온 뒤 바꿔
+    /// 끼운다. 최애로 지정할 수 있는 카드는 이미 뽑아 본 카드뿐이라 대개 캐시에 있다.
+    private func updateMenuBarIcon() {
+        let thickness = NSStatusBar.system.thickness
+        guard store.menuBarCardEnabled,
+              let card = wallet.menuBarCard(index: CardIndex.shared) else {
+            guard menuIconKey != nil else { return }
+            menuIconKey = nil
+            setStatusImage(Self.menuIcon())
+            return
+        }
+
+        let key = "\(card.id)@\(thickness)"
+        guard menuIconKey != key else { return }
+        menuIconKey = key
+
+        if let cached = CardImageLoader.cachedImage(cardID: card.id, hires: false) {
+            setStatusImage(MenuBarCardImage.image(from: cached, thickness: thickness))
+            return
+        }
+
+        setStatusImage(Self.menuIcon())
+        Task { [weak self] in
+            guard let image = await CardImageLoader.image(cardID: card.id, hires: false) else { return }
+            guard let self, self.menuIconKey == key else { return }   // 그 사이 카드가 바뀌었다
+            self.setStatusImage(MenuBarCardImage.image(from: image, thickness: thickness))
+        }
+    }
+
+    /// 카드가 없을 때 쓰는 기본 아이콘.
     /// 템플릿 이미지라 라이트·다크 메뉴바에 자동으로 맞는다.
     private static func menuIcon() -> NSImage? {
         let image = NSImage(systemSymbolName: "rectangle.stack.fill",

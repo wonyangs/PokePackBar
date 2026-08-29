@@ -16,6 +16,13 @@ VERSION="${1:-}"
 [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
   echo "사용법: ./scripts/release-internal.sh <x.y.z>" >&2; exit 1; }
 
+# 패치 노트를 먼저 쓴다. 버전을 올린 뒤에 적으면 배포된 앱에는 빈 목록이 들어간다.
+if ! grep -q "version: \"$VERSION\"" Sources/PokePackBar/Core/ReleaseNotes.swift; then
+  echo "✗ v$VERSION 패치 노트가 없다." >&2
+  echo "  Sources/PokePackBar/Core/ReleaseNotes.swift 에 먼저 적고 다시 실행하세요." >&2
+  exit 1
+fi
+
 APP_NAME="PokePackBar"
 CASK_FILE="Casks/poke-pack-bar.rb"
 PREV=$(grep -o 'VERSION="[0-9.]*"' scripts/build-app.sh | head -1 | tr -d 'VERSION="')

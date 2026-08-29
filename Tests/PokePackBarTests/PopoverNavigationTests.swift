@@ -16,11 +16,13 @@ final class PopoverNavigationTests: XCTestCase {
         let nav = PopoverNavigation()
         nav.tab = .collection
         nav.showSettings = true
+        nav.showReleaseNotes = true
 
         nav.reset()
 
         XCTAssertEqual(nav.tab, .shop)
         XCTAssertFalse(nav.showSettings)
+        XCTAssertFalse(nav.showReleaseNotes)
     }
 
     /// 기획에 필요한 탭만 둔다 — 팩을 사고, 팩을 열고, 카드를 보고, 조합을 모은다.

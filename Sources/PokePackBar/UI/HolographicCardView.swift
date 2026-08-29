@@ -31,7 +31,7 @@ struct HoloProfile: Equatable {
     ///
     /// 등급은 광택의 세기가 알린다 — 간격까지 등급별로 갈리면 카드를 연달아 볼 때
     /// 리듬이 들쭉날쭉해져 오히려 어색하다(개봉 유지 시간을 등급별로 줬다가
-    /// `RevealTiming.hold` 로 되돌린 것과 같은 이유다).
+    /// 일정한 간격으로 되돌린 것과 같은 이유다).
     static let sweepInterval = 5.0
 
     static func of(_ tier: CardTier) -> HoloProfile {

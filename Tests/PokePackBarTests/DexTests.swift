@@ -648,6 +648,29 @@ final class DexPerkRoutingTests: XCTestCase {
     }
 }
 
+/// 오리파 화면 갈래. 상세를 닫았을 때 어디로 돌아가는지가 여기서 결정된다.
+final class OripaScreenTests: XCTestCase {
+
+    /// 상세가 뽑기 결과보다 앞이다. 뒤에 두면 상세를 열려고 뽑기 결과를 지워야 하고,
+    /// 그러면 상세를 닫을 때 박스 화면으로 튕긴다(사용자가 보고한 결함).
+    func testDetailWinsOverDraw() {
+        XCTAssertEqual(OripaScreen.resolve(focused: "sv10-1", hasDraw: true), .detail("sv10-1"))
+    }
+
+    /// 박스에서 카드를 눌러 본 경우 — 뽑기 결과가 없으니 닫으면 박스로 돌아간다.
+    func testDetailWithoutDraw() {
+        XCTAssertEqual(OripaScreen.resolve(focused: "sv10-1", hasDraw: false), .detail("sv10-1"))
+    }
+
+    func testDrawWhenNothingFocused() {
+        XCTAssertEqual(OripaScreen.resolve(focused: nil, hasDraw: true), .draw)
+    }
+
+    func testBoardIsTheDefault() {
+        XCTAssertEqual(OripaScreen.resolve(focused: nil, hasDraw: false), .board)
+    }
+}
+
 /// 오리파 — 재고가 유한한 뽑기.
 @MainActor
 final class OripaTests: XCTestCase {
@@ -769,5 +792,45 @@ final class OripaTests: XCTestCase {
         XCTAssertLessThan(dust / paid, 0.5,
                           "혜택 최대일 때 환급이 값의 절반을 넘으면 오리파가 수익원이 된다")
         _ = index
+    }
+}
+
+/// 한국어 카드명 — 번들에 실제로 들어갔고, 절반만 한국어인 이름이 없어야 한다.
+final class KoreanCardNameTests: XCTestCase {
+
+    /// 한 장도 빠지면 안 된다. 한글과 영문이 목록에 섞여 나오면 그게 제일 보기 나쁘다.
+    func testEveryCardHasKoreanName() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let missing = index.cards.filter { $0.nameKo == nil }
+        XCTAssertTrue(missing.isEmpty,
+                      "한국어 이름이 없는 카드 \(missing.count)장: "
+                      + missing.prefix(5).map(\.id).joined(separator: ", "))
+    }
+
+    /// 이름 안에 영문이 남아 있으면 안 된다. "Team Rocket's 뮤츠 ex" 같은 반쪽짜리는
+    /// 영문보다 읽기 나빠서, 조립이 안 되면 아예 넣지 않기로 했다.
+    /// 꼬리표(ex·V·GX)는 한국판도 영문 그대로 쓰므로 예외다.
+    func testNoHalfTranslatedNames() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let suffixes = ["ex", "EX", "GX", "V", "VMAX", "VSTAR", "BREAK", "M"]
+        for entry in index.cards {
+            guard let korean = entry.nameKo else { continue }
+            let words = korean.split(separator: " ").map(String.init)
+            for word in words where word.allSatisfy({ $0.isASCII && $0.isLetter }) {
+                XCTAssertTrue(suffixes.contains(word),
+                              "\(entry.id): 한국어 이름에 영문이 섞였다 — \(korean)")
+            }
+        }
+    }
+
+    /// 언어가 한국어일 때만 한국어 이름을 쓴다.
+    func testDisplayNameFollowsLanguage() {
+        let entry = CardEntry(id: "s-1", name: "Charizard", tier: .doubleRare,
+                              setID: "s", nameKo: "리자몽")
+        XCTAssertEqual(entry.displayName(.ko), "리자몽")
+        XCTAssertEqual(entry.displayName(.en), "Charizard")
+        let untranslated = CardEntry(id: "s-2", name: "Rare Candy", tier: .common,
+                                     setID: "s", nameKo: nil)
+        XCTAssertEqual(untranslated.displayName(.ko), "Rare Candy")
     }
 }

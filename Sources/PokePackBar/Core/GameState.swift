@@ -49,6 +49,11 @@ struct GameState: Codable, Sendable {
     /// 개봉한 팩 누적 개수. 통계용.
     var packsOpened = 0
 
+    /// 메뉴바에 띄울 최애 카드. nil 이면 가진 것 중 가장 높은 등급을 쓴다.
+    ///
+    /// 게임 상태라 세이브에 들어간다 — 새 Mac 으로 옮겨도 같은 카드가 올라와야 한다.
+    var favoriteCardID: String? = nil
+
     // MARK: 조합 도감
 
     /// 보상을 수령한 도감 id. **영구 기록이다** — 나중에 도감 구성이 바뀌어도 이미 준 혜택을
@@ -114,6 +119,7 @@ struct GameState: Codable, Sendable {
         packs = value(.packs, [:])
         cards = value(.cards, [:])
         packsOpened = value(.packsOpened, 0)
+        favoriteCardID = try? c.decodeIfPresent(String.self, forKey: .favoriteCardID)
         // 이전 이름(completedDex)으로 저장된 값도 읽는다.
         var claimed = value(.claimedDex, [String]())
         if claimed.isEmpty, let legacy = try? decoder.container(keyedBy: LegacyKeys.self),

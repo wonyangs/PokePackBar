@@ -8,6 +8,8 @@ struct SettingsView: View {
     @Environment(UpdateChecker.self) private var updater
     /// 팝오버 내부 화면 전환 방식 — sheet/dismiss 를 쓰지 않는다 (PopoverView 의 NOTE 참조)
     var onClose: () -> Void
+    /// 패치 노트로 넘어가기. 설정을 열어 둔 채 덮어 씌우므로 닫으면 여기로 돌아온다.
+    var onOpenReleaseNotes: () -> Void = {}
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var launchAtLoginError: String?
     @State private var reportError: String?
@@ -173,8 +175,36 @@ struct SettingsView: View {
                 toggleRow(l.todayCost, $store.showCostInMenu)
                 Divider()
                 toggleRow(l.limitPercent, $store.showLimitInMenu)
+                Divider()
+                toggleRow(l.menuBarCardLabel, $store.menuBarCardEnabled)
+                if store.menuBarCardEnabled {
+                    Divider()
+                    groupRow { menuBarCardRow }
+                }
             }
             Text(l.allOffHint).font(.caption2).foregroundStyle(.tertiary).padding(.leading, 4)
+        }
+    }
+
+    /// 지금 메뉴바에 올라가 있는 카드. 직접 정한 것이면 내릴 수 있다.
+    @ViewBuilder
+    private var menuBarCardRow: some View {
+        if let card = wallet.menuBarCard(index: CardIndex.shared) {
+            CardImageView(cardID: card.id, width: 20)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(card.displayName(wallet.language))
+                    .font(.caption).lineLimit(1).truncationMode(.tail)
+                if wallet.favoriteCardID != card.id {
+                    Text(l.favoriteCardAuto).font(.system(size: 9)).foregroundStyle(.tertiary)
+                }
+            }
+            Spacer()
+            if wallet.favoriteCardID == card.id {
+                Button(l.favoriteCardClear) { wallet.setFavorite(nil) }.controlSize(.small)
+            }
+        } else {
+            Text(l.favoriteCardNone).font(.caption).foregroundStyle(.secondary)
+            Spacer()
         }
     }
 
@@ -246,6 +276,12 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(isCheckingUpdate)
+            }
+            Divider()
+            groupRow {
+                Text(l.releaseNotesTitle)
+                Spacer()
+                Button(l.releaseNotesOpen) { onOpenReleaseNotes() }.controlSize(.small)
             }
             // 확인 결과 — 알림을 꺼둔 사용자도 여기서 새 버전을 알고 바로 적용할 수 있게 업데이트 버튼을 함께 노출.
             if didCheckUpdate, !isCheckingUpdate {

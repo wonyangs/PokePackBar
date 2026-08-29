@@ -248,6 +248,25 @@ final class WalletStore {
         return refund
     }
 
+    // MARK: 최애 카드 (메뉴바)
+
+    var favoriteCardID: String? { state.favoriteCardID }
+
+    /// 최애 카드를 지정한다. 갖고 있지 않은 카드는 받지 않는다 —
+    /// 메뉴바에 못 그리는 카드를 가리킨 채로 두면 아이콘이 조용히 사라진다.
+    func setFavorite(_ cardID: String?) {
+        if let cardID, cardCount(cardID) == 0 { return }
+        guard state.favoriteCardID != cardID else { return }
+        state.favoriteCardID = cardID
+        save()
+        AppLog.write("favorite card = \(cardID ?? "none")")
+    }
+
+    /// 메뉴바에 올릴 카드. 최애 → 최고 등급 → 없음.
+    func menuBarCard(index: CardIndex?) -> CardEntry? {
+        MenuBarCard.resolve(favorite: state.favoriteCardID, owned: state.cards, index: index)
+    }
+
     // MARK: 카드 보유량
 
     func cardCount(_ cardID: String) -> Int { state.cards[cardID] ?? 0 }

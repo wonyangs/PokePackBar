@@ -45,6 +45,16 @@ struct CardEntry: Sendable, Identifiable {
     let name: String
     let tier: CardTier
     let setID: String     // 카드 ID 의 첫 '-' 앞부분
+    /// 한국어 카드명. 아직 확인된 표기가 없는 카드는 nil 이다.
+    ///
+    /// 없으면 영문을 그대로 쓴다. 절반만 한국어인 이름("Team Rocket's 뮤츠 ex")은
+    /// 영문보다 읽기 나쁘므로, 조립이 안 되면 아예 넣지 않는다.
+    var nameKo: String?
+
+    /// 화면에 쓸 이름. 한국어 표기가 있고 언어가 한국어일 때만 그것을 쓴다.
+    func displayName(_ language: AppLanguage) -> String {
+        language == .ko ? (nameKo ?? name) : name
+    }
 }
 
 struct CardSet: Sendable, Identifiable {
@@ -90,16 +100,36 @@ struct CardIndex: Sendable {
 
     /// 번들에서 읽는다. 인덱스가 없거나 깨졌으면 nil — 호출부가 실패를 드러내야 한다.
     /// 조용히 빈 인덱스를 돌려주면 상점이 텅 빈 이유를 알 수 없다.
+    /// 번들 인덱스. 메뉴바·팝오버·보너스 팩이 같은 것을 쓴다 —
+    /// 호출부마다 읽으면 같은 JSON 을 여러 번 파싱한다.
+    static let shared: CardIndex? = loadBundled()
+
     static func loadBundled() -> CardIndex? {
         guard let url = AppResources.bundle?.url(forResource: "card-index", withExtension: "json"),
               let data = try? Data(contentsOf: url) else {
             AppLog.write("card index missing from bundle")
             return nil
         }
-        return decode(data)
+        return decode(data, korean: loadKoreanNames())
     }
 
-    static func decode(_ data: Data) -> CardIndex? {
+    /// 한국어 카드명 표. 없으면 빈 표 — 이름이 영문으로 나올 뿐 앱은 그대로 돈다.
+    static func loadKoreanNames() -> [String: String] {
+        guard let url = AppResources.bundle?.url(forResource: "card-names-ko", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let payload = try? JSONDecoder().decode(KoreanNames.self, from: data) else {
+            AppLog.write("korean card names missing from bundle")
+            return [:]
+        }
+        return payload.names
+    }
+
+    private struct KoreanNames: Decodable {
+        let version: Int
+        let names: [String: String]
+    }
+
+    static func decode(_ data: Data, korean: [String: String] = [:]) -> CardIndex? {
         guard let payload = try? JSONDecoder().decode(Payload.self, from: data) else {
             AppLog.write("card index decode failed")
             return nil
@@ -115,7 +145,8 @@ struct CardIndex: Sendable {
             let id = row[0]
             guard let dash = id.firstIndex(of: "-") else { skipped += 1; continue }
             entries.append(CardEntry(id: id, name: row[1], tier: tier,
-                                     setID: String(id[id.startIndex..<dash])))
+                                     setID: String(id[id.startIndex..<dash]),
+                                     nameKo: korean[id]))
         }
         if skipped > 0 { AppLog.write("card index: skipped \(skipped) malformed rows") }
 

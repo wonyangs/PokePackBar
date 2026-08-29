@@ -1,5 +1,20 @@
 import SwiftUI
 
+/// 오리파 화면 갈래. 순서가 규칙이다 — **상세가 뽑기 결과보다 앞이다.**
+///
+/// 뽑기 결과를 지우고 상세로 넘어가면 상세를 닫을 때 박스 화면으로 튕긴다(실제 결함이었다).
+/// 뽑은 카드를 그대로 들고 상세를 위에 겹치면 닫는 순간 방금 뽑은 화면이 그대로 나온다.
+enum OripaScreen: Equatable {
+    case detail(String)
+    case draw
+    case board
+
+    static func resolve(focused: String?, hasDraw: Bool) -> OripaScreen {
+        if let focused { return .detail(focused) }
+        return hasDraw ? .draw : .board
+    }
+}
+
 /// 오리파 — 상위 등급만 담은 100슬롯 박스에서 한 장씩 뽑는다.
 ///
 /// 박스 안 카드를 전부 보여 준다. 실물 오리파의 고질적인 문제가 "무엇이 들었는지 검증할 수
@@ -18,22 +33,32 @@ struct OripaView: View {
     @State private var refilled = false
     /// 교체를 누른 직후. 확인을 인라인으로 받는다(`.alert` 금지 — 팝오버가 닫히면 고아 시트가 남는다).
     @State private var confirmingReplace = false
+    /// 방금 뽑은 카드의 가림막이 이미 걷혔는가. 상세를 보고 돌아왔을 때 연출을 다시 돌리지
+    /// 않기 위한 것이다 — 화면이 새로 만들어지므로 뷰 안의 상태만으로는 알 수 없다.
+    @State private var revealed = false
 
     private var box: OripaBox { wallet.oripaBox(index: index) }
 
     var body: some View {
-        if let drawn {
-            OripaDrawView(wallet: wallet, card: drawn,
-                          onDetail: { focused = drawn.id; self.drawn = nil },
-                          onDone: { self.drawn = nil })
-        } else if let focused, let entry = index.card(focused) {
-            CardSpotlightView(wallet: wallet, cardID: entry.id, name: entry.name,
-                              tier: entry.tier, setID: entry.setID,
-                              setName: index.set(entry.setID)?.name ?? entry.setID,
-                              ownedCount: wallet.cardCount(entry.id)) {
-                self.focused = nil
+        switch OripaScreen.resolve(focused: focused, hasDraw: drawn != nil) {
+        case .detail(let cardID):
+            if let entry = index.card(cardID) {
+                CardSpotlightView(wallet: wallet, cardID: entry.id,
+                                  name: entry.displayName(wallet.language),
+                                  tier: entry.tier, setID: entry.setID,
+                                  setName: index.set(entry.setID)?.name ?? entry.setID,
+                                  ownedCount: wallet.cardCount(entry.id)) {
+                    self.focused = nil
+                }
             }
-        } else {
+        case .draw:
+            if let drawn {
+                OripaDrawView(wallet: wallet, card: drawn, startOpened: revealed,
+                              onReveal: { revealed = true },
+                              onDetail: { focused = drawn.id },
+                              onDone: { self.drawn = nil })
+            }
+        case .board:
             board
         }
     }
@@ -155,7 +180,7 @@ struct OripaView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .help(index.card(id)?.name ?? id)
+                .help(index.card(id)?.displayName(wallet.language) ?? id)
             }
         }
         .padding(.horizontal, 1)
@@ -184,6 +209,8 @@ struct OripaView: View {
         confirmingReplace = false
         guard let result = wallet.pullOripa(index: index) else { return }
         refilled = wallet.oripaBox(index: index).remaining == OripaConfig.slotsPerBox
+        focused = nil
+        revealed = false
         drawn = result.card
     }
 }
@@ -196,6 +223,9 @@ struct OripaView: View {
 private struct OripaDrawView: View {
     let wallet: WalletStore
     let card: PulledCard
+    /// 이미 걷힌 상태로 시작한다. 상세를 보고 돌아온 경우다.
+    let startOpened: Bool
+    let onReveal: () -> Void
     let onDetail: () -> Void
     let onDone: () -> Void
 
@@ -218,6 +248,11 @@ private struct OripaDrawView: View {
                     CardImageView(cardID: card.id, hires: true, width: 170)
                         .shadow(radius: 10, y: 4)
                         .transition(.scale(scale: 0.55).combined(with: .opacity))
+                        // 버튼 대신 카드를 누른다. `Button` 으로 감싸지 않는 이유는
+                        // 라벨 안쪽 자식에는 `.help` 툴팁이 뜨지 않기 때문이다.
+                        .contentShape(Rectangle())
+                        .onTapGesture(perform: onDetail)
+                        .help(l.oripaSeeDetail)
                 } else {
                     // 가림막. 등급을 알 수 없게 두어 열리기 전까지 긴장을 남긴다.
                     RoundedRectangle(cornerRadius: 10)
@@ -248,17 +283,14 @@ private struct OripaDrawView: View {
             Spacer(minLength: 0)
 
             if opened {
-                HStack(spacing: 8) {
-                    Button(l.oripaSeeDetail, action: onDetail)
-                        .buttonStyle(.bordered).controlSize(.small)
-                    Button(l.done, action: onDone)
-                        .buttonStyle(.borderedProminent).controlSize(.small)
-                }
-                .transition(.opacity)
+                Button(l.done, action: onDone)
+                    .buttonStyle(.borderedProminent).controlSize(.small)
+                    .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: card.id) {
+            if startOpened { opened = true; return }
             opened = false
             withAnimation(.easeInOut(duration: 0.32).repeatForever(autoreverses: true)) {
                 pulse = true
@@ -266,6 +298,7 @@ private struct OripaDrawView: View {
             try? await Task.sleep(for: Self.suspense)
             guard !Task.isCancelled else { return }
             withAnimation(.spring(response: 0.42, dampingFraction: 0.62)) { opened = true }
+            onReveal()
         }
     }
 }
