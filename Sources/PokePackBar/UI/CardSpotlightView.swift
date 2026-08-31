@@ -28,8 +28,8 @@ struct CardSpotlightView: View {
     @Environment(PopoverNavigation.self) private var nav
 
     @State private var landed = false
-    @State private var confirmingDisenchant = false
-    /// 방금 돌려받은 액수. 잠깐 보여주고 지운다.
+    @State private var confirmingSale = false
+    /// 방금 받은 액수. 잠깐 보여주고 지운다.
     @State private var lastRefund: Int?
 
     var body: some View {
@@ -40,7 +40,7 @@ struct CardSpotlightView: View {
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 17))
+                        .font(.system(size: 18))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -51,54 +51,89 @@ struct CardSpotlightView: View {
 
             // 마우스를 올리면 기울고 광택이 흐른다 — 확대 화면에서만 준다.
             // 격자에서는 크기가 작아 각도가 읽히지 않고, 지나가는 커서마다 반응하면 산만하다.
-            HolographicCardView(cardID: cardID, tier: tier, width: 200,
+            HolographicCardView(cardID: cardID, tier: tier, width: 230,
                                 dimmed: ownedCount == 0, preloaded: preloaded)
                 .scaleEffect(landed ? 1 : 0.9)
                 .opacity(landed ? 1 : 0)
 
             Spacer(minLength: 0)
 
-            VStack(spacing: 5) {
+            // 글자를 키우면서 줄 수를 줄였다. 등급·세트·보유량을 한 줄에 모으고 이름을
+            // 한 줄로 묶어, 스크롤 없이 470pt 안에 들어오게 한다.
+            VStack(spacing: 4) {
                 Text(name)
-                    .font(.title3.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(Typography.heading)
+                    .lineLimit(1).minimumScaleFactor(0.7)
 
-                HStack(spacing: 6) {
-                    Text(l.tierBadge(tier))
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(tierColor(tier))
-                    Text(l.tierName(tier)).font(.caption).foregroundStyle(.secondary)
-                }
-
-                // 출처 팩 — 그림까지 함께 둔다. 이름만으로는 상점에서 어느 것인지 바로 못 찾는다.
                 HStack(spacing: 5) {
+                    Text(l.tierBadge(tier))
+                        .font(Typography.badgeLarge)
+                        .foregroundStyle(tierColor(tier))
+                    // 출처 팩 — 그림까지 함께 둔다. 이름만으로는 상점에서 어느 것인지 못 찾는다.
                     PackImageView(setID: setID, width: 15)
                     Text(setName)
-                        .font(.caption.weight(.medium))
+                        .font(Typography.body)
                         .lineLimit(1).truncationMode(.tail)
-                    Text("·").font(.caption2).foregroundStyle(.tertiary)
+                    Text("·").font(Typography.label).foregroundStyle(.tertiary)
                     Text(ownedCount > 0 ? l.copiesOwned(ownedCount) : l.notOwnedYet)
-                        .font(.caption2.weight(ownedCount > 0 ? .semibold : .regular))
+                        .font(ownedCount > 0 ? Typography.labelSemibold : Typography.label)
                         .foregroundStyle(ownedCount > 0 ? .secondary : .tertiary)
                         .monospacedDigit()
                 }
+                .lineLimit(1).minimumScaleFactor(0.75)
+
+                priceRow(l)
             }
 
             dexBadges(l)
                 .padding(.top, 6)
 
-            disenchantControls(l)
-                .padding(.top, 6)
-                .padding(.bottom, 6)
+            saleControls(l)
+                .padding(.top, 5)
+                .padding(.bottom, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             withAnimation(.spring(response: 0.34, dampingFraction: 0.75)) { landed = true }
         }
         .onChange(of: cardID) {
-            confirmingDisenchant = false
+            confirmingSale = false
             lastRefund = nil
+        }
+    }
+
+    /// 이 카드가 실제 시장에서 얼마인가. 갖고 있으면 장수만큼의 값도 함께 보여 준다.
+    ///
+    /// 등급 배지만으로는 알 수 없는 것을 말해 준다 — 같은 SAR 이라도 리자몽과 나머지는
+    /// 스무 배 넘게 차이가 나고, 1999년 세트의 커먼이 최신 세트의 SR 보다 비싸기도 하다.
+    @ViewBuilder
+    private func priceRow(_ l: L) -> some View {
+        if let prices = CardPrices.shared, let unit = prices.price(cardID) {
+            // 한 줄로 둔다. 줄을 나누면 그만큼 아래가 밀려 판매 버튼이 화면 밖으로 나간다.
+            HStack(spacing: 5) {
+                Text(prices.formattedWithKRW(unit, language: wallet.language))
+                    .font(Typography.bodySemibold).monospacedDigit()
+                if ownedCount > 1, let total = prices.total(cardID, count: ownedCount) {
+                    Text("·").font(Typography.label).foregroundStyle(.tertiary)
+                    Text(l.marketHoldings).font(.system(size: 14)).foregroundStyle(.tertiary)
+                    Text(WonFormatter.money(prices.krw(total), language: wallet.language))
+                        .font(Typography.bodySemibold).monospacedDigit()
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .lineLimit(1).minimumScaleFactor(0.75)
+            .help(l.marketPriceSource(prices.asOf))
+        }
+    }
+
+    private func priceLine(_ label: String, _ value: String, highlighted: Bool) -> some View {
+        HStack(spacing: 5) {
+            Text(label).font(.system(size: 14)).foregroundStyle(.tertiary)
+            Text(value)
+                .font(Typography.bodySemibold).monospacedDigit()
+                .foregroundStyle(highlighted ? AnyShapeStyle(Color.accentColor)
+                                             : AnyShapeStyle(.primary))
+                .lineLimit(1).minimumScaleFactor(0.8)
         }
     }
 
@@ -111,7 +146,7 @@ struct CardSpotlightView: View {
                 wallet.setFavorite(isFavorite ? nil : cardID)
             } label: {
                 Image(systemName: isFavorite ? "star.fill" : "star")
-                    .font(.system(size: 15))
+                    .font(.system(size: 17))
                     .foregroundStyle(isFavorite ? Color.yellow : Color.secondary)
             }
             .buttonStyle(.plain)
@@ -143,7 +178,7 @@ struct CardSpotlightView: View {
         if !related.isEmpty {
             VStack(spacing: 3) {
                 Text(l.dexCardBelongsTo)
-                    .font(.system(size: 9)).foregroundStyle(.tertiary)
+                    .font(Typography.caption).foregroundStyle(.tertiary)
                 HStack(spacing: 5) {
                     ForEach(related) { status in
                         Button {
@@ -152,10 +187,10 @@ struct CardSpotlightView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Text(status.dex.name.text(wallet.language))
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(.system(size: 14, weight: .semibold))
                                     .lineLimit(1)
                                 Text(l.dexProgress(status.ownedCount, status.total))
-                                    .font(.system(size: 9)).monospacedDigit()
+                                    .font(.system(size: 14)).monospacedDigit()
                                     .foregroundStyle(status.isFilled ? Color.accentColor : .secondary)
                             }
                             .padding(.horizontal, 6).padding(.vertical, 2.5)
@@ -165,56 +200,71 @@ struct CardSpotlightView: View {
                     }
                 }
             }
+            .lineLimit(1)
         }
     }
 
-    /// 중복분을 갈아 토큰으로 돌려받는다.
+    /// 중복분을 판다. 값은 시세 그대로다.
+    ///
+    /// 금액을 원으로 적는다. 카드값을 원으로 보여 주면서 파는 자리에서만 토큰 자릿수를
+    /// 내놓으면 같은 것을 두 가지 자로 재는 셈이 된다.
     ///
     /// 마지막 한 장은 남긴다 — 수집한 카드가 컬렉션에서 사라지는 것은 되돌릴 수 없다.
     /// 한 장뿐이면 아무것도 뜨지 않는다.
     /// 확인은 인라인이다(`.alert` 금지 — 팝오버가 닫히면 고아 시트가 남는다).
     @ViewBuilder
-    private func disenchantControls(_ l: L) -> some View {
+    private func saleControls(_ l: L) -> some View {
         let spare = wallet.spareCount(cardID)
-        let refund = CardDust.value(for: tier, perks: wallet.perks) * spare
+        let refund = CardSale.price(cardID: cardID, perks: wallet.perks) * spare
+        let bonus = wallet.perks.dustBonus
 
         if let lastRefund {
-            Label(l.disenchantDone(TokenFormatter.grouped(lastRefund)), systemImage: "checkmark.circle.fill")
-                .font(.caption.weight(.semibold))
+            Label(l.sellDone(MarketEconomy.money(tokens: lastRefund, language: wallet.language)),
+                  systemImage: "checkmark.circle.fill")
+                .font(Typography.bodySemibold)
                 .foregroundStyle(.green)
         } else if spare <= 0 {
-            // 갈 것이 없으면 아무것도 보여주지 않는다. 못 하는 이유를 적어 두면
+            // 팔 것이 없으면 아무것도 보여주지 않는다. 못 하는 이유를 적어 두면
             // 대부분의 카드에서 쓸모없는 줄만 남는다.
             EmptyView()
-        } else if confirmingDisenchant {
+        } else if confirmingSale {
             VStack(spacing: 5) {
-                Text(l.disenchantConfirm(spare, TokenFormatter.grouped(refund)))
-                    .font(.caption2).foregroundStyle(.secondary)
+                Text(l.sellConfirm(spare, MarketEconomy.money(tokens: refund,
+                                                              language: wallet.language)))
+                    .font(Typography.label).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
+                // 추가금이 붙어 있으면 그 사실을 여기서 알린다 — 도감 탭까지 가야
+                // 알 수 있으면 혜택을 받고 있다는 것을 모른 채 판다.
+                if bonus > 0 {
+                    Text(l.sellBonusIncluded(bonus))
+                        .font(Typography.caption).foregroundStyle(Color.accentColor)
+                }
                 HStack(spacing: 8) {
-                    Button(l.disenchant) {
-                        let got = wallet.disenchant(cardID: cardID, tier: tier, count: spare)
-                        confirmingDisenchant = false
+                    Button(l.sellSpares) {
+                        let got = wallet.sellSpares(cardID: cardID, tier: tier, count: spare)
+                        confirmingSale = false
                         lastRefund = got > 0 ? got : nil
                     }
-                    .buttonStyle(.borderedProminent).controlSize(.small)
-                    Button(l.cancel) { confirmingDisenchant = false }
-                        .buttonStyle(.borderless).controlSize(.small)
+                    .buttonStyle(.borderedProminent)
+                    Button(l.cancel) { confirmingSale = false }
+                        .buttonStyle(.borderless)
                 }
+                .font(Typography.button)
             }
         } else {
             Button {
-                confirmingDisenchant = true
+                confirmingSale = true
             } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "arrow.3.trianglepath")
-                    Text("\(l.disenchant) ×\(spare)")
-                    Text("+\(TokenFormatter.grouped(refund))").monospacedDigit().foregroundStyle(.secondary)
+                    Image(systemName: "wonsign.circle")
+                    Text("\(l.sellSpares) ×\(spare)")
+                    Text("+\(MarketEconomy.money(tokens: refund, language: wallet.language))")
+                        .monospacedDigit().foregroundStyle(.secondary)
                 }
-                .font(.caption)
+                .font(Typography.button)
             }
-            .buttonStyle(.bordered).controlSize(.small)
+            .buttonStyle(.bordered)
         }
     }
 }

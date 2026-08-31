@@ -21,7 +21,7 @@ struct DexView: View {
         Group {
             if wallet.dexes.isEmpty {
                 Text(wallet.l.dexEmpty)
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(Typography.body).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let selected, let dex = wallet.dexes.first(where: { $0.id == selected }) {
                 DexDetailView(wallet: wallet, index: index, dex: dex) { self.selected = nil }
@@ -29,7 +29,7 @@ struct DexView: View {
                 list
             }
         }
-        .frame(height: 470)
+        .frame(height: PopoverMetrics.tabHeight)
     }
 
     /// 누적 혜택도 목록과 함께 스크롤한다.
@@ -57,13 +57,13 @@ struct DexView: View {
         let summary = l.dexPerksSummary(wallet.perks)
         return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
-                Text(l.dexPerksHeader).font(.caption.weight(.semibold))
+                Text(l.dexPerksHeader).font(Typography.bodySemibold)
                 Spacer()
                 Text(l.dexCountSummary(all.filter(\.claimed).count, all.count))
-                    .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
+                    .font(Typography.label).foregroundStyle(.secondary).monospacedDigit()
             }
             if wallet.perks.isEmpty {
-                Text(l.dexPerksNone).font(.caption2).foregroundStyle(.secondary)
+                Text(l.dexPerksNone).font(Typography.label).foregroundStyle(.secondary)
             } else {
                 DexPerkLine(wallet: wallet, perks: wallet.perks)
             }
@@ -76,6 +76,10 @@ struct DexView: View {
 }
 
 /// 지금 걸려 있는 혜택을 종류별로 늘어놓는다. 각 항목에 설명 툴팁이 붙는다.
+///
+/// 혜택은 도감을 받을수록 늘어 일곱 종류까지 간다. 한 줄에 밀어 넣으면 글자가 항목 가운데서
+/// 꺾여 옆 항목과 뒤섞이므로, 넘치면 줄을 늘린다. 각 항목은 알약으로 감싸 경계를 못 박는다 —
+/// 구분점을 쓰면 줄이 끊기는 자리마다 점이 떠 버린다.
 @MainActor
 private struct DexPerkLine: View {
     let wallet: WalletStore
@@ -83,17 +87,23 @@ private struct DexPerkLine: View {
 
     var body: some View {
         let l = wallet.l
-        return HStack(spacing: 4) {
+        return WrapLayout(spacing: 5, lineSpacing: 3) {
             ForEach(DexPerkKind.allCases, id: \.self) { kind in
                 if let text = l.dexPerkSummaryItem(kind, perks) {
                     Text(text)
-                        .font(.caption2.weight(.semibold))
+                        .font(Typography.labelSemibold)
                         .foregroundStyle(Color.accentColor)
+                        .fixedSize()
+                        .padding(.horizontal, 6).padding(.vertical, 2)
+                        .background(.background.opacity(0.65), in: Capsule())
+                        // 감지 영역을 못 박는다. 커스텀 배치 안에서는 글자 모양만으로
+                        // 영역이 잡히지 않아 마우스를 올려도 설명이 뜨지 않았다.
+                        .contentShape(Capsule())
                         .help(l.dexPerkHelp(kind))
                 }
             }
-            Spacer(minLength: 0)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -104,23 +114,25 @@ private struct DexRow: View {
     let index: CardIndex?
     let status: DexStatus
 
-    /// 한 줄에 넣는 카드 수와 폭. 폭 332 안에서 카드가 읽힐 만큼 크게 잡는다.
-    static let columns = 5
-    static let cardWidth: CGFloat = 58
+    /// 한 줄에 넣는 카드 수와 폭. 줄 카드의 여백 안쪽에 맞춘 값이라 `CardGrid` 에서 온다 —
+    /// 여기 숫자를 따로 적어 두었더니 팝오버를 넓힐 때 띠만 줄 밖으로 넘쳤다.
+    static let columns = CardGrid.dexStrip.columns
+    static let cardWidth: CGFloat = CardGrid.dexStrip.width
     /// 카드는 한 줄만 쓴다. 22개 도감이 저마다 여러 줄을 쓰면 목록을 훑을 수 없다.
     /// 넘치면 마지막 칸을 "+N" 으로 바꾼다 — 상위 등급부터 정렬돼 있어 앞이 남는다.
-    static let maxShown = 5
+    static let maxShown = columns
 
     private var dex: Dex { status.dex }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             title
+            dexValue
             DexCardStrip(wallet: wallet, index: index, cards: dex.cards,
                          limit: Self.maxShown, onTap: nil)
             footer
         }
-        .padding(.vertical, 8).padding(.horizontal, 8)
+        .padding(.vertical, 8).padding(.horizontal, CardGrid.dexRowPadding)
         .background(background, in: RoundedRectangle(cornerRadius: 9))
         .overlay {
             RoundedRectangle(cornerRadius: 9)
@@ -137,46 +149,69 @@ private struct DexRow: View {
         let l = wallet.l
         return HStack(spacing: 6) {
             Text(dex.name.text(wallet.language))
-                .font(.caption.weight(.bold)).lineLimit(1)
+                .font(Typography.bodySemibold).lineLimit(1)
             DexStars(tier: dex.tier)
             Spacer(minLength: 0)
             Text(status.claimed ? l.dexComplete : l.dexProgress(status.ownedCount, status.total))
-                .font(.caption2.weight(.medium))
+                .font(Typography.body)
                 .foregroundStyle(status.claimed ? .green : .secondary)
                 .monospacedDigit()
+        }
+    }
+
+    /// 이 도감에 든 카드값의 합. 난이도의 근거이므로 별 옆에 숫자로도 보여 준다.
+    @ViewBuilder
+    private var dexValue: some View {
+        if let prices = CardPrices.shared {
+            Text(wallet.l.dexTotalValue(prices.formattedWithKRW(DexProgress.value(of: dex),
+                                                           language: wallet.language)))
+                .font(Typography.body).foregroundStyle(.tertiary)
+                .lineLimit(1).minimumScaleFactor(0.8)
         }
     }
 
     /// 보상은 항상 보이고, 다 모으면 수령 버튼이 켜진다.
     private var footer: some View {
         HStack(spacing: 6) {
-            DexRewardLine(wallet: wallet, dex: dex)
+            DexRewardLine(wallet: wallet, index: index, dex: dex)
             Spacer(minLength: 0)
             DexClaimAction(wallet: wallet, status: status)
         }
     }
 }
 
-/// 보상 한 줄 — 팩 수와 혜택. 혜택에는 설명 툴팁이 붙는다.
+/// 보상 한 줄 — 영구 혜택과 곁들이는 팩. 각 항목에 설명 툴팁이 붙는다.
+///
+/// **혜택을 앞에 둔다.** 보상의 본체는 영구 패시브이고 팩은 부수적인 재미다. 팩을 앞에 두면
+/// 개수가 먼저 읽혀 보상 크기를 개수로 가늠하게 되는데, 세트마다 팩값이 47배 갈려서 개수는
+/// 크기를 말해 주지 않는다.
 @MainActor
 private struct DexRewardLine: View {
     let wallet: WalletStore
+    let index: CardIndex?
     let dex: Dex
 
     var body: some View {
         let l = wallet.l
-        return HStack(spacing: 5) {
-            Image(systemName: "shippingbox.fill")
-                .font(.system(size: 9)).foregroundStyle(.secondary)
-            Text(l.dexRewardPacks(dex.reward.packs))
-                .font(.caption2.weight(.semibold))
+        return WrapLayout(spacing: 6, lineSpacing: 3) {
             ForEach(Array(dex.reward.perks.enumerated()), id: \.offset) { _, perk in
-                Text(verbatim: "·").font(.caption2).foregroundStyle(.tertiary)
                 Text(l.dexPerkText(perk))
-                    .font(.caption2.weight(.semibold))
+                    .font(Typography.labelSemibold)
                     .foregroundStyle(Color.accentColor)
+                    .fixedSize()
+                    .contentShape(Rectangle())
                     .help(l.dexPerkHelp(perk.kind))
             }
+            HStack(spacing: 5) {
+                Image(systemName: "shippingbox.fill")
+                    .font(.system(size: 14)).foregroundStyle(.secondary)
+                Text(l.dexRewardPacks(dex.reward.packs))
+                    .font(Typography.labelSemibold)
+            }
+            .fixedSize()
+            .contentShape(Rectangle())
+            .help(l.dexRewardPacksHelp(dex.reward.packs,
+                                        index?.set(dex.homeSet)?.name ?? dex.homeSet))
         }
     }
 }
@@ -191,10 +226,10 @@ private struct DexClaimAction: View {
         let l = wallet.l
         if status.claimed {
             Label(l.dexClaimed, systemImage: "checkmark.circle.fill")
-                .font(.caption2).foregroundStyle(.green)
+                .font(Typography.label).foregroundStyle(.green)
         } else if status.isClaimable {
             Button(l.dexClaim) { wallet.claim(status.dex.id) }
-                .buttonStyle(.borderedProminent).controlSize(.small)
+                .buttonStyle(.borderedProminent).font(Typography.button)
         }
     }
 }
@@ -213,9 +248,8 @@ private struct DexCardStrip: View {
         let overflow = cards.count > limit
         let shown = Array(cards.prefix(overflow ? limit - 1 : limit))
         let hidden = cards.count - shown.count
-        let grid = Array(repeating: GridItem(.fixed(DexRow.cardWidth), spacing: 5),
-                         count: DexRow.columns)
-        return LazyVGrid(columns: grid, alignment: .leading, spacing: 5) {
+        return LazyVGrid(columns: CardGrid.dexStrip.items, alignment: .leading,
+                         spacing: CardGrid.dexStrip.spacing) {
             ForEach(shown, id: \.self) { cardID in
                 if let onTap {
                     Button { onTap(cardID) } label: { member(cardID) }
@@ -225,12 +259,18 @@ private struct DexCardStrip: View {
                 }
             }
             if hidden > 0 {
-                Text(verbatim: "+\(hidden)")
-                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                    .frame(width: DexRow.cardWidth,
-                           height: (DexRow.cardWidth / 0.717).rounded())
-                    .background(Color.secondary.opacity(0.12),
-                                in: RoundedRectangle(cornerRadius: 4))
+                // 카드 칸과 **같은 틀**로 쌓는다. 등급 줄을 빼면 이 칸만 낮아지고,
+                // 격자는 낮은 칸을 줄 가운데에 놓으므로 혼자 아래로 내려가 보인다.
+                VStack(spacing: 2) {
+                    Text(verbatim: "+\(hidden)")
+                        .font(Typography.bodySemibold).foregroundStyle(.secondary)
+                        .frame(width: DexRow.cardWidth,
+                               height: (DexRow.cardWidth / 0.717).rounded())
+                        .background(Color.secondary.opacity(0.12),
+                                    in: RoundedRectangle(cornerRadius: 4))
+                    // 등급 줄 자리를 비워 둔다. 빈 글자라도 같은 글꼴이면 같은 높이다.
+                    Text(verbatim: " ").font(.system(size: 13, weight: .heavy))
+                }
             }
         }
     }
@@ -241,7 +281,7 @@ private struct DexCardStrip: View {
         return VStack(spacing: 2) {
             CardImageView(cardID: cardID, width: DexRow.cardWidth, dimmed: !owned)
             Text(entry.map { wallet.l.tierBadge($0.tier) } ?? "")
-                .font(.system(size: 8, weight: .heavy))
+                .font(.system(size: 13, weight: .heavy))
                 .foregroundStyle(entry.map { owned ? tierColor($0.tier) : Color.secondary }
                                  ?? Color.secondary)
                 .opacity(owned ? 1 : 0.55)
@@ -298,7 +338,7 @@ private struct DexDetailView: View {
             HStack {
                 Button(action: onClose) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(Typography.labelSemibold)
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
@@ -308,19 +348,26 @@ private struct DexDetailView: View {
 
             VStack(spacing: 4) {
                 Text(dex.name.text(wallet.language))
-                    .font(.title3.weight(.semibold))
+                    .font(Typography.heading)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 6) {
                     DexStars(tier: dex.tier)
                     Text(state.claimed ? l.dexComplete
                                        : l.dexProgress(state.ownedCount, state.total))
-                        .font(.caption.weight(.semibold))
+                        .font(Typography.bodySemibold)
                         .foregroundStyle(state.claimed ? .green : .secondary)
                         .monospacedDigit()
                 }
+                if let prices = CardPrices.shared {
+                    Text(wallet.l.dexTotalValue(prices.formattedWithKRW(DexProgress.value(of: dex),
+                                                                   language: wallet.language)))
+                        .font(Typography.title)
+                        .foregroundStyle(Color.accentColor)
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                }
                 Text(dex.blurb.text(wallet.language))
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(Typography.body).foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 6)
@@ -335,11 +382,21 @@ private struct DexDetailView: View {
             Spacer(minLength: 0)
 
             VStack(spacing: 6) {
-                HStack(spacing: 6) {
-                    DexRewardLine(wallet: wallet, dex: dex)
-                    Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 3) {
+                    HStack(spacing: 6) {
+                        DexRewardLine(wallet: wallet, index: index, dex: dex)
+                        Spacer(minLength: 0)
+                    }
+                    // 상세에서는 혜택 뜻을 **보이는 글자로** 적는다. 마우스를 올려야만
+                    // 알 수 있으면 「판매 추가금 +2.5%」가 무슨 말인지 알 길이 없다.
+                    ForEach(Array(dex.reward.perks.enumerated()), id: \.offset) { _, perk in
+                        Text(l.dexPerkHelp(perk.kind))
+                            .font(Typography.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding(.vertical, 4).padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
 
                 HStack(spacing: 8) {
@@ -349,9 +406,9 @@ private struct DexDetailView: View {
                             nav.shopSet = dex.homeSet
                             nav.tab = .shop
                         } label: {
-                            Label(l.dexGoBuyPack, systemImage: "cart").font(.caption)
+                            Label(l.dexGoBuyPack, systemImage: "cart").font(Typography.button)
                         }
-                        .buttonStyle(.bordered).controlSize(.small)
+                        .buttonStyle(.bordered)
                     }
                 }
             }
@@ -371,7 +428,7 @@ struct DexStars: View {
         HStack(spacing: 0.5) {
             ForEach(1...Dex.maxTier, id: \.self) { step in
                 Image(systemName: step <= tier ? "star.fill" : "star")
-                    .font(.system(size: 6.5))
+                    .font(.system(size: 13.5))
                     .foregroundStyle(step <= tier ? Color.orange : Color.secondary.opacity(0.35))
             }
         }

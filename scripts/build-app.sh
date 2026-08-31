@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="0.3.3"
+VERSION="0.4.0"
 APP_NAME="PokePackBar"
 BUILD_DIR="build"
 # 원본과 겹치면 로그인 항목·Keychain ACL·LaunchServices 상태가 섞인다.
@@ -93,11 +93,14 @@ echo "   dex.json $(wc -c < "$DEX" | tr -d ' ') bytes"
 
 # 한국어 카드명 — 빠지면 이름이 조용히 전부 영문으로 나온다. 앱은 정상 동작해서 눈치채기 어렵다.
 KO_NAMES="$APP/Contents/Resources/${APP_NAME}_${APP_NAME}.bundle/card-names-ko.json"
+PRICES="$APP/Contents/Resources/${APP_NAME}_${APP_NAME}.bundle/card-prices.json"
 if [ ! -f "$KO_NAMES" ]; then
     echo "   \u2717 한국어 카드명이 번들에 없다: $KO_NAMES" >&2
     exit 1
 fi
 echo "   card-names-ko.json $(wc -c < "$KO_NAMES" | tr -d ' ') bytes"
+[[ -s "$PRICES" ]] || { echo "✗ card-prices.json 이 번들에 없다" >&2; exit 1; }
+echo "   card-prices.json $(wc -c < "$PRICES" | tr -d ' ') bytes"
 
 # 팩 아트 — 판매 세트 수만큼 있어야 한다. 빠지면 상점이 빈 상자로 뜬다.
 PACK_DIR="$APP/Contents/Resources/${APP_NAME}_${APP_NAME}.bundle/packs"

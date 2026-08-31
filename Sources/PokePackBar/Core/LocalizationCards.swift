@@ -7,6 +7,30 @@ extension L {
     // MARK: 탭
     var packsTab: String { t("팩", "Packs", "パック", "Sobres", "Boosters", "Pacotes") }
 
+    // MARK: 시세
+    var marketPrice: String { t("시세", "Market", "相場", "Mercado", "Marché", "Mercado") }
+    func dexTotalValue(_ amount: String) -> String {
+        t("총 가치 \(amount)", "Total value \(amount)", "総価値 \(amount)",
+          "Valor total \(amount)", "Valeur totale \(amount)", "Valor total \(amount)")
+    }
+    /// 개봉한 팩에서 나온 카드값의 합.
+    func packTotalValue(_ amount: String) -> String {
+        t("총 가치 \(amount)", "Total value \(amount)", "総価値 \(amount)",
+          "Valor total \(amount)", "Valeur totale \(amount)", "Valor total \(amount)")
+    }
+    var collectionValue: String { t("컬렉션 가치", "Collection value", "コレクション価値",
+                                    "Valor de la colección", "Valeur de la collection",
+                                    "Valor da coleção") }
+    var marketHoldings: String { t("보유", "Holdings", "保有", "En posesión", "En stock", "Em posse") }
+    func marketPriceSource(_ date: String) -> String {
+        t("TCGplayer 시장가 · \(date) 기준",
+          "TCGplayer market price, as of \(date)",
+          "TCGplayer 市場価格・\(date) 時点",
+          "Precio de mercado de TCGplayer, a \(date)",
+          "Prix du marché TCGplayer, au \(date)",
+          "Preço de mercado da TCGplayer, em \(date)")
+    }
+
     // MARK: 메뉴바 카드
     var menuBarCardLabel: String { t("메뉴바에 카드 표시", "Show a card in the menu bar", "メニューバーにカードを表示",
                                      "Mostrar una carta en la barra de menús", "Afficher une carte dans la barre de menus",
@@ -25,14 +49,18 @@ extension L {
                                      "Nenhuma carta para mostrar") }
 
     // MARK: 지갑
-    var walletBalance: String { t("쓸 수 있는 토큰", "Spendable tokens", "使えるトークン",
-                                   "Tokens disponibles", "Tokens disponibles", "Tokens disponíveis") }
-    var walletHint: String { t("코딩할 때 쓴 토큰으로 카드팩을 살 수 있어요.",
-                                "Spend the tokens you burn while coding on card packs.",
-                                "コーディングで使ったトークンでカードパックを買えます。",
-                                "Gasta en sobres los tokens que consumes programando.",
-                                "Dépense en boosters les tokens consommés en codant.",
-                                "Compre pacotes com os tokens que você gasta programando.") }
+    var walletBalance: String { t("쓸 수 있는 금액", "Spendable", "使える金額",
+                                   "Disponible", "Disponible", "Disponível") }
+    var walletRateTitle: String { t("토큰은 얼마인가요?", "What is a token worth?",
+                                     "トークンはいくら？", "¿Cuánto vale un token?",
+                                     "Combien vaut un token ?", "Quanto vale um token?") }
+    /// 토큰 한 개는 5원도 안 되어 그대로 적으면 감이 오지 않는다. 100만 개를 기준으로 적는다.
+    /// 한 줄이다 — 환산이 어디서 왔는지까지 늘어놓으면 읽기 전에 닫는다.
+    func walletRateBody(_ tokens: String, _ money: String) -> String {
+        t("토큰 \(tokens)개 = \(money)", "\(tokens) tokens = \(money)",
+           "トークン \(tokens)個 = \(money)", "\(tokens) tokens = \(money)",
+           "\(tokens) tokens = \(money)", "\(tokens) tokens = \(money)")
+    }
     var awaitingUsage: String { t("사용량을 아직 못 읽었어요. AI 코딩 도구를 한 번 써 보세요.",
                                    "No usage yet. Use an AI coding tool once to get started.",
                                    "使用量がまだありません。AI コーディングツールを一度使ってみてください。",
@@ -46,9 +74,6 @@ extension L {
     }
 
     // MARK: 상점
-    var shopCardHint: String { t("세트를 골라 팩을 사세요.", "Pick a set and buy a pack.",
-                                  "セットを選んでパックを買いましょう。", "Elige un set y compra un sobre.",
-                                  "Choisis un set et achète un booster.", "Escolha um set e compre um pacote.") }
     func packName(_ setName: String) -> String {
         t("\(setName) 팩", "\(setName) Pack", "\(setName) パック",
            "Sobre de \(setName)", "Booster \(setName)", "Pacote \(setName)")
@@ -149,12 +174,14 @@ extension L {
     }
 
     // MARK: 컬렉션
-    var collectionEmptyTitle: String { t("아직 카드가 없어요", "No cards yet", "カードがありません",
-                                          "Sin cartas", "Aucune carte", "Nenhuma carta") }
     var collectionEmptyHint: String { t("팩을 뜯으면 여기에 모여요.", "Open a pack and they'll show up here.",
                                          "パックを開けるとここに集まります。", "Abre un sobre y aparecerán aquí.",
                                          "Ouvre un booster et elles apparaîtront ici.", "Abra um pacote e elas aparecerão aqui.") }
     var filterSet: String { t("세트", "Set", "セット", "Set", "Set", "Set") }
+    var ownedOnly: String { t("보유한 카드만", "Owned only", "所持カードのみ",
+                               "Solo en posesión", "Possédées seulement", "Somente possuídas") }
+    var tierSummaryToggle: String { t("등급별 수집 현황", "By rarity", "レアリティ別",
+                                       "Por rareza", "Par rareté", "Por raridade") }
     var filterTier: String { t("등급", "Rarity", "レアリティ", "Rareza", "Rareté", "Raridade") }
     var notOwnedYet: String { t("아직 없음", "Not owned yet", "未所持",
                                  "Aún no obtenida", "Pas encore obtenue", "Ainda não obtida") }
@@ -188,21 +215,29 @@ extension L {
            "Você atingiu o limite de \(window): \(count) pacotes de \(set) esperam.")
     }
 
-    // MARK: 카드 갈기
+    // MARK: 카드 판매
 
-    var disenchant: String { t("중복 갈기", "Recycle spares", "重複を分解",
-                                "Reciclar repetidas", "Recycler les doubles", "Reciclar repetidas") }
-    func disenchantConfirm(_ count: Int, _ tokens: String) -> String {
-        t("\(count)장을 갈아 \(tokens) 토큰을 받습니다. 한 장은 남습니다.",
-           "Recycle \(count) for \(tokens) tokens. One copy stays.",
-           "\(count)枚を分解して \(tokens) トークン。1枚は残ります。",
-           "Recicla \(count) por \(tokens) tokens. Se conserva una.",
-           "Recycle \(count) pour \(tokens) tokens. Un exemplaire reste.",
-           "Recicle \(count) por \(tokens) tokens. Uma cópia fica.")
+    var sellSpares: String { t("중복 판매", "Sell spares", "重複を売る",
+                                "Vender repetidas", "Vendre les doubles", "Vender repetidas") }
+    /// 값은 원화로 적는다. 모으는 것은 토큰이지만 카드값이 실제 시세에서 온 값이라,
+    /// 파는 자리에서 토큰 자릿수를 보여 주면 얼마를 받는 것인지 가늠이 되지 않는다.
+    func sellConfirm(_ count: Int, _ money: String) -> String {
+        t("\(count)장을 팔아 \(money)을 받습니다. 한 장은 남습니다.",
+           "Sell \(count) for \(money). One copy stays.",
+           "\(count)枚を売って \(money)。1枚は残ります。",
+           "Vende \(count) por \(money). Se conserva una.",
+           "Vends \(count) pour \(money). Un exemplaire reste.",
+           "Venda \(count) por \(money). Uma cópia fica.")
     }
-    func disenchantDone(_ tokens: String) -> String {
-        t("+\(tokens) 토큰", "+\(tokens) tokens", "+\(tokens) トークン",
-           "+\(tokens) tokens", "+\(tokens) tokens", "+\(tokens) tokens")
+    /// 판매가에 도감 추가금이 얹혀 있을 때 그 사실을 적는다.
+    func sellBonusIncluded(_ value: Double) -> String {
+        let percent = Self.percent(value)
+        return t("판매 추가금 +\(percent) 포함", "includes +\(percent) sale bonus",
+                  "販売ボーナス +\(percent) 込み", "incluye +\(percent) de bonificación",
+                  "bonus de vente +\(percent) inclus", "inclui bônus de venda +\(percent)")
+    }
+    func sellDone(_ money: String) -> String {
+        t("+\(money)", "+\(money)", "+\(money)", "+\(money)", "+\(money)", "+\(money)")
     }
 
     // MARK: 등급
@@ -252,12 +287,13 @@ extension L {
     var oripaSubtitle: String { t("상위 등급만 담은 뽑기", "A draw of high rarities only",
                                    "上位レアだけの一発勝負", "Solo cartas de alta rareza",
                                    "Uniquement des hautes raretés", "Só cartas de alta raridade") }
-    var oripaHint: String { t("여러 세트에서 골라 담은 100장짜리 박스예요. 한 장씩 뽑으면 그 카드는 박스에서 빠집니다.",
-                               "A 100-card box drawn from every set. Each pull removes that card from the box.",
-                               "全セットから選んだ100枚の箱です。引いたカードは箱から抜けます。",
-                               "Una caja de 100 cartas de todos los sets. Cada tirada retira esa carta.",
-                               "Une boîte de 100 cartes tirées de tous les sets. Chaque tirage retire la carte.",
-                               "Uma caixa de 100 cartas de todos os sets. Cada tiragem remove a carta.") }
+    /// 두 문장을 각각 한 줄에 둔다. 이어 붙이면 줄바꿈이 문장 가운데서 일어나 읽기 나쁘다.
+    var oripaHint: String { t("여러 세트에서 골라 담은 100장짜리 박스예요.\n한 장씩 뽑으면 그 카드는 박스에서 빠집니다.",
+                               "A 100-card box drawn from every set.\nEach pull removes that card from the box.",
+                               "全セットから選んだ100枚の箱です。\n引いたカードは箱から抜けます。",
+                               "Una caja de 100 cartas de todos los sets.\nCada tirada retira esa carta.",
+                               "Une boîte de 100 cartes tirées de tous les sets.\nChaque tirage retire la carte.",
+                               "Uma caixa de 100 cartas de todos os sets.\nCada tiragem remove a carta.") }
     var oripaPull: String { t("뽑기", "Pull", "引く", "Tirar", "Tirer", "Tirar") }
     var oripaDrawHint: String { t("밀어서 확인", "Slide to reveal", "スライドして確認",
                                   "Desliza para ver", "Fais glisser pour voir",
@@ -266,8 +302,6 @@ extension L {
                                      "¿Tirar?", "Tirer ?", "Tirar?") }
     var oripaSeeDetail: String { t("자세히 보기", "See details", "詳しく見る",
                                     "Ver detalles", "Voir la carte", "Ver detalhes") }
-    var oripaContents: String { t("박스에 남은 카드", "Left in the box", "箱の残り",
-                                   "Quedan en la caja", "Reste dans la boîte", "Resta na caixa") }
     func oripaRemaining(_ left: Int, _ total: Int) -> String {
         t("남은 슬롯 \(left) / \(total)", "\(left) of \(total) slots left", "残り \(left) / \(total)",
            "\(left) de \(total) ranuras", "\(left) sur \(total) restantes", "\(left) de \(total) restantes")
@@ -319,19 +353,11 @@ extension L {
 
     // MARK: 조합 도감
     var dexTab: String { t("도감", "Dex", "図鑑", "Dex", "Dex", "Dex") }
-    var dexHint: String { t("카드를 묶어 도감을 완성하면 팩과 영구 혜택을 받아요.",
-                             "Complete a dex to earn packs and a permanent perk.",
-                             "図鑑を完成させるとパックと永続ボーナスがもらえます。",
-                             "Completa un dex para ganar sobres y una ventaja permanente.",
-                             "Complète un dex pour gagner des boosters et un bonus permanent.",
-                             "Complete um dex para ganhar pacotes e um bônus permanente.") }
     var dexComplete: String { t("완성", "Complete", "コンプリート", "Completo", "Complet", "Completo") }
     var dexClaim: String { t("보상 수령", "Claim reward", "報酬を受け取る",
                               "Reclamar", "Récupérer", "Resgatar") }
     var dexClaimed: String { t("수령 완료", "Claimed", "受取済み", "Reclamado", "Récupéré", "Resgatado") }
     var dexPerksNone: String { t("아직 없음", "None yet", "まだなし", "Ninguna", "Aucun", "Nenhum") }
-    var dexBlurbHeader: String { t("이 조합은", "About this dex", "この図鑑は",
-                                    "Sobre este dex", "À propos", "Sobre este dex") }
     var dexGoBuyPack: String { t("이 팩 사러 가기", "Buy this pack", "このパックを買う",
                                   "Comprar este sobre", "Acheter ce booster", "Comprar este pacote") }
     var dexReward: String { t("완성 보상", "Reward", "完成報酬", "Recompensa", "Récompense", "Recompensa") }
@@ -356,6 +382,15 @@ extension L {
         t("팩 \(count)개", "\(count) packs", "パック \(count)個",
            "\(count) sobres", "\(count) boosters", "\(count) pacotes")
     }
+    /// 어느 세트 팩을 받는지는 개수만으로는 알 수 없다.
+    func dexRewardPacksHelp(_ count: Int, _ setName: String) -> String {
+        t("\(setName) 팩 \(count)개를 받아요.",
+           "You get \(count) \(setName) packs.",
+           "\(setName) パックを \(count)個もらえます。",
+           "Recibes \(count) sobres de \(setName).",
+           "Tu reçois \(count) boosters \(setName).",
+           "Você recebe \(count) pacotes de \(setName).")
+    }
 
     /// 한 팩에서 이 카드가 나올 확률. 없는 카드를 눌렀을 때 보여준다 —
     /// 얼마나 먼 카드인지 알아야 계속 살지 판단할 수 있다.
@@ -371,9 +406,7 @@ extension L {
         case .packDiscount: return "\(dexPerkPackDiscount) −\(Self.percent(perk.value))"
         case .dustBonus:    return "\(dexPerkDustBonus) +\(Self.percent(perk.value))"
         case .hitOdds:      return "\(dexPerkHitOdds) +\(Self.percent(perk.value))"
-        case .bonusPacks:   return "\(dexPerkBonusPacks) +\(Int(perk.value.rounded()))"
         case .extraHitSlot: return "\(dexPerkExtraHit) +\(Int(perk.value.rounded()))"
-        case .duplicateGuard: return dexPerkDuplicateGuard
         }
     }
 
@@ -388,12 +421,8 @@ extension L {
             return perks.dustBonus > 0 ? "\(dexPerkDustBonus) +\(Self.percent(perks.dustBonus))" : nil
         case .hitOdds:
             return perks.hitOdds > 0 ? "\(dexPerkHitOdds) +\(Self.percent(perks.hitOdds))" : nil
-        case .bonusPacks:
-            return perks.bonusPacks > 0 ? "\(dexPerkBonusPacks) +\(perks.bonusPacks)" : nil
         case .extraHitSlot:
             return perks.extraHitSlot > 0 ? "\(dexPerkExtraHit) +\(perks.extraHitSlot)" : nil
-        case .duplicateGuard:
-            return perks.duplicateGuard ? dexPerkDuplicateGuard : nil
         }
     }
 
@@ -404,25 +433,20 @@ extension L {
         if perks.packDiscount > 0 { parts.append("\(dexPerkPackDiscount) −\(Self.percent(perks.packDiscount))") }
         if perks.dustBonus > 0 { parts.append("\(dexPerkDustBonus) +\(Self.percent(perks.dustBonus))") }
         if perks.hitOdds > 0 { parts.append("\(dexPerkHitOdds) +\(Self.percent(perks.hitOdds))") }
-        if perks.bonusPacks > 0 { parts.append("\(dexPerkBonusPacks) +\(perks.bonusPacks)") }
         if perks.extraHitSlot > 0 { parts.append("\(dexPerkExtraHit) +\(perks.extraHitSlot)") }
-        if perks.duplicateGuard { parts.append(dexPerkDuplicateGuard) }
         return parts.joined(separator: "  ·  ")
     }
 
     var dexPerkTokenGain: String { t("적립 토큰", "Token earning", "獲得トークン",
                                       "Tokens ganados", "Tokens gagnés", "Tokens ganhos") }
     var dexPerkPackDiscount: String { t("팩 가격", "Pack price", "パック価格", "Precio", "Prix", "Preço") }
-    var dexPerkDustBonus: String { t("갈갈 환급", "Recycle", "分解還元", "Reciclaje", "Recyclage", "Reciclagem") }
+    var dexPerkDustBonus: String { t("판매 추가금", "Sale bonus", "販売ボーナス",
+                                      "Bonificación de venta", "Bonus de vente", "Bônus de venda") }
     var dexPerkHitOdds: String { t("상위 등급 확률", "Higher rarity odds", "上位レア確率",
                                     "Prob. de rareza alta", "Chance de haute rareté",
                                     "Chance de raridade alta") }
-    var dexPerkBonusPacks: String { t("보너스 팩", "Bonus packs", "ボーナスパック",
-                                       "Sobres extra", "Boosters bonus", "Pacotes bônus") }
     var dexPerkExtraHit: String { t("레어 이상 확정", "Guaranteed rare+", "レア以上確定",
                                      "Rara garantizada", "Rare garantie", "Rara garantida") }
-    var dexPerkDuplicateGuard: String { t("중복 회피", "Duplicate guard", "重複回避",
-                                            "Evita duplicados", "Anti-doublon", "Evita duplicadas") }
 
     /// 혜택이 실제로 무엇을 바꾸는지 한 줄로. 이름 위에 마우스를 올리면 뜬다.
     func dexPerkHelp(_ kind: DexPerkKind) -> String {
@@ -442,12 +466,12 @@ extension L {
                       "Tous les boosters coûtent moins cher.",
                       "Todos os pacotes ficam mais baratos.")
         case .dustBonus:
-            return t("중복 카드를 갈 때 돌려받는 토큰이 늘어요.",
-                      "Recycling duplicates gives back more tokens.",
-                      "重複カードを分解したときの還元が増えます。",
-                      "Reciclar duplicados devuelve más tokens.",
-                      "Recycler les doublons rapporte plus de tokens.",
-                      "Reciclar duplicatas devolve mais tokens.")
+            return t("중복 카드를 팔 때 시세보다 그만큼 더 받아요.",
+                      "Selling duplicates pays that much above market price.",
+                      "重複カードを売るとき相場よりその分多くもらえます。",
+                      "Vender duplicados paga ese porcentaje por encima del precio.",
+                      "Vendre les doublons rapporte ce pourcentage au-dessus du marché.",
+                      "Vender duplicatas paga essa porcentagem acima do mercado.")
         case .hitOdds:
             return t("팩마다 하나씩 들어오는 레어 이상 자리에서 더 높은 등급이 나올 확률이 올라가요.",
                       "The guaranteed rare slot rolls higher rarities more often.",
@@ -455,13 +479,6 @@ extension L {
                       "La carta rara garantizada sale con más rareza.",
                       "La carte rare garantie monte plus souvent en rareté.",
                       "A carta rara garantida sobe de raridade com mais frequência.")
-        case .bonusPacks:
-            return t("사용 한도를 다 채웠을 때 받는 보너스 팩이 늘어요.",
-                      "You get more bonus packs when you max a usage limit.",
-                      "使用上限を使い切ったときのボーナスパックが増えます。",
-                      "Recibes más sobres extra al alcanzar el límite de uso.",
-                      "Tu reçois plus de boosters bonus en atteignant la limite.",
-                      "Você recebe mais pacotes bônus ao atingir o limite de uso.")
         case .extraHitSlot:
             return t("팩마다 레어 이상 확정 칸이 하나 늘어요. 10장 팩이 11장이 됩니다.",
                       "Every pack holds one more rare-or-better card.",
@@ -469,13 +486,6 @@ extension L {
                       "Cada sobre trae una carta rara adicional.",
                       "Chaque booster contient une carte rare de plus.",
                       "Cada pacote traz mais uma carta rara.")
-        case .duplicateGuard:
-            return t("레어 이상 자리에서 이미 가진 카드가 나오면 한 번 다시 뽑아요.",
-                      "The rare-or-better slot rerolls once when it hits a card you own.",
-                      "レア以上の枠で所持済みが出たら一度引き直します。",
-                      "La carta rara se vuelve a tirar si ya la tienes.",
-                      "La carte rare est retirée une fois si tu l'as déjà.",
-                      "A carta rara é sorteada de novo se você já a tem.")
         }
     }
 

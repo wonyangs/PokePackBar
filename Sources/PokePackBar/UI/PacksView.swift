@@ -51,7 +51,7 @@ struct PacksView: View {
                 packList
             }
         }
-        .frame(height: 470)
+        .frame(height: PopoverMetrics.tabHeight)
     }
 
     private var emptyState: some View {
@@ -59,9 +59,9 @@ struct PacksView: View {
         return VStack(spacing: 8) {
             Image(systemName: "shippingbox")
                 .font(.system(size: 40)).foregroundStyle(.tertiary)
-            Text(l.packsEmptyTitle).font(.callout.weight(.semibold))
+            Text(l.packsEmptyTitle).font(Typography.title)
             Text(l.packsEmptyHint)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(Typography.body).foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, 24)
@@ -94,6 +94,9 @@ struct PacksView: View {
         wallet.setPity(pity, setID: set.id)
         // 수집이 도감 완성까지 처리하고 그 목록을 돌려준다.
         let completions = wallet.collect(pulled.cards.map(\.id))
+        // 카드는 이미 들어갔지만 머리글의 컬렉션 가치는 뒤집은 만큼만 올린다 —
+        // 값이 먼저 오르면 무엇이 나왔는지 카드를 보기 전에 알게 된다.
+        wallet.holdForReveal(pulled.cards.map(\.id))
         preparing = PendingPack(setID: set.id, setName: set.name,
                                 cards: PackOpening.revealOrder(pulled.cards),
                                 isGodPack: pulled.isGodPack,
@@ -139,12 +142,12 @@ private struct PreparingView: View {
             VStack(spacing: 3) {
                 if god {
                     Text(l.godPackTitle)
-                        .font(.title2.weight(.heavy))
+                        .font(Typography.display)
                         .foregroundStyle(Color.orange)
-                    Text(l.godPackHint).font(.caption).foregroundStyle(.secondary)
+                    Text(l.godPackHint).font(Typography.body).foregroundStyle(.secondary)
                 } else {
-                    Text(l.packPreparing).font(.callout.weight(.semibold))
-                    Text(pending.setName).font(.caption).foregroundStyle(.secondary)
+                    Text(l.packPreparing).font(Typography.title)
+                    Text(pending.setName).font(Typography.body).foregroundStyle(.secondary)
                 }
             }
             ProgressView().controlSize(.small)
@@ -189,14 +192,14 @@ private struct OwnedPackRow: View {
             PackImageView(setID: set.id, width: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.packName(set.name))
-                    .font(.callout.weight(.semibold))
+                    .font(Typography.title)
                     .fixedSize(horizontal: false, vertical: true)
                 Text("\(l.packContents(PackPricing.cardCount(setID: set.id, index: index, perks: wallet.perks)))  ·  ×\(count)")
-                    .font(.caption).foregroundStyle(.secondary).monospacedDigit()
+                    .font(Typography.body).foregroundStyle(.secondary).monospacedDigit()
             }
             Spacer(minLength: 0)
             Button(l.openPack, action: onOpen)
-                .buttonStyle(.borderedProminent).controlSize(.small)
+                .buttonStyle(.borderedProminent).font(Typography.button)
         }
         .padding(10)
         .background(Color.secondary.opacity(0.06))
@@ -243,6 +246,9 @@ private struct RevealView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onChange(of: opened.id) { position = 0 }
+        // 연출을 끝까지 보지 않고 화면을 벗어나도 값은 제자리로 돌아와야 한다 —
+        // 감춘 채로 남으면 가진 것보다 적게 표시된다.
+        .onDisappear { wallet.markAllRevealed() }
     }
 
     /// 다음 장으로. **카드끼리 넘어갈 때는 애니메이션 트랜잭션을 열지 않는다.**
@@ -254,7 +260,10 @@ private struct RevealView: View {
     ///
     /// 마지막 장에서 요약으로 넘어갈 때만 화면이 통째로 바뀌므로 그때는 애니메이션을 준다.
     private func advance() {
+        // 방금 본 장을 컬렉션 가치에 얹는다. 넘긴 뒤에 올려야 머리글이 카드보다 앞서지 않는다.
+        wallet.markRevealed(opened.cards[min(position, opened.cards.count - 1)].id)
         if position + 1 >= opened.cards.count {
+            wallet.markAllRevealed()
             withAnimation(.easeOut(duration: 0.22)) { position += 1 }
         } else {
             position += 1
@@ -266,10 +275,36 @@ private struct RevealView: View {
     /// 예전에는 1초에 한 장씩 자동으로 넘겼다. 그러면 열 장을 다 볼 때까지 10초를 기다려야
     /// 하고, 그동안 할 수 있는 것도 없다. 결과를 보고 싶다는 뜻이니 결과를 바로 준다.
     private func skipToSummary() {
+        // 요약이 열 장을 한꺼번에 보여 주므로 값도 한꺼번에 올린다.
+        wallet.markAllRevealed()
         withAnimation(.easeOut(duration: 0.22)) { position = opened.cards.count }
     }
 
     // MARK: 한 장씩
+
+    /// 카드 아래 정보. 등급만 있으면 무엇을 뽑았는지가 배지 한 글자에 달린다 —
+    /// 이름과 값까지 있어야 이 카드가 무엇인지, 얼마짜리인지 그 자리에서 읽힌다.
+    @ViewBuilder
+    private func revealInfo(_ l: L, card: PulledCard) -> some View {
+        VStack(spacing: 3) {
+            Text(index?.card(card.id)?.displayName(wallet.language) ?? card.id)
+                .font(Typography.title)
+                .lineLimit(1).minimumScaleFactor(0.7)
+            HStack(spacing: 5) {
+                Text(l.tierBadge(card.tier))
+                    .font(Typography.badge)
+                    .foregroundStyle(tierColor(card.tier))
+                Text(l.tierName(card.tier)).font(Typography.label).foregroundStyle(.secondary)
+                if let prices = CardPrices.shared, let usd = prices.price(card.id) {
+                    Text("·").font(Typography.label).foregroundStyle(.tertiary)
+                    Text(prices.formattedWithKRW(usd, language: wallet.language))
+                        .font(Typography.labelSemibold).monospacedDigit()
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .lineLimit(1).minimumScaleFactor(0.8)
+        }
+    }
 
     /// 다음 장. 마지막 장에서는 없다 — 밑에 깔 것이 없다.
     private var nextCard: PulledCard? {
@@ -284,15 +319,15 @@ private struct RevealView: View {
             HStack {
                 if opened.isGodPack {
                     Text(l.godPackBadge)
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(.system(size: 14, weight: .heavy))
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(Color.orange, in: Capsule())
                         .foregroundStyle(.white)
                 }
-                Text(opened.setName).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                Text(opened.setName).font(Typography.body).foregroundStyle(.secondary).lineLimit(1)
                 Spacer()
                 Text("\(position + 1) / \(opened.cards.count)")
-                    .font(.caption.weight(.semibold)).foregroundStyle(.secondary).monospacedDigit()
+                    .font(Typography.bodySemibold).foregroundStyle(.secondary).monospacedDigit()
             }
 
             Spacer(minLength: 0)
@@ -304,19 +339,14 @@ private struct RevealView: View {
                         nextPreloaded: nextCard.map { opened.hires[$0.id] } ?? nil,
                         onAdvance: advance)
 
-            VStack(spacing: 2) {
-                Text(l.tierBadge(card.tier))
-                    .font(.system(size: 15, weight: .heavy))
-                    .foregroundStyle(tierColor(card.tier))
-                Text(l.tierName(card.tier)).font(.caption2).foregroundStyle(.secondary)
-            }
+            revealInfo(l, card: card)
 
             Spacer(minLength: 0)
 
             // 마지막 장에는 누를 것이 없다 — 카드를 넘기면 결과로 간다.
             // 자리는 남겨 둔다. 버튼이 사라지면 카드가 아래로 내려앉아 흔들린다.
             Button(l.openAll, action: skipToSummary)
-                .buttonStyle(.bordered).controlSize(.small)
+                .buttonStyle(.bordered).font(Typography.button)
                 .opacity(isLast ? 0 : 1)
                 .disabled(isLast)
                 .accessibilityHidden(isLast)
@@ -331,10 +361,23 @@ private struct RevealView: View {
         return VStack(spacing: 8) {
             VStack(spacing: 2) {
                 Text(opened.isGodPack ? l.godPackTitle : l.packOpened)
-                    .font(.callout.weight(opened.isGodPack ? .heavy : .semibold))
+                    .font(opened.isGodPack ? Typography.badgeLarge : Typography.title)
                     .foregroundStyle(opened.isGodPack ? Color.orange : Color.primary)
                 Text("\(opened.setName)  ·  \(l.packOpenSummary(new: newCount, total: opened.cards.count))")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(Typography.body).foregroundStyle(.secondary)
+                // 무엇이 나왔는지는 카드 그림이 말해 주지만, 얼마어치가 나왔는지는 숫자로만
+                // 알 수 있다. 팩값과 나란히 놓고 보라고 여기 둔다.
+                if let prices = CardPrices.shared {
+                    let worth = opened.cards.reduce(0.0) {
+                        $0 + MarketEconomy.usd(cardID: $1.id, prices: prices)
+                    }
+                    Text(l.packTotalValue(prices.formattedWithKRW(worth,
+                                                                  language: wallet.language)))
+                        .font(Typography.amount).monospacedDigit()
+                        .foregroundStyle(Color.accentColor)
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                        .padding(.top, 1)
+                }
             }
             .padding(.top, 2)
 
@@ -348,21 +391,24 @@ private struct RevealView: View {
                 }
             }
 
-            ScrollView {
-                LazyVGrid(columns: Array(repeating: GridItem(spacing: 8), count: 4), spacing: 8) {
-                    // 요약은 희귀한 것부터 — 무엇을 건졌는지 먼저 보인다.
-                    ForEach(Array(opened.cards.reversed().enumerated()), id: \.offset) { _, card in
-                        Button { spotlight = card } label: {
-                            PulledCardCell(wallet: wallet, card: card, preloaded: opened.thumbs[card.id])
-                        }
-                        .buttonStyle(.plain)
+            // 스크롤로 감싸지 않는다. 열 장이 두 줄로 들어가므로 감쌀 이유가 없고,
+            // 감싸면 결과를 다 보려고 굴려야 한다.
+            LazyVGrid(columns: CardGrid.packSummary.items,
+                      spacing: CardGrid.packSummary.spacing) {
+                // 요약은 희귀한 것부터 — 무엇을 건졌는지 먼저 보인다.
+                ForEach(Array(opened.cards.reversed().enumerated()), id: \.offset) { _, card in
+                    Button { spotlight = card } label: {
+                        PulledCardCell(wallet: wallet, card: card, preloaded: opened.thumbs[card.id])
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 2)
             }
+            .padding(.horizontal, 2)
+
+            Spacer(minLength: 0)
 
             Button(l.done, action: onDone)
-                .buttonStyle(.borderedProminent).controlSize(.small)
+                .buttonStyle(.borderedProminent).font(Typography.button)
                 .padding(.bottom, 2)
         }
     }
@@ -492,15 +538,15 @@ private struct DexCompletionBanner: View {
         let l = wallet.l
         HStack(spacing: 6) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 13)).foregroundStyle(Color.accentColor)
+                .font(.system(size: 17)).foregroundStyle(Color.accentColor)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 5) {
                     Text(completion.name.text(wallet.language))
-                        .font(.caption.weight(.bold)).lineLimit(1)
+                        .font(Typography.bodySemibold).lineLimit(1)
                     DexStars(tier: completion.tier)
                 }
                 Text(l.dexCompletedBanner)
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(Typography.label).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }
@@ -521,7 +567,7 @@ struct NewBadge: View {
     let text: String
     var body: some View {
         Text(text)
-            .font(.system(size: 8, weight: .heavy))
+            .font(.system(size: 13, weight: .heavy))
             .padding(.horizontal, 4).padding(.vertical, 1.5)
             .background(Color.accentColor, in: Capsule())
             .foregroundStyle(.white)
@@ -562,10 +608,10 @@ enum RevealPeek {
 
     /// 개봉 화면에서 카드를 그리는 폭(pt).
     ///
-    /// 탭 높이 470 안에서 머리글·등급 표기·버튼·여백이 115pt 남짓을 쓰고, 밑장이 7pt 더
-    /// 삐져나온다. 남는 세로를 카드가 다 먹으면 위아래가 답답해지므로 35pt 정도를 남긴 값이다.
-    /// 더 키우려면 이 폭이 아니라 주변 요소부터 줄여야 한다.
-    static let cardWidth: CGFloat = 230
+    /// 탭 높이(`PopoverMetrics.tabHeight`) 안에서 머리글·이름·등급·값·버튼·여백이 130pt
+    /// 남짓을 쓰고, 밑장이 7pt 더 삐져나온다. 남는 세로를 카드가 다 먹으면 위아래가
+    /// 답답해지므로 45pt 정도를 남긴 값이다.
+    static let cardWidth: CGFloat = 260
 
     // MARK: 덱 — 밑에 깔리는 다음 장
 
@@ -648,14 +694,14 @@ private struct PulledCardCell: View {
     var body: some View {
         VStack(spacing: 3) {
             ZStack(alignment: .topTrailing) {
-                CardImageView(cardID: card.id, width: 68, preloaded: preloaded)
+                CardImageView(cardID: card.id, width: CardGrid.packSummary.width, preloaded: preloaded)
                 if card.isNew {
                     // 카드 안쪽에 붙인다. 바깥으로 내밀면 격자 경계에서 위가 잘린다.
                     NewBadge(text: wallet.l.newCardBadge).padding(3)
                 }
             }
             Text(wallet.l.tierBadge(card.tier))
-                .font(.system(size: 9, weight: .heavy))
+                .font(.system(size: 14, weight: .heavy))
                 .foregroundStyle(tierColor(card.tier))
         }
     }

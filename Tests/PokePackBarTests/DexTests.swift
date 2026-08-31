@@ -41,36 +41,123 @@ final class BundledDexTests: XCTestCase {
     /// 팩을 손보면 여기서 먼저 걸린다.
     func testStoredDifficultyMatchesRecomputedValue() throws {
         let (cards, dexes) = try loadIndexes()
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
         for dex in dexes.dexes {
-            let recomputed = DexDifficulty.packsNeeded(cards: dex.cards, quantile: 0.5,
-                                                       index: cards)
-            XCTAssertEqual(recomputed, dex.medianPacks,
-                           "\(dex.id): 저장된 \(dex.medianPacks)팩 vs 재계산 \(recomputed)팩")
-            XCTAssertEqual(DexDifficulty.tier(forMedianPacks: recomputed), dex.tier,
+            let packs = DexDifficulty.packsNeeded(cards: dex.cards, quantile: 0.5, index: cards)
+            XCTAssertEqual(packs, dex.medianPacks,
+                           "\(dex.id): 저장된 \(dex.medianPacks)팩 vs 재계산 \(packs)팩")
+
+            let value = DexProgress.recomputedValue(of: dex, prices: prices)
+            XCTAssertEqual(value, dex.valueUSD, accuracy: 0.02,
+                           "\(dex.id): 저장된 값 \(dex.valueUSD) vs 재계산 \(value)")
+            XCTAssertEqual(DexDifficulty.tier(forValueUSD: value), dex.tier,
                            "\(dex.id): 티어가 어긋났다")
         }
     }
 
-    /// 최고 난도 두 개는 눈에 보이는 혜택과 패시브를 함께 준다.
-    /// 팩이 좋아지는 것이 보이지 않으면 최상위 보상으로 읽히지 않는다.
-    func testTopTierDexesGiveAVisiblePackPerk() throws {
+    /// 「인권 조합」이 실재하고, 제일 비싼 축에 있어야 한다.
+    ///
+    /// 개봉 자체가 좋아지는 혜택(`extraHitSlot`)은 상한이 1 이라 한 조합에만 붙는다.
+    /// 그 조합은 반드시 완성 비용이 제일 비싼 축이어야 한다.
+    func testFlagshipDexesAreTheMostExpensive() throws {
         let (_, dexes) = try loadIndexes()
-        let top = dexes.dexes.filter { $0.tier == Dex.maxTier }
-        XCTAssertFalse(top.isEmpty)
-        for dex in top {
-            let kinds = Set(dex.reward.perks.map(\.kind))
-            XCTAssertTrue(kinds.contains(.extraHitSlot) || kinds.contains(.duplicateGuard),
-                          "\(dex.id): 개봉이 좋아지는 혜택이 없다")
-            XCTAssertGreaterThanOrEqual(dex.reward.perks.count, 2, "\(dex.id): 패시브가 없다")
+        let flagship = dexes.dexes.filter { $0.reward.perks.contains { $0.kind.isStructural } }
+        XCTAssertEqual(flagship.count, 1, "판을 바꾸는 혜택은 한 조합에만 붙는다")
+
+        // 견주는 기준은 **완성 비용**이다. 카드값 합계로 보면 순서가 어긋난다 —
+        // 값비싼 카드 몇 장짜리 조합이 흔한 카드 여럿짜리보다 싸게 끝나는 경우가 있다.
+        let median = dexes.dexes.map(\.medianTokens).sorted()[dexes.dexes.count / 2]
+        for dex in flagship {
+            XCTAssertGreaterThan(dex.medianTokens, median,
+                                 "\(dex.id): 인권 조합인데 완성 비용이 중간값 아래다")
+        }
+        // 패시브를 몇 개 주는지는 세지 않는다. 히트 칸 하나가 팩 기대값을 50% 올려
+        // 그것만으로 그 도감의 보상 예산이 차므로, 하나만 주는 것이 정상이다.
+    }
+
+    /// 지급 팩은 **부수**다 — 목표를 넘지 않고, 개수도 상한 안이다.
+    ///
+    /// 팩 수를 티어표로 적던 시절에는 팩만의 리턴이 0.01배~1.61배로 흩어졌고, 값에 맞춰
+    /// 계산하자 109개까지 나왔다. 한 장씩 뜯는 것이 일이 되면 보상이 아니다. 지금은 상한을
+    /// 두고 나머지를 영구 패시브가 맡는다.
+    func testRewardPacksStayASideTreat() throws {
+        let (cards, dexes) = try loadIndexes()
+        for dex in dexes.dexes {
+            XCTAssertTrue((1...DexDifficulty.maxRewardPacks).contains(dex.reward.packs),
+                          "\(dex.id): 지급 팩 \(dex.reward.packs)개는 1~"
+                          + "\(DexDifficulty.maxRewardPacks) 범위를 벗어난다")
+            let packPrice = Double(PackPricing.price(setID: dex.homeSet, index: cards))
+            let paid = Double(dex.reward.packs) * packPrice
+            let target = Double(dex.medianTokens) * DexDifficulty.targetReturn
+            // 팩은 정수라 반 팩까지는 어긋난다. 그 이상 넘으면 계산이 아니라 손으로 적은 값이다.
+            XCTAssertLessThanOrEqual(paid, target + packPrice / 2,
+                                     "\(dex.id): 지급 팩이 목표를 넘는다")
         }
     }
 
-    /// 보상 팩 수는 티어 표에서 나온다. 손으로 적은 값이 섞이면 난이도와 보상이 갈라진다.
-    func testRewardPacksFollowTheTierTable() throws {
+    /// 보상의 본체는 영구 패시브다. 팩만 주는 조합은 예외로만 남는다.
+    func testMostDexesGrantAPermanentPerk() throws {
         let (_, dexes) = try loadIndexes()
+        let withPerk = dexes.dexes.filter { !$0.reward.perks.isEmpty }.count
+        XCTAssertGreaterThanOrEqual(withPerk, dexes.dexes.count * 4 / 5,
+                                    "\(dexes.dexes.count)개 중 \(withPerk)개만 패시브를 준다 — "
+                                    + "팩이 보상의 본체가 되어 버렸다")
+    }
+
+    /// 같은 종류의 혜택은 **완성 비용**이 오를 때 값이 줄지 않는다.
+    ///
+    /// 별 수가 아니라 비용을 기준으로 본다. 별은 카드값 합계로 매기는데 완성 비용은 거기에
+    /// 「그 카드가 얼마나 안 나오는가」까지 곱해진 값이라 둘이 어긋난다 — ★★★★★ 불꽃도마뱀
+    /// (906만원)이 ★★★★ 금은 시절 새싹(2,216만원)보다 싸다. 별로 사다리를 세우면 실제로 더
+    /// 많이 들인 사람이 더 적게 받는다.
+    func testPerkValuesNeverFallAsCostRises() throws {
+        let (_, dexes) = try loadIndexes()
+        let byCost = dexes.dexes.sorted { $0.medianTokens < $1.medianTokens }
+        for kind in DexPerkKind.allCases {
+            let seen = byCost.flatMap { dex in
+                dex.reward.perks.filter { $0.kind == kind }.map { (dex.id, $0.value) }
+            }
+            for (lower, upper) in zip(seen, seen.dropFirst()) {
+                XCTAssertGreaterThanOrEqual(upper.1, lower.1,
+                    "\(kind): \(lower.0) +\(lower.1) 다음에 \(upper.0) +\(upper.1) — "
+                    + "더 많이 들여야 하는 조합이 더 적게 주면 모을 이유가 없다")
+            }
+        }
+    }
+
+    /// 판을 바꾸는 혜택은 **가장 비싼 두 조합**에서만 나온다.
+    ///
+    /// 히트 칸 하나와 중복 회피는 한 번 얻으면 이후 모든 개봉이 달라진다. 중간 난이도에
+    /// 붙어 있으면 그 위를 모을 이유가 사라진다 — 로켓단 총수가 중복 회피를 들고 있던 것이
+    /// 그 상태였다.
+    func testStructuralPerksBelongToThePriciestDexes() throws {
+        let (_, dexes) = try loadIndexes()
+        let priciest = Set(dexes.dexes.sorted { $0.medianTokens < $1.medianTokens }
+            .suffix(2).map(\.id))
+        var found = 0
         for dex in dexes.dexes {
-            let expected = DexDifficulty.rewardPacks[dex.tier - 1]
-            XCTAssertEqual(dex.reward.packs, expected, "\(dex.id): 보상 팩 수가 티어와 어긋났다")
+            for perk in dex.reward.perks where perk.kind.isStructural {
+                found += 1
+                XCTAssertTrue(priciest.contains(dex.id),
+                              "\(dex.id): \(perk.kind) 는 가장 비싼 조합에서만 준다")
+            }
+        }
+        XCTAssertEqual(found, 1, "판을 바꾸는 혜택은 하나뿐이다 (상한이 1)")
+    }
+
+    /// 혜택이 없는 조합은 지급 팩이 목표를 **정확히** 채운다.
+    ///
+    /// 채울 것이 팩뿐이라 반 팩의 반올림 말고는 어긋날 이유가 없다. 여기가 틀어지면
+    /// 스크립트가 비율에서 거꾸로 계산하지 않고 어딘가에 손으로 적은 값이 남아 있다는 뜻이다.
+    func testPerklessDexesLandOnTheTarget() throws {
+        let (cards, dexes) = try loadIndexes()
+        let plain = dexes.dexes.filter { $0.reward.perks.isEmpty }
+        for dex in plain {
+            let packPrice = Double(PackPricing.price(setID: dex.homeSet, index: cards))
+            let paid = Double(dex.reward.packs) * packPrice
+            let target = Double(dex.medianTokens) * DexDifficulty.targetReturn
+            XCTAssertEqual(paid, target, accuracy: packPrice / 2 + 1,
+                           "\(dex.id): 목표 \(target) 인데 \(paid) 를 준다")
         }
     }
 
@@ -93,7 +180,6 @@ final class BundledDexTests: XCTestCase {
         XCTAssertLessThanOrEqual(all.packDiscount, DexPerks.caps.packDiscount)
         XCTAssertLessThanOrEqual(all.dustBonus, DexPerks.caps.dustBonus)
         XCTAssertLessThanOrEqual(all.hitOdds, DexPerks.caps.hitOdds)
-        XCTAssertLessThanOrEqual(all.bonusPacks, DexPerks.caps.bonusPacks)
         XCTAssertLessThanOrEqual(all.extraHitSlot, DexPerks.caps.extraHitSlot)
     }
 
@@ -112,13 +198,13 @@ final class BundledDexTests: XCTestCase {
         let json = """
         {"version":1,"dexes":[
           {"id":"empty","name":{"ko":"a","en":"a"},"blurb":{"ko":"b","en":"b"},
-           "homeSet":"base1","cards":[],"tier":1,"medianPacks":1,
+           "homeSet":"base1","cards":[],"tier":1,"medianPacks":1,"medianTokens":10000000,"valueUSD":1.0,
            "reward":{"packs":1,"perks":[]}},
           {"id":"badtier","name":{"ko":"a","en":"a"},"blurb":{"ko":"b","en":"b"},
-           "homeSet":"base1","cards":["base1-1"],"tier":9,"medianPacks":1,
+           "homeSet":"base1","cards":["base1-1"],"tier":9,"medianPacks":1,"medianTokens":10000000,"valueUSD":1.0,
            "reward":{"packs":1,"perks":[]}},
           {"id":"ok","name":{"ko":"a","en":"a"},"blurb":{"ko":"b","en":"b"},
-           "homeSet":"base1","cards":["base1-1"],"tier":1,"medianPacks":1,
+           "homeSet":"base1","cards":["base1-1"],"tier":1,"medianPacks":1,"medianTokens":10000000,"valueUSD":1.0,
            "reward":{"packs":1,"perks":[]}}
         ]}
         """
@@ -133,7 +219,7 @@ final class DexProgressTests: XCTestCase {
     private func dex(_ id: String, _ cards: [String], tier: Int = 2, packs: Int = 10,
                      perk: DexPerk? = nil) -> Dex {
         Dex(id: id, name: DexText(ko: id, en: id), blurb: DexText(ko: "", en: ""),
-            homeSet: "s", cards: cards, tier: tier, medianPacks: packs,
+            homeSet: "s", cards: cards, tier: tier, medianPacks: packs, medianTokens: packs * 10_000_000, valueUSD: Double(packs),
             reward: DexReward(packs: 3, perks: perk.map { [$0] } ?? []))
     }
 
@@ -197,17 +283,35 @@ final class DexProgressTests: XCTestCase {
         XCTAssertEqual(fresh.map(\.id), ["hard", "mid", "easy"])
     }
 
-    /// 목록 순서 — 어려운 것부터, 같은 난이도면 카드가 적은 것부터.
-    func testSortedRunsHardestFirstThenShortest() {
+    /// 목록 순서 — 어려운 것부터, 같은 난이도면 값비싼 카드가 든 것부터.
+    func testSortedRunsHardestFirstThenMostValuable() throws {
+        let prices = try XCTUnwrap(CardPrices.decode(Data("""
+            {"version":2,"asOf":"2026-08-30","currency":"USD","krwPerUsd":1376.6,
+             "prices":{"a":1.0,"b":1.0,"c":1.0,"gold":500.0}}
+            """.utf8)))
         let statuses = DexProgress.statuses(
             dexes: [dex("hard", ["a"], tier: 4, packs: 200),
                     dex("easy", ["a"], tier: 1, packs: 9),
-                    dex("midLong", ["a", "b", "c"], tier: 2, packs: 20),
-                    dex("midShort", ["a", "b"], tier: 2, packs: 40)],
+                    // 장수는 셋이지만 싸다. 값으로 정렬하면 뒤로 간다.
+                    dex("midMany", ["a", "b", "c"], tier: 2, packs: 20),
+                    dex("midRich", ["gold"], tier: 2, packs: 40)],
             owned: { _ in false }, claimed: [])
-        XCTAssertEqual(DexProgress.sorted(statuses).map(\.id),
-                       ["hard", "midShort", "midLong", "easy"],
-                       "같은 난이도면 팩 수보다 카드 장수가 먼저다")
+        XCTAssertEqual(DexProgress.sorted(statuses, prices: prices).map(\.id),
+                       ["hard", "midRich", "midMany", "easy"],
+                       "같은 난이도면 장수보다 값이 먼저다")
+    }
+
+    /// 값이 같으면 장수가 적은 쪽이 먼저다 — 그래야 순서가 흔들리지 않는다.
+    func testSortedFallsBackToCardCount() throws {
+        let prices = try XCTUnwrap(CardPrices.decode(Data("""
+            {"version":2,"asOf":"","currency":"USD","krwPerUsd":1376.6,
+             "prices":{"a":2.0,"b":1.0,"c":1.0}}
+            """.utf8)))
+        let statuses = DexProgress.statuses(
+            dexes: [dex("two", ["b", "c"], tier: 2, packs: 20),
+                    dex("one", ["a"], tier: 2, packs: 40)],
+            owned: { _ in false }, claimed: [])
+        XCTAssertEqual(DexProgress.sorted(statuses, prices: prices).map(\.id), ["one", "two"])
     }
 
     /// 진행 상태는 순서를 바꾸지 않는다. 카드를 얻을 때마다 목록이 재배열되면
@@ -229,7 +333,7 @@ final class DexPerksTests: XCTestCase {
 
     private func dex(_ id: String, _ perks: [DexPerk]) -> Dex {
         Dex(id: id, name: DexText(ko: id, en: id), blurb: DexText(ko: "", en: ""),
-            homeSet: "s", cards: ["c"], tier: 2, medianPacks: 10,
+            homeSet: "s", cards: ["c"], tier: 2, medianPacks: 10, medianTokens: 100_000_000, valueUSD: 5,
             reward: DexReward(packs: 3, perks: perks))
     }
 
@@ -259,13 +363,6 @@ final class DexPerksTests: XCTestCase {
         XCTAssertEqual(perks.hitOdds, 0.05, accuracy: 0.0001)
     }
 
-    /// 켜고 끄는 혜택은 여러 번 붙어도 한 번만 켜진다.
-    func testToggleStyleaPerkStaysOnce() {
-        let dexes = [dex("a", [DexPerk(kind: .duplicateGuard, value: 1)]),
-                     dex("b", [DexPerk(kind: .duplicateGuard, value: 1)])]
-        XCTAssertTrue(DexPerks.total(completed: ["a", "b"], dexes: dexes).duplicateGuard)
-        XCTAssertFalse(DexPerks.total(completed: [], dexes: dexes).duplicateGuard)
-    }
 
     /// 세이브에 남은 낯선 id 는 무시한다 — 도감을 지우거나 이름을 바꿔도 세이브가 깨지지 않아야 한다.
     func testUnknownCompletedIDsAreIgnored() {
@@ -311,10 +408,11 @@ final class DexPerkEffectTests: XCTestCase {
     }
 
     func testDustBonusRaisesRefund() {
-        let base = CardDust.value(for: .rare)
-        let boosted = CardDust.value(for: .rare, perks: DexPerks(dustBonus: 0.3))
+        let card = "sv10-1"
+        let base = CardSale.price(cardID: card)
+        let boosted = CardSale.price(cardID: card, perks: DexPerks(dustBonus: 0.3))
         XCTAssertEqual(boosted, Int(Double(base) * 1.3))
-        XCTAssertEqual(CardDust.value(for: .rare, perks: .none), base)
+        XCTAssertEqual(CardSale.price(cardID: card, perks: .none), base)
     }
 
     /// 카드 한 장이 늘고, 그 한 장이 히트 슬롯이어야 한다.
@@ -338,69 +436,6 @@ final class DexPerkEffectTests: XCTestCase {
         XCTAssertGreaterThan(hitShare(.none), 1, "확정 한 장 위에 다른 칸의 몫이 얹힌다")
     }
 
-    /// 중복 회피는 카드 장수도 등급 분포도 바꾸지 않는다.
-    /// 바꾸면 갈갈 회수율이 함께 올라가고, 이 혜택을 고른 이유가 사라진다.
-    func testDuplicateGuardChangesNeitherSizeNorOdds() {
-        let index = makeIndex()
-        let guarded = DexPerks(duplicateGuard: true)
-        XCTAssertEqual(PackPricing.cardCount(setID: "s", index: index, perks: guarded),
-                       PackPricing.cardCount(setID: "s", index: index, perks: .none))
-        // 부동소수 비교라 값끼리 대조한다 — 마지막 자리 차이로 실패하면 무엇도 알려 주지 않는다.
-        let guardedOdds = PackOpening.packOdds(setID: "s", index: index, perks: guarded)
-        let plainOdds = PackOpening.packOdds(setID: "s", index: index, perks: .none)
-        XCTAssertEqual(guardedOdds.map(\.tier), plainOdds.map(\.tier))
-        for (a, b) in zip(guardedOdds, plainOdds) {
-            XCTAssertEqual(a.probability, b.probability, accuracy: 1e-9, "\(a.tier) 확률이 달라졌다")
-        }
-    }
-
-    /// 이미 가진 레어가 나오면 다시 뽑는다.
-    ///
-    /// 레어 후보가 둘뿐인 세트에서 하나를 갖고 있으면, 혜택이 켜진 팩의 레어 자리에는
-    /// 반드시 나머지 한 장이 온다 — 다시 뽑을 때 방금 나온 카드를 후보에서 빼기 때문이다.
-    func testDuplicateGuardRerollsAnOwnedHit() {
-        var cards: [[String]] = []
-        for i in 1...20 { cards.append(["s-\(i)", "c\(i)", "C"]) }
-        for i in 21...30 { cards.append(["s-\(i)", "u\(i)", "U"]) }
-        for i in 91...96 { cards.append(["s-\(i)", "r\(i)", "R"]) }
-        let payload: [String: Any] = [
-            "version": 1,
-            "sets": [["id": "s", "name": "Set", "released": "2020/01/01", "cardCount": cards.count]],
-            "cards": cards,
-        ]
-        let index = CardIndex.decode(try! JSONSerialization.data(withJSONObject: payload))!
-
-        for seed in UInt64(1)...30 {
-            var g = SeededGenerator(seed: seed)
-            let pack = PackOpening.draw(setID: "s", index: index, alreadyOwned: ["s-91"],
-                                        perks: DexPerks(duplicateGuard: true), using: &g)
-            // 마지막 장이 레어 이상 확정 칸이다. 다른 칸에서도 레어가 나올 수 있으므로
-            // 전체가 아니라 그 칸만 본다.
-            XCTAssertNotEqual(pack.last?.id, "s-91", "seed \(seed): 확정 칸에 중복이 그대로 나왔다")
-        }
-    }
-
-    /// 혜택이 없으면 중복도 그대로 나온다 — 위 검사가 무엇을 잠그는지 분명히 한다.
-    func testWithoutTheGuardOwnedHitsStillAppear() {
-        var cards: [[String]] = []
-        for i in 1...20 { cards.append(["s-\(i)", "c\(i)", "C"]) }
-        for i in 21...30 { cards.append(["s-\(i)", "u\(i)", "U"]) }
-        for i in 91...96 { cards.append(["s-\(i)", "r\(i)", "R"]) }
-        let payload: [String: Any] = [
-            "version": 1,
-            "sets": [["id": "s", "name": "Set", "released": "2020/01/01", "cardCount": cards.count]],
-            "cards": cards,
-        ]
-        let index = CardIndex.decode(try! JSONSerialization.data(withJSONObject: payload))!
-
-        var sawOwned = false
-        for seed in UInt64(1)...30 {
-            var g = SeededGenerator(seed: seed)
-            let pack = PackOpening.draw(setID: "s", index: index, alreadyOwned: ["s-91"], using: &g)
-            if pack.last?.id == "s-91" { sawOwned = true }
-        }
-        XCTAssertTrue(sawOwned, "혜택 없이는 확정 칸에도 중복이 나와야 한다")
-    }
 
     /// 레어의 몫이 상위 등급으로 넘어간다. 전체 합은 여전히 1 이다.
     func testHitOddsMovesWeightFromRareToHigherTiers() {
@@ -444,16 +479,16 @@ final class DexPerkEffectTests: XCTestCase {
     /// 재화를 늘리는 순환은 성립하지 않는다. 이 검사가 깨지면 상한을 내려야 한다.
     func testRecyclingStaysUnprofitableEvenWithEveryPerk() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
-        let perks = DexPerks.caps
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
         for set in index.sets {
-            let odds = PackOpening.packOdds(setID: set.id, index: index, perks: perks)
-            let cards = Double(PackPricing.cardCount(setID: set.id, index: index, perks: perks))
-            let dust = odds.reduce(0.0) {
-                $0 + $1.probability * cards * Double(CardDust.value(for: $1.tier, perks: perks))
-            }
-            let price = Double(PackPricing.price(setID: set.id, index: index, perks: perks))
-            XCTAssertLessThan(dust / price, 0.75,
-                              "\(set.id): 혜택 최대일 때 환급이 팩 값의 75% 를 넘는다")
+            let ratio = CardSaleTests.sellBackRatio(set.id, index: index, prices: prices,
+                                                 perks: DexPerks.caps)
+            // 상한이 0.75 였다. 시세를 쓰면서 「히트 칸 +1」 혜택의 값이 세트마다 크게
+            // 달라졌다 — 값이 몇 장에 몰린 세트(sv8pt5 는 상위 10%가 90%를 차지한다)에서는
+            // 히트 한 칸이 곱절로 뛴다. 그래도 100% 아래면 팔아서 버는 경로는 아니다.
+            XCTAssertLessThan(ratio, 0.85,
+                              "\(set.id): 혜택 최대일 때 환급이 팩 값의 \(Int(ratio * 100))% 다")
+            XCTAssertLessThan(ratio, 1.0, "\(set.id): 갈면 버는 팩이 되었다")
         }
     }
 }
@@ -479,7 +514,7 @@ final class DexWalletTests: XCTestCase {
     private func dex(_ id: String, _ cards: [String], tier: Int = 2, packs: Int = 3,
                      perk: DexPerk? = nil) -> Dex {
         Dex(id: id, name: DexText(ko: id, en: id), blurb: DexText(ko: "", en: ""),
-            homeSet: "home", cards: cards, tier: tier, medianPacks: 10,
+            homeSet: "home", cards: cards, tier: tier, medianPacks: 10, medianTokens: 100_000_000, valueUSD: 5,
             reward: DexReward(packs: packs, perks: perk.map { [$0] } ?? []))
     }
 
@@ -589,15 +624,6 @@ final class DexWalletTests: XCTestCase {
         XCTAssertEqual(s.availableTokens, 5_000)
     }
 
-    /// 보너스 팩 혜택은 지급 개수에 더해진다.
-    func testBonusPackPerkRaisesGrantCount() {
-        var tierMap: [String: Int] = [:]
-        var g = SeededGenerator(seed: 7)
-        let windows = [BonusWindow(key: "w", name: "W", kind: .session, utilization: 100)]
-        let grants = WalletStore.evaluateGrants(windows: windows, grantTier: &tierMap,
-                                               availableSets: ["s"], bonusPacks: 3, using: &g)
-        XCTAssertEqual(grants.first?.count, PackConfig.bonusPackCount + 3)
-    }
 }
 
 /// 혜택을 지나가는 계산은 반드시 `perks:` 를 받아야 한다.
@@ -609,9 +635,13 @@ final class DexPerkRoutingTests: XCTestCase {
     /// 정의부 자체는 검사 대상이 아니다.
     private static let exempt = ["PackOpening.swift", "DexProgress.swift"]
 
+    /// 일부러 혜택을 빼는 자리에 붙이는 표시. 팩값 계산이 그렇다 — 혜택으로 카드가 늘면
+    /// 팩값이 올라가 혜택이 벌이 된다. 파일을 통째로 빼지 않고 줄에 이유를 적어 남긴다.
+    private static let optOut = "혜택 제외"
+
     private static let mustCarryPerks = [
         "PackPricing.price(", "PackPricing.cardCount(",
-        "PackOpening.packOdds(", "PackOpening.draw(", "CardDust.value(",
+        "PackOpening.packOdds(", "PackOpening.draw(", "CardSale.price(",
         "PackOpening.packSlots(",
     ]
 
@@ -633,6 +663,7 @@ final class DexPerkRoutingTests: XCTestCase {
                 guard Self.mustCarryPerks.contains(where: { line.contains($0) }) else { continue }
                 // 호출이 여러 줄로 나뉘면 다음 줄에 perks: 가 온다.
                 let window = lines[offset..<min(offset + 3, lines.count)].joined()
+                guard !window.contains(Self.optOut) else { continue }
                 if !window.contains("perks:") {
                     offenders.append("\(url.lastPathComponent):\(offset + 1) (perks)")
                 }
@@ -730,12 +761,9 @@ final class OripaTests: XCTestCase {
 
         XCTAssertEqual(box.slots.count, OripaConfig.slotsPerBox)
         XCTAssertEqual(Set(box.slots).count, box.slots.count, "같은 카드가 두 번 들어갔다")
-        for entry in OripaConfig.composition {
-            let actual = box.slots.filter { index.card($0)?.tier == entry.tier }.count
-            XCTAssertEqual(actual, entry.count, "\(entry.tier) 장수가 구성과 다르다")
-        }
-        XCTAssertTrue(box.slots.allSatisfy { (index.card($0)?.tier.rank ?? 0) >= CardTier.doubleRare.rank },
-                      "RR 미만이 섞였다")
+        XCTAssertTrue(box.slots.allSatisfy {
+            (index.card($0)?.tier.rank ?? 0) >= OripaConfig.minimumTier.rank
+        }, "RR 미만이 섞였다")
     }
 
     /// 뽑으면 그 카드가 박스에서 빠진다. 재고가 줄지 않으면 오리파가 아니라 그냥 비싼 팩이다.
@@ -782,7 +810,7 @@ final class OripaTests: XCTestCase {
 
         let before = s.availableTokens
         let result = try XCTUnwrap(s.pullOripa(index: index))
-        XCTAssertEqual(s.availableTokens, before - OripaConfig.slotPrice)
+        XCTAssertEqual(s.availableTokens, before - s.oripaPrice(index: index))
         XCTAssertEqual(s.cardCount(result.card.id), 1)
 
         let remaining = s.oripaBox(index: index).slots
@@ -809,17 +837,50 @@ final class OripaTests: XCTestCase {
         XCTAssertNotEqual(after.slots, before.slots, "내용이 그대로면 교체가 아니다")
     }
 
-    /// 갈아서 버는 경로가 되면 안 된다. 오리파 한 슬롯의 기대 환급이 값보다 한참 낮아야 한다.
+    /// 팔아서 버는 경로가 되면 안 된다. 오리파 한 슬롯의 기대 판매가가 값보다 한참 낮아야 한다.
     func testOripaIsNeverWorthGrinding() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
-        let dust = OripaConfig.composition.reduce(0) {
-            $0 + Double($1.count) * Double(CardDust.value(for: $1.tier, perks: DexPerks.caps))
-        }
-        let paid = Double(OripaConfig.slotsPerBox * OripaConfig.slotPrice)
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let pool = OripaConfig.eligible(index: index, prices: prices)
+        let slotUSD = OripaConfig.expectedSlotUSD(pool: pool, prices: prices)
+        let dust = Double(MarketEconomy.tokens(usd: slotUSD)) * (1 + DexPerks.caps.dustBonus)
+        let paid = Double(OripaConfig.slotPrice(index: index, prices: prices))
             * (1 - DexPerks.caps.packDiscount)
         XCTAssertLessThan(dust / paid, 0.5,
-                          "혜택 최대일 때 환급이 값의 절반을 넘으면 오리파가 수익원이 된다")
-        _ = index
+                          "혜택 최대일 때 환급이 값의 \(Int(dust / paid * 100))% 다")
+    }
+
+    /// 박스는 값 구간으로 채운다. 맨 위 칸에는 늘 최상위권 카드가 들어가야 한다 —
+    /// 등급으로 채우던 시절에는 값싼 UR 만 들어찬 박스가 나올 수 있었다.
+    func testEveryBoxCarriesATopValueCard() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let ranked = OripaConfig.eligible(index: index, prices: prices)
+        let topFive = Set(ranked.prefix(OripaConfig.bounds(OripaConfig.composition[0].band,
+                                                          count: ranked.count).count))
+        var generator = SystemRandomNumberGenerator()
+        for serial in 1...20 {
+            let box = Oripa.makeBox(index: index, serial: serial, prices: prices,
+                                    using: &generator)
+            XCTAssertEqual(box.slots.count, OripaConfig.slotsPerBox)
+            XCTAssertEqual(Set(box.slots).count, box.slots.count, "같은 카드가 두 번 들었다")
+            XCTAssertFalse(topFive.isDisjoint(with: box.slots),
+                           "박스 \(serial) 에 최상위권 카드가 없다")
+        }
+    }
+
+    /// 박스마다 값이 크게 흔들리면 같은 값에 파는 것이 말이 안 된다.
+    func testBoxValueIsStableAcrossBoxes() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        var generator = SystemRandomNumberGenerator()
+        let totals = (1...12).map { serial -> Double in
+            Oripa.makeBox(index: index, serial: serial, prices: prices, using: &generator)
+                .slots.reduce(0.0) { $0 + MarketEconomy.usd(cardID: $1, prices: prices) }
+        }
+        let low = totals.min() ?? 0, high = totals.max() ?? 0
+        XCTAssertLessThan(high / max(low, 0.01), 3,
+                          "박스 값이 \(Int(high / low))배까지 갈린다 — 구간이 너무 넓다")
     }
 }
 

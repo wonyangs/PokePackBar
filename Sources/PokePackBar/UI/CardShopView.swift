@@ -38,12 +38,12 @@ struct CardShopView: View {
                 }
             } else {
                 Text(wallet.l.cardIndexMissing)
-                    .font(.callout).foregroundStyle(.secondary)
+                    .font(Typography.body).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         // 고정 높이 — 팝오버를 다시 열 때 크기가 줄어드는 것을 막는다.
-        .frame(height: 470)
+        .frame(height: PopoverMetrics.tabHeight)
         .task(id: index?.setIDs.joined()) {
             // 상점이 첫 화면이라 여기가 비어 보이면 앱 전체가 안 뜬 것처럼 보인다.
             guard let index else { return }
@@ -96,7 +96,6 @@ private struct PackGridCell: View {
     let set: CardSet
 
     var body: some View {
-        let l = wallet.l
         let price = PackPricing.price(setID: set.id, index: index, perks: wallet.perks)
         let owned = wallet.packCount(setID: set.id)
         return VStack(spacing: 5) {
@@ -104,7 +103,7 @@ private struct PackGridCell: View {
                 PackImageView(setID: set.id, width: 78)
                 if owned > 0 {
                     Text("×\(owned)")
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(.system(size: 14, weight: .heavy))
                         .padding(.horizontal, 4).padding(.vertical, 1.5)
                         .background(Color.accentColor, in: Capsule())
                         .foregroundStyle(.white)
@@ -112,11 +111,11 @@ private struct PackGridCell: View {
                 }
             }
             Text(set.name)
-                .font(.caption.weight(.semibold))
+                .font(Typography.bodySemibold)
                 .lineLimit(2).multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
-            Text(TokenFormatter.readable(price, language: wallet.language))
-                .font(.caption2).monospacedDigit()
+            Text(MarketEconomy.money(tokens: price, language: wallet.language))
+                .font(Typography.amount).monospacedDigit()
                 .lineLimit(1).minimumScaleFactor(0.75)
                 .foregroundStyle(wallet.availableTokens >= price ? .secondary : .tertiary)
         }
@@ -156,7 +155,7 @@ private struct PackDetailView: View {
                 Spacer()
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16)).foregroundStyle(.secondary)
+                        .font(.system(size: 17)).foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
                 .help(l.close)
@@ -167,13 +166,13 @@ private struct PackDetailView: View {
                     .shadow(radius: 4, y: 2)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(set.name)
-                        .font(.callout.weight(.semibold))
+                        .font(Typography.title)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("\(String(set.released.prefix(4)))  ·  \(l.packContents(cardsPerPack))")
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(Typography.label).foregroundStyle(.secondary)
                     if let blurb = l.packBlurb(set.id) {
                         Text(blurb)
-                            .font(.caption2).foregroundStyle(.secondary)
+                            .font(Typography.label).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -190,12 +189,12 @@ private struct PackDetailView: View {
     private func summaryRows(_ l: L) -> some View {
         let rate = members.isEmpty ? 0 : Double(ownedCount) / Double(members.count) * 100
         return HStack {
-            Text(l.packTotalCards).font(.caption2).foregroundStyle(.secondary)
-            Text("\(members.count)").font(.caption2.weight(.semibold)).monospacedDigit()
+            Text(l.packTotalCards).font(Typography.label).foregroundStyle(.secondary)
+            Text("\(members.count)").font(Typography.labelSemibold).monospacedDigit()
             Spacer()
-            Text(l.packCollected).font(.caption2).foregroundStyle(.secondary)
+            Text(l.packCollected).font(Typography.label).foregroundStyle(.secondary)
             Text("\(ownedCount)/\(members.count) (\(String(format: "%.0f", rate))%)")
-                .font(.caption2.weight(.semibold)).monospacedDigit()
+                .font(Typography.labelSemibold).monospacedDigit()
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
         .background(Color.secondary.opacity(0.06))
@@ -213,9 +212,9 @@ private struct PackDetailView: View {
 
         return VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(l.packOdds).font(.caption2.weight(.semibold))
+                Text(l.packOdds).font(Typography.labelSemibold)
                 Spacer()
-                Text(l.packOddsColumns).font(.system(size: 9)).foregroundStyle(.tertiary)
+                Text(l.packOddsColumns).font(.system(size: 14)).foregroundStyle(.tertiary)
             }
             .padding(.bottom, 1)
 
@@ -224,14 +223,14 @@ private struct PackDetailView: View {
                 let owned = (pool[entry.tier] ?? []).filter { wallet.cardCount($0) > 0 }.count
                 HStack(spacing: 5) {
                     Text(entry.tier.rawValue)
-                        .font(.system(size: 10, weight: .heavy))
+                        .font(.system(size: 14, weight: .heavy))
                         .foregroundStyle(tierColor(entry.tier))
                         .frame(width: 30, alignment: .leading)
                     Text("\(owned)/\(all)")
-                        .font(.system(size: 10)).foregroundStyle(.tertiary).monospacedDigit()
+                        .font(.system(size: 14)).foregroundStyle(.tertiary).monospacedDigit()
                     Spacer()
                     Text(percentText(entry.probability))
-                        .font(.system(size: 10, weight: .semibold)).monospacedDigit()
+                        .font(.system(size: 14, weight: .semibold)).monospacedDigit()
                         .frame(width: 48, alignment: .trailing)
                 }
             }
@@ -241,7 +240,7 @@ private struct PackDetailView: View {
                                          pity: PackConfig.pityThreshold))
                 Text(l.godPackNote(PackConfig.godPackOneIn))
             }
-            .font(.system(size: 9)).foregroundStyle(.tertiary)
+            .font(.system(size: 14)).foregroundStyle(.tertiary)
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, 2)
         }
@@ -261,20 +260,20 @@ private struct PackDetailView: View {
     private func purchaseBar(_ l: L) -> some View {
         VStack(spacing: 5) {
             HStack(spacing: 8) {
-                Text(l.packQuantity).font(.caption2).foregroundStyle(.secondary)
+                Text(l.packQuantity).font(Typography.label).foregroundStyle(.secondary)
                 Stepper(value: $quantity, in: 1...maxQuantity) {
-                    Text("\(quantity)").font(.callout.weight(.semibold)).monospacedDigit()
+                    Text("\(quantity)").font(Typography.title).monospacedDigit()
                 }
                 .fixedSize()
                 Spacer()
-                Text(TokenFormatter.readable(total, language: wallet.language))
-                    .font(.caption.weight(.semibold)).monospacedDigit()
+                Text(MarketEconomy.money(tokens: total, language: wallet.language))
+                    .font(Typography.amount).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.75)
                     .foregroundStyle(canBuy ? .primary : .secondary)
             }
             Button(canBuy ? l.buyCount(quantity) : l.notEnoughTokens) { buy() }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.small)
+                .font(Typography.button)
                 .disabled(!canBuy)
                 .frame(maxWidth: .infinity)
         }

@@ -133,17 +133,32 @@ struct PackSlot: Equatable, Sendable, Identifiable {
 
 /// 팩 가격. 세트마다 표를 두지 않고 구성에서 유도한다 — 세트를 추가할 때 가격을 잊지 않게.
 enum PackPricing {
-    /// 일반 팩(10장).
-    static let standard = 10_000_000
 
-    /// 특별 팩(4장) — 전 카드가 레어 이상이라 장수가 적어도 값이 높다.
-    static let special = 20_000_000
-
-    static func price(setID: String, index: CardIndex, perks: DexPerks = .none) -> Int {
-        let pool = index.pools[setID] ?? [:]
-        let base = (pool[.common] ?? []).isEmpty ? special : standard
+    /// 팩 하나의 값. **세트마다 다르다.**
+    ///
+    /// 예전에는 일반 팩 1,000만·특별 팩 2,000만으로 두 종류뿐이었다. 실제로는 세트에 따라
+    /// 팩 안의 기대 시세가 50배 넘게 갈리므로, 같은 값에 팔면 제일 비싼 세트만 사는 것이
+    /// 유일한 정답이 된다.
+    ///
+    /// 시세를 못 읽으면 예전 고정값으로 물러난다 — 값이 0 인 상점이 되는 것보다 낫다.
+    static func price(setID: String, index: CardIndex,
+                      prices: CardPrices? = CardPrices.shared,
+                      perks: DexPerks = .none) -> Int {
+        let base = basePrice(setID: setID, index: index, prices: prices)
         guard perks.packDiscount > 0 else { return base }
         return max(1, Int((Double(base) * (1 - perks.packDiscount)).rounded()))
+    }
+
+    /// 혜택을 빼고 본 팩값.
+    static func basePrice(setID: String, index: CardIndex, prices: CardPrices?) -> Int {
+        let value = MarketEconomy.packValueUSD(setID: setID, index: index, prices: prices)
+        guard value > 0 else { return fallbackPrice(setID: setID, index: index) }
+        return MarketEconomy.tokens(usd: value * MarketEconomy.packMargin)
+    }
+
+    /// 시세가 없을 때의 예전 고정값.
+    static func fallbackPrice(setID: String, index: CardIndex) -> Int {
+        (index.pools[setID]?[.common] ?? []).isEmpty ? 20_000_000 : 10_000_000
     }
 
     static func cardCount(setID: String, index: CardIndex, perks: DexPerks = .none) -> Int {
@@ -154,31 +169,24 @@ enum PackPricing {
     }
 }
 
-/// 중복 카드를 갈았을 때 돌려주는 토큰.
+/// 중복 카드를 팔았을 때 받는 돈. **그 카드의 시세를 그대로 준다.**
 ///
-/// 팩 하나를 갈아 나오는 총액이 팩 값을 넘으면 안 된다 — 사서 갈기만 반복하는 것이
-/// 이득이 되면 게임이 성립하지 않는다. 지금 값으로 일반 팩 1개의 기대 환급은
-/// 약 330만이고 팩 값은 1,000만이라 3분의 1 수준이다.
-enum CardDust {
-    static func value(for tier: CardTier, perks: DexPerks = .none) -> Int {
-        let base = baseValue(for: tier)
+/// 화면에 "이 카드 12,000원" 이라 적어 두고 팔 때 그보다 적게 주면 적어 둔 값이 무엇을
+/// 뜻하는지 알 수 없게 된다. 판매가는 시세와 같고, 도감 혜택이 있으면 그 위에 추가금이 붙는다.
+///
+/// 등급표를 쓰지 않는다. 같은 SAR 이라도 리자몽과 나머지가 시장에서 25배 차이 나고,
+/// 등급 사다리 자체가 시장과 네 군데에서 순서가 뒤집혀 있다.
+///
+/// 팩 하나를 통째로 팔아 나오는 총액이 팩 값을 넘으면 안 된다 — 사서 팔기만 반복하는 것이
+/// 이득이면 게임이 성립하지 않는다. 팩값이 같은 시세에 `MarketEconomy.packMargin` 을 곱한
+/// 값이므로 이 비율은 자동으로 `1/packMargin` 에서 시작한다.
+enum CardSale {
+    /// 한 장 값. `perks.dustBonus` 가 도감이 주는 판매 추가금이다.
+    static func price(cardID: String, prices: CardPrices? = CardPrices.shared,
+                      perks: DexPerks = .none) -> Int {
+        let base = MarketEconomy.tokens(usd: MarketEconomy.usd(cardID: cardID, prices: prices))
         guard perks.dustBonus > 0 else { return base }
         return Int((Double(base) * (1 + perks.dustBonus)).rounded())
-    }
-
-    private static func baseValue(for tier: CardTier) -> Int {
-        switch tier {
-        case .energy:         return 50_000
-        case .common:         return 100_000
-        case .uncommon:       return 200_000
-        case .rare:           return 500_000
-        case .doubleRare:     return 1_500_000
-        case .tripleRare:     return 3_000_000
-        case .artRare:        return 5_000_000
-        case .superRare:      return 8_000_000
-        case .specialArtRare: return 15_000_000
-        case .ultraRare:      return 30_000_000
-        }
     }
 }
 
@@ -283,19 +291,11 @@ enum PackOpening {
 
         var picked: [PulledCard] = []
         var usedInThisPack: Set<String> = []
-        for (slot, tier) in requests.enumerated() {
-            guard var id = pick(tier: tier, from: pool, avoiding: usedInThisPack,
+        // 중복이 나와도 다시 뽑지 않는다. 값비싼 카드가 떴는데 「이미 가진 것」이라는 이유로
+        // 더 싼 카드로 바뀌면, 도와주려던 장치가 오히려 뽑기를 망친 것으로 남는다.
+        for tier in requests {
+            guard let id = pick(tier: tier, from: pool, avoiding: usedInThisPack,
                                 using: &generator) else { continue }
-            // 중복 회피 — 레어 이상 칸에서 이미 가진 카드가 나오면 한 번 다시 뽑는다.
-            // 카드 장수도 등급 분포도 그대로라 가루 경제에 영향이 없고, 안 가진 카드가
-            // 나올 확률만 오른다. 방금 나온 카드는 후보에서 빼 같은 카드가 다시 나오지 않게 한다.
-            let guardedSlot = isGod || slot >= requests.count - PackConfig.hitSlotCount(perks)
-            if perks.duplicateGuard, guardedSlot,
-               alreadyOwned.contains(id),
-               let retry = pick(tier: tier, from: pool,
-                                avoiding: usedInThisPack.union([id]), using: &generator) {
-                id = retry
-            }
             usedInThisPack.insert(id)
             let actualTier = index.card(id)?.tier ?? tier
             picked.append(PulledCard(id: id, tier: actualTier, isNew: !alreadyOwned.contains(id)))

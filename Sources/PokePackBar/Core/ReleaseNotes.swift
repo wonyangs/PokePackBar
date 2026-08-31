@@ -1,10 +1,32 @@
 import Foundation
 
+/// 판올림 항목 하나. 아래에 딸린 세부가 있을 수 있다.
+///
+/// 큰 개편은 제목 한 줄로는 무엇이 바뀌었는지 알 수 없고, 세부를 같은 층에 늘어놓으면
+/// 열 줄이 평평하게 이어져 어디까지가 한 덩이인지 읽히지 않는다.
+struct ReleaseNoteItem: Sendable, Equatable {
+    let text: String
+    var details: [String] = []
+
+    /// 제목과 세부를 합친 전체 문구. 번역 누락 검사가 한 줄씩 훑을 때 쓴다.
+    var lines: [String] { [text] + details }
+}
+
 /// 한 판올림에서 바뀐 것.
 struct ReleaseNote: Identifiable, Sendable, Equatable {
     let version: String
-    let items: [String]
+    let items: [ReleaseNoteItem]
     var id: String { version }
+
+    init(version: String, items: [ReleaseNoteItem]) {
+        self.version = version
+        self.items = items
+    }
+
+    /// 세부가 없는 목록. 예전 판올림은 전부 이 모양이다.
+    init(version: String, lines: [String]) {
+        self.init(version: version, items: lines.map { ReleaseNoteItem(text: $0) })
+    }
 }
 
 /// 판올림 기록. 새 버전을 내기 전에 여기에 먼저 적는다 —
@@ -34,7 +56,77 @@ extension L {
 
     var releaseNotes: [ReleaseNote] {
         [
-            ReleaseNote(version: "0.3.3", items: [
+            ReleaseNote(version: "0.4.0", items: [
+                ReleaseNoteItem(text: t("시세 연동 대개편",
+                                         "Market prices, everywhere",
+                                         "相場連動の大改編",
+                                         "Precios de mercado en todo",
+                                         "Prix du marché partout",
+                                         "Preços de mercado em tudo"), details: [
+                    t("실제 카드 시세가 카드에 표시됨",
+                      "Every card shows its real market price",
+                      "カードに実際の相場を表示",
+                      "Cada carta muestra su precio real de mercado",
+                      "Chaque carte affiche son prix réel du marché",
+                      "Cada carta mostra seu preço real de mercado"),
+                    t("실제 카드 팩 가격에 맞게 반영",
+                      "Pack prices follow the real market",
+                      "パック価格を実際の相場に合わせた",
+                      "El precio de los sobres sigue el mercado real",
+                      "Le prix des boosters suit le marché réel",
+                      "O preço dos pacotes segue o mercado real"),
+                    t("거래 단위가 토큰 → 원화로 변경",
+                      "Prices are shown in won, not tokens",
+                      "取引単位をトークンからウォンに変更",
+                      "Los precios se muestran en wones, no en tokens",
+                      "Les prix sont affichés en wons, plus en tokens",
+                      "Os preços aparecem em wones, não em tokens"),
+                    t("컬렉션 총 가치 표기",
+                      "Your collection's total value in the header",
+                      "コレクションの総価値を表示",
+                      "Valor total de tu colección en la cabecera",
+                      "Valeur totale de ta collection dans l'en-tête",
+                      "Valor total da sua coleção no topo"),
+                    t("컬렉션 정렬을 카드 가치 순으로 변경",
+                      "The collection is sorted by card value",
+                      "コレクションをカード価値順に並べ替え",
+                      "La colección se ordena por valor de carta",
+                      "La collection est triée par valeur de carte",
+                      "A coleção é ordenada por valor da carta"),
+                    t("도감 난이도는 카드 가치 기준으로 재산정",
+                      "Dex difficulty is recalculated from card value",
+                      "図鑑の難易度をカード価値基準に再計算",
+                      "La dificultad del dex se recalcula por valor de carta",
+                      "La difficulté des dex est recalculée par valeur de carte",
+                      "A dificuldade do dex é recalculada por valor da carta"),
+                ]),
+                ReleaseNoteItem(text: t("카드 뽑기 시 카드명과 시세가 함께 표기되도록 UI 추가",
+                                         "Opening a pack now shows each card's name and price",
+                                         "開封中にカード名と相場を一緒に表示",
+                                         "Al abrir un sobre se ve el nombre y el precio de cada carta",
+                                         "À l'ouverture, le nom et le prix de chaque carte s'affichent",
+                                         "Ao abrir, aparecem o nome e o preço de cada carta"), details: [
+                    t("뽑기 완료 시 해당 뽑기에서 나온 카드의 총 가치 표시",
+                      "The summary adds up what the pack was worth",
+                      "開封結果にそのパックの総価値を表示",
+                      "El resumen suma cuánto valía el sobre",
+                      "Le résumé additionne la valeur du booster",
+                      "O resumo soma quanto o pacote valia"),
+                ]),
+                ReleaseNoteItem(text: t("컬렉션에서 보유한 카드만 보기 ON/OFF 기능 추가",
+                                         "Collection: show only the cards you own, on or off",
+                                         "コレクションに「所持カードのみ」の切り替えを追加",
+                                         "Colección: mostrar solo tus cartas, activable",
+                                         "Collection : n'afficher que tes cartes, activable",
+                                         "Coleção: mostrar só suas cartas, com liga/desliga")),
+                ReleaseNoteItem(text: t("전반적인 앱 UI 개편",
+                                         "The whole interface has been reworked",
+                                         "アプリ全体の UI を刷新",
+                                         "Toda la interfaz ha sido rediseñada",
+                                         "Toute l'interface a été revue",
+                                         "Toda a interface foi reformulada")),
+            ]),
+            ReleaseNote(version: "0.3.3", lines: [
                 t("카드깡 시 뒤에 카드 보이도록 UI 수정",
                   "The next card now sits under the one in your hand",
                   "次のカードが手にしているカードの下に見えるように",
@@ -54,7 +146,7 @@ extension L {
                   "Les cartes sont environ 20% plus grandes à l'ouverture",
                   "As cartas ficam cerca de 20% maiores na abertura"),
             ]),
-            ReleaseNote(version: "0.3.2", items: [
+            ReleaseNote(version: "0.3.2", lines: [
                 t("카드명 한글화",
                   "Korean card names",
                   "カード名を韓国語表記に",
@@ -86,7 +178,7 @@ extension L {
                   "Écran de tirage oripa amélioré",
                   "Tela de sorteio do oripa melhorada"),
             ]),
-            ReleaseNote(version: "0.3.1", items: [
+            ReleaseNote(version: "0.3.1", lines: [
                 t("오리파 뽑기 시 효과 부족한 부분 수정",
                   "Added the missing oripa draw animation",
                   "オリパ抽選時の演出不足を修正",
@@ -100,7 +192,7 @@ extension L {
                   "Correction de la lenteur des vérifications de mise à jour",
                   "Corrigida a lentidão na verificação de atualizações"),
             ]),
-            ReleaseNote(version: "0.3.0", items: [
+            ReleaseNote(version: "0.3.0", lines: [
                 t("갓팩 추가 (1/300 확률로 갓-팩이 등장)",
                   "God Pack added — 1 in 300 packs",
                   "ゴッドパックを追加（1/300で出現）",

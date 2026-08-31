@@ -56,12 +56,14 @@ struct OripaView: View {
         case .draw:
             if let drawn {
                 OripaDrawView(wallet: wallet, card: drawn, startOpened: revealed,
-                              onReveal: { revealed = true },
+                              onReveal: { revealed = true; wallet.markAllRevealed() },
                               onDetail: { focused = drawn.id },
-                              onDone: { self.drawn = nil })
+                              onDone: { self.drawn = nil },
+                              name: index.card(drawn.id)?.displayName(wallet.language) ?? drawn.id)
             }
         case .board:
-            board
+            // 뽑기 화면을 벗어나면 감춰 둔 값을 되돌린다. 남겨 두면 가진 것보다 적게 보인다.
+            board.onAppear { wallet.markAllRevealed() }
         }
     }
 
@@ -84,16 +86,16 @@ struct OripaView: View {
         return VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
                 Text(l.oripaBoxNumber(box.serial))
-                    .font(.caption.weight(.semibold)).monospacedDigit()
+                    .font(Typography.bodySemibold).monospacedDigit()
                 if owned > 0 {
                     Text(l.oripaOwnedCount(owned))
-                        .font(.system(size: 9)).foregroundStyle(.tertiary).monospacedDigit()
+                        .font(.system(size: 14)).foregroundStyle(.tertiary).monospacedDigit()
                 }
                 Spacer(minLength: 0)
                 replaceControl(l)
             }
             Text(refilled ? l.oripaRefilled : l.oripaHint)
-                .font(.caption2)
+                .font(Typography.label)
                 .foregroundStyle(refilled ? Color.accentColor : .secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -106,7 +108,7 @@ struct OripaView: View {
         if confirmingReplace {
             HStack(spacing: 6) {
                 Text(l.oripaReplaceConfirm)
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                    .font(.system(size: 14)).foregroundStyle(.secondary)
                     .lineLimit(1).fixedSize()
                 Button(l.oripaReplace) {
                     wallet.replaceOripaBox(index: index)
@@ -114,14 +116,14 @@ struct OripaView: View {
                     confirmingPull = false
                     refilled = false
                 }
-                .buttonStyle(.borderedProminent).controlSize(.mini)
+                .buttonStyle(.borderedProminent).font(Typography.button)
                 Button(l.cancel) { confirmingReplace = false }
-                    .buttonStyle(.borderless).controlSize(.mini)
+                    .buttonStyle(.borderless).font(Typography.button)
             }
         } else {
             Button { confirmingReplace = true; confirmingPull = false } label: {
                 Label(l.oripaReplace, systemImage: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 10))
+                    .font(.system(size: 14))
             }
             .buttonStyle(.borderless)
             .help(l.oripaReplaceHelp)
@@ -135,48 +137,46 @@ struct OripaView: View {
             ForEach(counts, id: \.tier) { entry in
                 HStack(spacing: 2) {
                     Text(wallet.l.tierBadge(entry.tier))
-                        .font(.system(size: 9, weight: .heavy))
+                        .font(.system(size: 14, weight: .heavy))
                         .foregroundStyle(tierColor(entry.tier))
                     Text("\(entry.count)")
-                        .font(.system(size: 9, weight: .semibold)).monospacedDigit()
+                        .font(.system(size: 14, weight: .semibold)).monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
             }
             Spacer(minLength: 0)
             Text(wallet.l.oripaRemaining(box.remaining, OripaConfig.slotsPerBox))
-                .font(.system(size: 9)).foregroundStyle(.tertiary).monospacedDigit()
+                .font(.system(size: 14)).foregroundStyle(.tertiary).monospacedDigit()
         }
         .padding(.horizontal, 8).padding(.vertical, 5)
         .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
     }
 
-    /// 박스에 남은 카드 전부. 등급이 높은 것부터 늘어놓는다.
+    /// 박스에 남은 카드 전부. **값이 비싼 것부터** 늘어놓는다.
+    ///
+    /// 등급 순으로 세우면 순서가 시장과 어긋난다 — 같은 등급 안에서도 값이 수십 배 갈리고,
+    /// 박스를 살지 말지는 결국 위쪽에 무엇이 남았는지로 정해진다. 컬렉션·도감과 같은 기준이다.
     private func contents(_ l: L, _ box: OripaBox) -> some View {
-        let ordered = box.slots.sorted { a, b in
-            let ra = index.card(a)?.tier.rank ?? 0, rb = index.card(b)?.tier.rank ?? 0
-            return ra != rb ? ra > rb : a < b
-        }
-        // 5칸 × 56 + 여백이 팝오버 폭(332) 안에 들어와야 한다.
-        // 넘치면 팝오버 전체가 옆으로 밀려 상단 탭까지 흔들린다.
-        let columns = Array(repeating: GridItem(.fixed(56), spacing: 5), count: 5)
-        return LazyVGrid(columns: columns, spacing: 6) {
+        let ordered = Oripa.sortedByValue(box.slots, index: index)
+        let columns = CardGrid.oripa.items
+        return LazyVGrid(columns: columns, spacing: CardGrid.oripa.spacing) {
             ForEach(ordered, id: \.self) { id in
                 let owned = wallet.cardCount(id) > 0
                 Button { focused = id } label: {
                     VStack(spacing: 1) {
-                        CardImageView(cardID: id, width: 56)
+                        CardImageView(cardID: id, width: CardGrid.oripa.width)
                             .opacity(owned ? 0.45 : 1)
                             .overlay(alignment: .topTrailing) {
                                 if owned {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 10))
+                                        .font(.system(size: 14))
                                         .foregroundStyle(.green)
                                         .padding(2)
                                 }
                             }
                         if let entry = index.card(id) {
                             Text(l.tierBadge(entry.tier))
-                                .font(.system(size: 8, weight: .heavy))
+                                .font(.system(size: 13, weight: .heavy))
                                 .foregroundStyle(tierColor(entry.tier))
                                 .opacity(owned ? 0.5 : 1)
                         }
@@ -197,13 +197,13 @@ struct OripaView: View {
                 // 확인 중에는 여기서 묻는다. 값이 바로 옆에 있어야 무엇에 얼마를 쓰는지
                 // 보면서 결정할 수 있고, 아래 버튼 줄은 버튼만 남아 폭에 여유가 생긴다.
                 Text(confirmingPull ? l.oripaPullConfirm : l.oripaSubtitle)
-                    .font(.caption2)
+                    .font(Typography.label)
                     .foregroundStyle(confirmingPull ? AnyShapeStyle(.primary)
                                                     : AnyShapeStyle(.secondary))
                     .lineLimit(1)
                 Spacer()
-                Text(TokenFormatter.readable(price, language: wallet.language))
-                    .font(.caption.weight(.semibold)).monospacedDigit()
+                Text(MarketEconomy.money(tokens: price, language: wallet.language))
+                    .font(Typography.amount).monospacedDigit()
                     .foregroundStyle(canPull ? .primary : .secondary)
                     .lineLimit(1).minimumScaleFactor(0.75)
             }
@@ -218,9 +218,11 @@ struct OripaView: View {
                     Button(l.cancel) { confirmingPull = false }
                         .buttonStyle(.bordered)
                 }
+                .font(Typography.button)
             } else {
                 Button(l.oripaPull) { confirmingPull = true }
                     .buttonStyle(.borderedProminent)
+                    .font(Typography.button)
                     .disabled(!canPull)
             }
         }
@@ -279,6 +281,8 @@ private struct OripaDrawView: View {
     let onReveal: () -> Void
     let onDetail: () -> Void
     let onDone: () -> Void
+    /// 화면에 쓸 카드 이름. 뽑기 화면은 인덱스를 들고 있지 않아 밖에서 받는다.
+    let name: String
 
     /// 가림막이 걷혔는가. 걷히기 전까지는 카드가 보이지 않는다.
     @State private var opened = false
@@ -293,7 +297,7 @@ private struct OripaDrawView: View {
     ///
     /// 개봉 화면(`RevealPeek.cardWidth`)보다 조금 작다. 상점 탭에는 「일반 팩 / 오리파」
     /// 갈래 선택이 한 줄 더 있어 세로가 그만큼 좁고, 새 카드일 때 NEW 배지가 한 줄 더 붙는다.
-    private static let cardWidth: CGFloat = 210
+    private static let cardWidth: CGFloat = 240
 
     /// 이 거리 안에서 끝나면 민 것이 아니라 누른 것으로 본다(pt).
     /// 손을 떼는 순간 몇 px 흔들리는 것까지 밀기로 치면 눌러도 안 열린다.
@@ -388,23 +392,34 @@ private struct OripaDrawView: View {
             .help(opened ? l.oripaSeeDetail : l.oripaDrawHint)
 
             if opened {
-                VStack(spacing: 2) {
-                    Text(l.tierBadge(card.tier))
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(tierColor(card.tier))
-                    Text(l.tierName(card.tier)).font(.caption2).foregroundStyle(.secondary)
-                    if card.isNew { NewBadge(text: l.newCardBadge).padding(.top, 2) }
+                VStack(spacing: 3) {
+                    Text(name).font(Typography.title)
+                        .lineLimit(1).minimumScaleFactor(0.7)
+                    HStack(spacing: 5) {
+                        Text(l.tierBadge(card.tier))
+                            .font(Typography.badge)
+                            .foregroundStyle(tierColor(card.tier))
+                        Text(l.tierName(card.tier)).font(Typography.label).foregroundStyle(.secondary)
+                        if let prices = CardPrices.shared, let usd = prices.price(card.id) {
+                            Text("·").font(Typography.label).foregroundStyle(.tertiary)
+                            Text(prices.formattedWithKRW(usd, language: wallet.language))
+                                .font(Typography.labelSemibold).monospacedDigit()
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                    .lineLimit(1).minimumScaleFactor(0.8)
+                    if card.isNew { NewBadge(text: l.newCardBadge).padding(.top, 1) }
                 }
                 .transition(.opacity)
             } else {
-                Text(l.oripaDrawHint).font(.caption).foregroundStyle(.secondary)
+                Text(l.oripaDrawHint).font(Typography.body).foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
 
             if opened {
                 Button(l.done, action: onDone)
-                    .buttonStyle(.borderedProminent).controlSize(.small)
+                    .buttonStyle(.borderedProminent).font(Typography.button)
                     .transition(.opacity)
             }
         }

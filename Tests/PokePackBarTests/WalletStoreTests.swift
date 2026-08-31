@@ -126,6 +126,36 @@ final class WalletStoreTests: XCTestCase {
 
     // MARK: 지출
 
+    /// 개봉 연출이 끝나기 전에는 컬렉션 가치가 오르지 않는다.
+    ///
+    /// 카드는 뽑는 순간 수집함에 들어간다(연출 중에 팝오버를 닫아도 잃지 않아야 한다).
+    /// 그런데 머리글의 컬렉션 가치는 늘 보이므로, 값이 먼저 오르면 카드를 뒤집기 전에
+    /// 무엇이 나왔는지 알게 된다 — 스포일러다.
+    func testHeldCardsStayOutOfTheCollectionValue() throws {
+        let s = makeStore()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.shared)
+        let cards = Array(index.cards.prefix(3).map(\.id))
+
+        s.collect(cards)
+        let full = s.collectionValueUSD(prices: prices)
+        XCTAssertGreaterThan(full, 0)
+
+        s.holdForReveal(cards)
+        XCTAssertEqual(s.collectionValueUSD(prices: prices), 0, accuracy: 1e-9,
+                       "아직 안 본 카드가 값에 들어갔다")
+
+        s.markRevealed(cards[0])
+        let partial = s.collectionValueUSD(prices: prices)
+        XCTAssertGreaterThan(partial, 0)
+        XCTAssertLessThan(partial, full, "한 장만 봤는데 전부 반영됐다")
+
+        s.markAllRevealed()
+        XCTAssertEqual(s.collectionValueUSD(prices: prices), full, accuracy: 1e-9)
+        // 카드 자체는 처음부터 들어 있다 — 감춘 것은 값 표시뿐이다.
+        XCTAssertEqual(s.distinctCardCount, cards.count)
+    }
+
     func testSpendDeductsFromBalanceButNotFromLifetime() {
         let s = makeStore()
         s.update(todayTokensByProvider: ["a": 0], todayDate: "2026-08-26", hasUsageData: true)
@@ -289,9 +319,9 @@ final class DisenchantTests: XCTestCase {
         s.collect(["sv10-1", "sv10-1", "sv10-1"])
         XCTAssertEqual(s.spareCount("sv10-1"), 2)
 
-        let refund = s.disenchant(cardID: "sv10-1", tier: .rare, count: 99)
+        let refund = s.sellSpares(cardID: "sv10-1", tier: .rare, count: 99)
         XCTAssertEqual(s.cardCount("sv10-1"), 1, "한 장은 남아야 한다")
-        XCTAssertEqual(refund, CardDust.value(for: .rare) * 2)
+        XCTAssertEqual(refund, CardSale.price(cardID: "sv10-1") * 2)
     }
 
     /// 한 장뿐이면 갈 수 없다.
@@ -299,7 +329,7 @@ final class DisenchantTests: XCTestCase {
         let s = makeStore()
         s.collect(["sv10-1"])
         XCTAssertEqual(s.spareCount("sv10-1"), 0)
-        XCTAssertEqual(s.disenchant(cardID: "sv10-1", tier: .rare, count: 1), 0)
+        XCTAssertEqual(s.sellSpares(cardID: "sv10-1", tier: .rare, count: 1), 0)
         XCTAssertEqual(s.cardCount("sv10-1"), 1)
     }
 
@@ -311,7 +341,7 @@ final class DisenchantTests: XCTestCase {
         s.collect(["sv10-2", "sv10-2"])
 
         let before = s.availableTokens
-        let refund = s.disenchant(cardID: "sv10-2", tier: .ultraRare, count: 1)
+        let refund = s.sellSpares(cardID: "sv10-2", tier: .ultraRare, count: 1)
         XCTAssertEqual(s.availableTokens, before + refund)
         XCTAssertEqual(s.usedSinceInstall, 1_000_000, "사용량 통계는 그대로여야 한다")
     }
@@ -325,7 +355,7 @@ final class DisenchantTests: XCTestCase {
 
         let first = WalletStore(fileURL: file)
         first.collect(["sv10-3", "sv10-3"])
-        let refund = first.disenchant(cardID: "sv10-3", tier: .doubleRare, count: 1)
+        let refund = first.sellSpares(cardID: "sv10-3", tier: .doubleRare, count: 1)
 
         let reloaded = WalletStore(fileURL: file)
         XCTAssertEqual(reloaded.cardCount("sv10-3"), 1)

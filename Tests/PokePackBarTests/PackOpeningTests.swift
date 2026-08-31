@@ -421,24 +421,33 @@ final class CollectionSortTests: XCTestCase {
         CardEntry(id: id, name: id, tier: tier, setID: "s")
     }
 
-    /// 보유한 카드가 위로, 그 안에서 희귀한 것이 앞으로.
-    func testOwnedFirstThenRarestFirst() {
+    /// 값이 비싼 것부터. 시세를 모르는 카드끼리는 등급순으로 떨어진다.
+    func testPricyFirstThenRarest() {
         let entries = [
             entry("s-1", .common), entry("s-2", .ultraRare),
             entry("s-3", .doubleRare), entry("s-4", .superRare),
         ]
-        // 보유: 커먼과 더블레어
-        let owned: Set<String> = ["s-1", "s-3"]
-        let sorted = CardCollectionView.sorted(entries) { owned.contains($0) }
-
-        XCTAssertEqual(sorted.map(\.id), ["s-3", "s-1", "s-2", "s-4"],
-                       "보유분(RR, C)이 먼저 · 그 안에서 희귀도순 · 미보유분도 희귀도순")
+        let sorted = CardCollectionView.sorted(entries, prices: nil)
+        XCTAssertEqual(sorted.map(\.id), ["s-2", "s-4", "s-3", "s-1"],
+                       "시세가 같으면 등급이 높은 것이 앞이다")
     }
 
-    /// 같은 보유 상태·같은 등급이면 카드 ID 로 안정적으로 정렬한다.
-    func testStableWithinSameOwnershipAndTier() {
+    /// **보유 여부는 순서에 넣지 않는다.**
+    ///
+    /// 가진 카드를 통째로 위로 올리면 값의 사다리가 두 토막으로 끊겨, 전체 중 내가 어디까지
+    /// 왔는지도 위쪽에 무엇이 아직 없는지도 알 수 없다. 가진 것만 보려면 목록을 거르면 된다.
+    func testOwnershipDoesNotChangeTheOrder() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let sample = Array(index.cards.prefix(120))
+        XCTAssertEqual(CardCollectionView.sorted(sample).map(\.id),
+                       CardCollectionView.sorted(sample.reversed()).map(\.id),
+                       "입력 순서가 결과를 바꾸면 정렬이 불안정하다")
+    }
+
+    /// 같은 값·같은 등급이면 카드 ID 로 안정적으로 정렬한다.
+    func testStableWithinSamePriceAndTier() {
         let entries = [entry("s-9", .rare), entry("s-2", .rare), entry("s-5", .rare)]
-        let sorted = CardCollectionView.sorted(entries) { _ in false }
+        let sorted = CardCollectionView.sorted(entries, prices: nil)
         XCTAssertEqual(sorted.map(\.id), ["s-2", "s-5", "s-9"])
     }
 }
@@ -779,28 +788,79 @@ final class PackOddsTests: XCTestCase {
     }
 }
 
-final class CardDustTests: XCTestCase {
+final class CardSaleTests: XCTestCase {
 
-    /// 희귀할수록 환급이 크다.
-    func testDustRisesWithRarity() {
-        let ordered = CardTier.allCases.sorted { $0.rank < $1.rank }
-        let values = ordered.map { CardDust.value(for: $0) }
-        for (a, b) in zip(values, values.dropFirst()) {
-            XCTAssertLessThanOrEqual(a, b, "환급액이 뒤집혔다: \(values)")
+    /// 환급은 그 카드의 실제 시세다.
+    ///
+    /// 예전에는 "희귀할수록 환급이 크다" 를 검사했다. 시장은 그렇지 않다 — 등급 중앙값이
+    /// 네 군데에서 뒤집히므로 그 검사는 이제 거짓을 지키는 셈이 된다.
+    func testDustFollowsTheCardsPrice() throws {
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        for entry in index.cards.prefix(50) {
+            let usd = try XCTUnwrap(prices.price(entry.id))
+            XCTAssertEqual(CardSale.price(cardID: entry.id, prices: prices),
+                           MarketEconomy.tokens(usd: usd))
         }
     }
 
+    /// 같은 등급이라도 값이 크게 갈린다 — 이 차이를 만들려고 등급표를 걷어냈다.
+    func testSameTierCanDifferWildly() throws {
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let holos = index.cards.filter { $0.setID == "base1" && $0.tier == .doubleRare }
+        let values = holos.map { CardSale.price(cardID: $0.id, prices: prices) }
+        let low = try XCTUnwrap(values.min()), high = try XCTUnwrap(values.max())
+        XCTAssertGreaterThan(Double(high) / Double(low), 5,
+                             "같은 등급 안에서 값이 갈리지 않으면 등급표와 다를 게 없다")
+    }
+
+    /// 시세를 모르는 카드도 0 이 되지 않는다. 0 이면 갈 수조차 없는 카드가 된다.
+    func testUnknownCardStillHasValue() {
+        XCTAssertGreaterThan(CardSale.price(cardID: "no-such-card", prices: nil), 0)
+    }
+
     /// 팩을 사서 전부 갈았을 때 기대 환급이 팩 값보다 훨씬 낮아야 한다.
-    /// 넘으면 사서 갈기만 반복하는 것이 이득이 되어 게임이 무너진다.
+    /// 넘으면 사서 팔기만 반복하는 것이 이득이 되어 게임이 무너진다.
+    ///
+    /// 등급 확률에 **그 세트·그 등급 카드들의 실제 환급 평균**을 곱해 잰다. 시세 평균을
+    /// 그대로 쓰면 팩값 계산과 같은 식이라 늘 통과하는 검사가 된다.
     func testGrindingAPackNeverPaysForItself() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
         for set in index.sets {
-            let cards = Double(PackPricing.cardCount(setID: set.id, index: index))
-            let dust = PackOpening.packOdds(setID: set.id, index: index)
-                .reduce(0.0) { $0 + $1.probability * cards * Double(CardDust.value(for: $1.tier)) }
-            let price = Double(PackPricing.price(setID: set.id, index: index))
-            XCTAssertLessThan(dust, price * 0.6,
-                              "\(set.id): 기대 환급 \(Int(dust)) 이 팩 값 \(Int(price)) 의 60% 를 넘는다")
+            let ratio = Self.sellBackRatio(set.id, index: index, prices: prices, perks: .none)
+            XCTAssertLessThan(ratio, 0.6,
+                              "\(set.id): 기대 환급이 팩 값의 \(Int(ratio * 100))% 다")
         }
+    }
+
+    /// 설계상 회수율은 `1/packMargin` 이어야 한다. 크게 벗어나면 팩값과 환급이
+    /// 서로 다른 근거로 계산되고 있다는 뜻이다.
+    func testGrindRatioMatchesTheMargin() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let want = 1 / MarketEconomy.packMargin
+        for set in index.sets {
+            let ratio = Self.sellBackRatio(set.id, index: index, prices: prices, perks: .none)
+            XCTAssertEqual(ratio, want, accuracy: 0.02, "\(set.id) 회수율이 설계와 다르다")
+        }
+    }
+
+    /// 팩 하나를 사서 전부 갈았을 때 돌아오는 비율.
+    static func sellBackRatio(_ setID: String, index: CardIndex, prices: CardPrices,
+                           perks: DexPerks) -> Double {
+        let cards = Double(PackPricing.cardCount(setID: setID, index: index, perks: perks))
+        let dust = PackOpening.packOdds(setID: setID, index: index, perks: perks)
+            .reduce(0.0) { running, odds in
+                let ids = index.pools[setID]?[odds.tier] ?? []
+                guard !ids.isEmpty else { return running }
+                let mean = ids.reduce(0.0) {
+                    $0 + Double(CardSale.price(cardID: $1, prices: prices, perks: perks))
+                } / Double(ids.count)
+                return running + odds.probability * cards * mean
+            }
+        return dust / Double(PackPricing.price(setID: setID, index: index,
+                                               prices: prices, perks: perks))
     }
 }

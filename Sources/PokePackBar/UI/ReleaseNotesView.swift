@@ -26,7 +26,7 @@ struct ReleaseNotesView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(height: 460)
+        .frame(height: PopoverMetrics.tabHeight)
         .onAppear { store.lastSeenReleaseVersion = ReleaseNotes.runningVersion ?? "" }
     }
 
@@ -55,10 +55,10 @@ struct ReleaseNotesView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
                 Text("v\(note.version)")
-                    .font(.callout.weight(.semibold)).monospacedDigit()
+                    .font(Typography.title).monospacedDigit()
                 if note.version == ReleaseNotes.runningVersion {
                     Text(l.releaseNotesCurrentBadge)
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(Color.accentColor.opacity(0.16),
                                     in: Capsule())
@@ -67,15 +67,29 @@ struct ReleaseNotesView: View {
                 Spacer(minLength: 0)
             }
             ForEach(Array(note.items.enumerated()), id: \.offset) { _, item in
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text("•").font(.caption).foregroundStyle(.tertiary)
-                    Text(item)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    line(item.text, mark: "•", tint: .secondary)
+                    // 세부는 한 칸 들여 다른 기호로 적는다. 같은 층에 늘어놓으면
+                    // 어디까지가 한 덩이인지 읽히지 않는다.
+                    ForEach(Array(item.details.enumerated()), id: \.offset) { _, detail in
+                        line(detail, mark: "–", tint: .tertiary)
+                            .padding(.leading, 15)
+                    }
                 }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func line(_ text: String, mark: String,
+                      tint: HierarchicalShapeStyle) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(mark).font(Typography.body).foregroundStyle(.tertiary)
+            Text(text)
+                .font(Typography.body)
+                .foregroundStyle(tint)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
     }
 }

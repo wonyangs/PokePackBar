@@ -229,22 +229,23 @@ final class WalletStore {
     /// 갈 수 있는 장수 — 보유분에서 한 장은 남긴다. 컬렉션에서 사라지면 안 된다.
     func spareCount(_ cardID: String) -> Int { max(0, cardCount(cardID) - 1) }
 
-    /// 중복분을 갈아 토큰으로 돌려받는다. 돌려받은 액수를 반환하고, 갈 것이 없으면 0.
+    /// 중복분을 판다. 받은 액수를 반환하고, 팔 것이 없으면 0.
     ///
-    /// 마지막 한 장은 남긴다. 수집한 카드가 컬렉션에서 없어지는 것은
-    /// 되돌릴 수 없고, 실수로 그렇게 되면 잃은 것이 크다.
+    /// 시세 그대로 값을 쳐 준다(도감 판매 추가금이 있으면 그만큼 더). 마지막 한 장은
+    /// 남긴다 — 수집한 카드가 컬렉션에서 없어지는 것은 되돌릴 수 없고, 실수로 그렇게 되면
+    /// 잃은 것이 크다.
     @discardableResult
-    func disenchant(cardID: String, tier: CardTier, count: Int) -> Int {
+    func sellSpares(cardID: String, tier: CardTier, count: Int) -> Int {
         let spare = spareCount(cardID)
         let amount = min(max(count, 0), spare)
         guard amount > 0 else { return 0 }
 
         state.cards[cardID] = cardCount(cardID) - amount
-        let refund = CardDust.value(for: tier, perks: perks) * amount
+        let refund = CardSale.price(cardID: cardID, perks: perks) * amount
         state.refundedTokens += refund
         state.cardsDisenchanted += amount
         save()
-        AppLog.write("disenchanted \(amount)x \(cardID) (\(tier.rawValue)) for \(refund)")
+        AppLog.write("sold \(amount)x \(cardID) (\(tier.rawValue)) for \(refund)")
         return refund
     }
 
@@ -274,6 +275,50 @@ final class WalletStore {
     var distinctCardCount: Int { state.cards.count }
 
     var totalCardCount: Int { state.cards.values.reduce(0, +) }
+
+    /// 모은 카드를 지금 시세로 매긴 총액(달러). 중복도 장수만큼 센다.
+    ///
+    /// "몇 장 모았나" 만으로는 컬렉션이 자라는 감각이 약하다. 1999년 커먼 한 장이 최신
+    /// SR 보다 비싸기도 해서, 장수와 값이 서로 다른 이야기를 한다.
+    func collectionValueUSD(prices: CardPrices? = CardPrices.shared) -> Double {
+        let owned = state.cards.reduce(0.0) { running, entry in
+            running + MarketEconomy.usd(cardID: entry.key, prices: prices) * Double(entry.value)
+        }
+        let held = unrevealed.reduce(0.0) { running, entry in
+            running + MarketEconomy.usd(cardID: entry.key, prices: prices) * Double(entry.value)
+        }
+        return max(0, owned - held)
+    }
+
+    // MARK: 개봉 연출 중 값 감추기
+
+    /// 아직 뒤집어 보지 않은 카드. 컬렉션 가치 **표시에서만** 뺀다.
+    ///
+    /// 카드는 뽑는 순간 수집함에 들어간다 — 연출이 끝날 때까지 미루면 도중에 팝오버를 닫는
+    /// 순간 뽑은 카드가 사라진다. 그런데 머리글의 컬렉션 가치는 늘 보이므로, 값이 먼저
+    /// 올라가면 무엇이 나왔는지 카드를 뒤집기 전에 알게 된다. 그래서 값만 늦춘다.
+    ///
+    /// 저장하지 않는다. 앱을 다시 켜면 이미 다 본 것으로 친다 — 연출은 그 자리에서 끝난다.
+    private(set) var unrevealed: [String: Int] = [:]
+
+    /// 이 카드들을 아직 안 본 것으로 둔다.
+    func holdForReveal(_ cardIDs: [String]) {
+        var held: [String: Int] = [:]
+        for id in cardIDs { held[id, default: 0] += 1 }
+        unrevealed = held
+    }
+
+    /// 한 장을 봤다.
+    func markRevealed(_ cardID: String) {
+        guard let count = unrevealed[cardID] else { return }
+        if count <= 1 { unrevealed.removeValue(forKey: cardID) } else { unrevealed[cardID] = count - 1 }
+    }
+
+    /// 남은 전부를 봤다 — 요약 화면은 카드를 한꺼번에 보여 준다.
+    func markAllRevealed() {
+        guard !unrevealed.isEmpty else { return }
+        unrevealed = [:]
+    }
 
     /// 개봉 결과를 수집함에 넣는다. 같은 카드가 여러 장 나오면 그만큼 쌓인다.
     ///
@@ -334,8 +379,8 @@ final class WalletStore {
     }
 
     /// 오리파 슬롯 값. 팩 할인 혜택이 여기에도 걸린다 — 같은 상점에서 사는 물건이다.
-    func oripaPrice() -> Int {
-        let base = OripaConfig.slotPrice
+    func oripaPrice(index: CardIndex? = CardIndex.shared) -> Int {
+        let base = index.map { OripaConfig.slotPrice(index: $0) } ?? 30_000_000
         guard perks.packDiscount > 0 else { return base }
         return max(1, Int((Double(base) * (1 - perks.packDiscount)).rounded()))
     }
@@ -346,13 +391,15 @@ final class WalletStore {
     @discardableResult
     func pullOripa(index: CardIndex) -> (card: PulledCard, completions: [DexCompletion])? {
         var box = oripaBox(index: index)
-        guard !box.isEmpty, spend(oripaPrice()) else { return nil }
+        guard !box.isEmpty, spend(oripaPrice(index: index)) else { return nil }
 
         var generator = SystemRandomNumberGenerator()
         guard let id = Oripa.pull(from: &box, using: &generator) else { return nil }
         let isNew = cardCount(id) == 0
         state.oripa = box
         let completions = collect([id])   // 저장까지 여기서 한다
+        // 가림막을 걷기 전까지는 값을 올리지 않는다 — 오리파도 뒤집어 보는 연출이다.
+        holdForReveal([id])
         AppLog.write("oripa pulled \(id) box=\(box.serial) remaining=\(box.remaining)")
         return (PulledCard(id: id, tier: index.card(id)?.tier ?? .doubleRare, isNew: isNew),
                 completions)
@@ -407,7 +454,6 @@ final class WalletStore {
         windows: [BonusWindow],
         grantTier: inout [String: Int],
         availableSets: [String],
-        bonusPacks: Int = 0,
         using generator: inout some RandomNumberGenerator
     ) -> [PackGrant] {
         guard !availableSets.isEmpty else { return [] }
@@ -420,7 +466,7 @@ final class WalletStore {
             // 주간에 가중을 주면 보상이 세션 쪽으로 쏠린다.
             let setID = availableSets[Int(generator.next(upperBound: UInt64(availableSets.count)))]
             grants.append(PackGrant(windowKey: w.key, windowName: w.name,
-                                    setID: setID, count: PackConfig.bonusPackCount + bonusPacks))
+                                    setID: setID, count: PackConfig.bonusPackCount))
         }
         return grants
     }
@@ -445,8 +491,7 @@ final class WalletStore {
         let before = state.packGrantTier
         var generator = SystemRandomNumberGenerator()
         let grants = Self.evaluateGrants(windows: windows, grantTier: &state.packGrantTier,
-                                         availableSets: availableSets,
-                                         bonusPacks: perks.bonusPacks, using: &generator)
+                                         availableSets: availableSets, using: &generator)
         for g in grants {
             state.packs[g.setID, default: 0] += g.count
             lastGrant = g

@@ -58,8 +58,12 @@ final class ReleaseNotesTests: XCTestCase {
             for (note, expected) in zip(notes, reference) {
                 XCTAssertEqual(note.items.count, expected.items.count,
                                "\(language) v\(note.version) 의 항목 수가 다르다")
-                for item in note.items {
-                    XCTAssertFalse(item.trimmingCharacters(in: .whitespaces).isEmpty,
+                // 세부 줄까지 센다. 세부 하나를 빠뜨리면 그 언어에서만 항목이 사라진다.
+                XCTAssertEqual(note.items.map(\.details.count),
+                               expected.items.map(\.details.count),
+                               "\(language) v\(note.version) 의 세부 줄 수가 다르다")
+                for line in note.items.flatMap(\.lines) {
+                    XCTAssertFalse(line.trimmingCharacters(in: .whitespaces).isEmpty,
                                    "\(language) v\(note.version) 에 빈 항목이 있다")
                 }
             }
@@ -70,9 +74,9 @@ final class ReleaseNotesTests: XCTestCase {
     func testNonKoreanLanguagesCarryNoHangul() {
         for language in AppLanguage.allCases where language != .ko {
             for note in L(language).releaseNotes {
-                for item in note.items {
-                    XCTAssertFalse(item.unicodeScalars.contains { (0xAC00...0xD7A3).contains($0.value) },
-                                   "\(language) v\(note.version): 번역이 빠졌다 — \(item)")
+                for line in note.items.flatMap(\.lines) {
+                    XCTAssertFalse(line.unicodeScalars.contains { (0xAC00...0xD7A3).contains($0.value) },
+                                   "\(language) v\(note.version): 번역이 빠졌다 — \(line)")
                 }
             }
         }

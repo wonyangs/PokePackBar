@@ -8,10 +8,15 @@ enum PopoverTab: CaseIterable { case shop, packs, collection, dex }
 /// 팝오버 치수의 단일 소스. 자식이 쓸 수 있는 폭을 알아야 할 때 이 값을 쓴다 — 넘치는 자식이
 /// 부모 폭을 부풀리므로 GeometryReader 로 재면 순환한다.
 enum PopoverMetrics {
-    static let width: CGFloat = 360
+    /// 팝오버 폭. 360 이던 것을 넓혔다 — 좁은 폭에 맞추려고 글자를 계속 줄이다 보니
+    /// 정보가 읽히지 않았다. 창을 넓히는 편이 글자를 줄이는 것보다 낫다.
+    static let width: CGFloat = 440
     static let padding: CGFloat = 14
     /// 이 폭을 넘는 자식은 팝오버 창에 좌우로 잘린다.
     static let contentWidth: CGFloat = width - padding * 2
+
+    /// 탭 하나가 쓰는 세로 길이.
+    static let tabHeight: CGFloat = 540
 }
 
 /// 팝오버 내부 내비게이션 상태.
@@ -51,6 +56,10 @@ struct PopoverView: View {
 
     private var l: L { wallet.l }
 
+    /// 물음표에 마우스가 올라와 있는가. 환산 안내가 이 값만 보고 뜬다 — 누르고 닫는
+    /// 동작을 만들지 않는다. 한 줄짜리 안내를 보려고 두 번 누르게 할 이유가 없다.
+    @State private var hoveringRate = false
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // 패치 노트를 먼저 본다 — 설정에서 열었을 때 닫으면 설정으로 돌아가게 하려는 것이다.
@@ -68,6 +77,11 @@ struct PopoverView: View {
                 tabContent
             }
         }
+        // 안쪽 폭을 못 박는다. 자식이 이 폭보다 넓으면 창이 통째로 넓어지고, 창은
+        // `width` 로 고정돼 있으므로 남는 만큼 왼쪽으로 밀린다 — 탭 하나만 넓어도
+        // 상단 머리글이 그 탭에서만 옆으로 덜컹거렸다. 넘치는 자식은 제 자리에서
+        // 잘리게 두고, 머리글은 어느 탭에서든 같은 자리에 둔다.
+        .frame(width: PopoverMetrics.contentWidth, alignment: .leading)
         .padding(PopoverMetrics.padding)
         .frame(width: PopoverMetrics.width)
     }
@@ -76,16 +90,16 @@ struct PopoverView: View {
 
     private var walletHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(l.walletBalance).font(.caption).foregroundStyle(.secondary)
-                    // 앱 안에서는 실제 숫자를 쓴다. 요약 표기(95.2M)는 메뉴바 전용이다 —
-                    // 팩 값과 잔액을 비교하려면 자리수가 그대로 보여야 한다.
-                    Text(TokenFormatter.readable(wallet.availableTokens, language: wallet.language))
-                        .font(.system(size: 22, weight: .bold)).monospacedDigit()
-                        .lineLimit(1).minimumScaleFactor(0.6)
-                }
-                Spacer()
+            // 두 숫자를 같은 틀로 세운다. 이름줄과 숫자줄이 각각 한 선에 놓여야 나란히 읽힌다.
+            // 모으는 것은 토큰이지만 읽는 것은 원이다 — 카드 시세가 실제 시장에서 온 값이라,
+            // 팩 값과 잔액도 같은 단위로 읽어야 비교가 된다.
+            HStack(alignment: .top, spacing: 10) {
+                headerStat(l.walletBalance,
+                           MarketEconomy.money(tokens: wallet.availableTokens,
+                                               language: wallet.language),
+                           tint: nil, hint: true)
+                collectionWorth
+                Spacer(minLength: 4)
                 // 새 버전이 있으면 설정 옆에 바로 띄운다. 설정 안에 숨겨 두면
                 // 들어가 보지 않는 한 업데이트가 있는지도 모른다.
                 if let update = updater.available {
@@ -96,17 +110,16 @@ struct PopoverView: View {
                             Image(systemName: "arrow.down.circle.fill")
                             Text(update.version).monospacedDigit()
                         }
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(Typography.labelSemibold)
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.mini)
                     .disabled(updater.isUpdating)
                     .help(l.updateAvailableHelp(update.version))
                 }
                 Button {
                     nav.showSettings = true
                 } label: {
-                    Image(systemName: "gearshape").font(.system(size: 13))
+                    Image(systemName: "gearshape").font(.system(size: 17))
                 }
                 .buttonStyle(.borderless)
                 .help(l.settings)
@@ -114,7 +127,7 @@ struct PopoverView: View {
 
             if wallet.awaitingFirstUsage {
                 Text(l.awaitingUsage)
-                    .font(.caption2).foregroundStyle(.secondary)
+                    .font(Typography.label).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 HStack(spacing: 5) {
@@ -125,7 +138,7 @@ struct PopoverView: View {
                         Text("\(top.name) \(Int(top.utilization.rounded()))%").monospacedDigit()
                     }
                 }
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(Typography.label).foregroundStyle(.secondary)
                 .lineLimit(1)
 
                 if let top = topWindow {
@@ -138,6 +151,114 @@ struct PopoverView: View {
         .padding(10)
         .background(Color.secondary.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        // 겹쳐 띄운다. 줄로 끼워 넣으면 열고 닫을 때마다 아래 화면이 통째로 위아래로 밀린다.
+        .overlay(alignment: .topLeading) { rateHelp }
+    }
+
+    /// 모은 카드의 값. 잔액 옆에 둔다 — 쓸 수 있는 돈과 쌓아 둔 값은 나란히 읽어야
+    /// 뜻이 생기고, 탭 안에 두면 정작 카드를 볼 자리를 그만큼 잡아먹는다.
+    @ViewBuilder
+    private var collectionWorth: some View {
+        if let prices = CardPrices.shared, wallet.distinctCardCount > 0 {
+            // 머리글에서는 원화만 쓴다. 달러까지 붙이면 잔액과 나란히 놓기에 너무 길다 —
+            // 달러는 카드 상세에서 보면 된다.
+            headerStat(l.collectionValue,
+                       WonFormatter.money(prices.krw(wallet.collectionValueUSD(prices: prices)),
+                                          language: wallet.language),
+                       tint: .accentColor)
+                .help(l.marketPriceSource(prices.asOf))
+        }
+    }
+
+    /// 머리글 숫자 한 칸이 쓰는 폭.
+    ///
+    /// 내용에 맞춰 늘어나게 두면 잔액의 자릿수가 바뀔 때마다 옆 칸이 따라 움직여 두 칸의
+    /// 왼쪽 선이 맞지 않는다. 폭을 못 박아 두 칸을 같은 자리에서 시작시킨다 —
+    /// 9자리 금액(17pt 기준 약 117pt)까지 들어간다.
+    private static let statWidth: CGFloat = 124
+
+    /// 머리글의 숫자 한 칸. 이름과 숫자가 늘 같은 글꼴·같은 간격·같은 폭으로 쌓인다.
+    private func headerStat(_ label: String, _ value: String, tint: Color?,
+                            hint: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 3) {
+                Text(label)
+                    .font(Typography.caption).foregroundStyle(.secondary)
+                    .lineLimit(1)
+                // 물음표가 있는 칸에만 그리되 **자리는 두 칸 모두 잡는다.**
+                //
+                // 물음표는 13pt 글리프에 여백까지 붙어 이름줄보다 높다. 한쪽에만 넣으면
+                // 그 칸의 이름줄이 그만큼 두꺼워져 아래 숫자줄이 밀리고, 두 금액의 밑선이
+                // 어긋난다 — 잔액이 컬렉션 가치보다 몇 pt 내려가 보인 것이 이것이다.
+                //
+                // 버튼이 아니다. 마우스를 올리면 뜨고 떼면 사라지므로 누를 것이 없다.
+                // 화면을 읽어 주는 경로에는 안내 문구 자체를 이름으로 달아 둔다.
+                Image(systemName: "questionmark.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(hoveringRate ? Color.accentColor : .secondary)
+                    // 13pt 글리프만 감지 영역으로 두면 겨냥하기 어렵다. 여백까지 넓힌다.
+                    .padding(3)
+                    .contentShape(Rectangle())
+                    .onHover { if hint { hoveringRate = $0 } }
+                    .opacity(hint ? 1 : 0)
+                    .allowsHitTesting(hint)
+                    .accessibilityHidden(!hint)
+                    .accessibilityLabel(rateText ?? l.walletRateTitle)
+            }
+            Text(value)
+                .font(Typography.amount).monospacedDigit()
+                .foregroundStyle(tint ?? .primary)
+                .lineLimit(1).minimumScaleFactor(0.6)
+        }
+        .frame(width: Self.statWidth, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// 토큰 100만 개가 얼마인가.
+    ///
+    /// 잔액과 팩값을 원으로 보여 주는데 실제로 모으는 것은 토큰이다. 그 환산을 어디에도
+    /// 적지 않으면 원 표기가 어디서 나온 값인지 알 수 없다. 토큰 한 개는 5원도 안 되어
+    /// 그대로 적으면 감이 오지 않아 100만 개를 기준으로 적는다.
+    ///
+    /// 끝자리를 끊지 않는다. 환산을 알려 주는 자리에서 반올림한 값을 적으면 그 값이
+    /// 어디서 나왔는지 되짚을 수가 없다.
+    private var rateText: String? {
+        guard let prices = CardPrices.shared else { return nil }
+        let sample = 1_000_000
+        return l.walletRateBody(
+            TokenFormatter.grouped(sample),
+            WonFormatter.exact(MarketEconomy.won(tokens: sample, prices: prices),
+                               language: wallet.language))
+    }
+
+    /// 환산 안내. 물음표에 마우스를 올리면 뜨고, 떼면 사라진다.
+    ///
+    /// **머리글 위에 겹쳐 띄운다.** 줄로 끼워 넣으면 뜰 때마다 탭과 카드 격자까지 아래로
+    /// 밀려 화면이 덜컹거린다. 겹치면 자리를 차지하지 않으므로 아무것도 움직이지 않는다.
+    @ViewBuilder
+    private var rateHelp: some View {
+        if hoveringRate, let text = rateText {
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 14)).foregroundStyle(Color.accentColor)
+                Text(text)
+                    .font(Typography.labelSemibold).monospacedDigit()
+                    .lineLimit(1)
+            }
+            .padding(.vertical, 6).padding(.horizontal, 9)
+            .background(.background, in: RoundedRectangle(cornerRadius: 8))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(Color.accentColor.opacity(0.35), lineWidth: 1)
+            }
+            .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+            // 숫자 두 줄 밑으로 내린다. 위로 붙이면 정작 묻고 있는 금액을 가린다.
+            .offset(x: 8, y: 52)
+            // 마우스를 스쳐도 깜빡이지 않게 아주 짧게 페이드한다.
+            .transition(.opacity.animation(.easeOut(duration: 0.12)))
+            // 안내가 마우스를 가로채면 뜨는 순간 hover 가 풀려 다시 사라진다.
+            .allowsHitTesting(false)
+        }
     }
 
     /// 가장 많이 찬 한도 창. 보너스 팩이 여기서 나오므로 진행률을 보여 준다.
@@ -153,16 +274,16 @@ struct PopoverView: View {
             HStack(spacing: 7) {
                 Image(systemName: "gift.fill").foregroundStyle(.green)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(l.bonusPackTitle).font(.caption.weight(.semibold))
+                    Text(l.bonusPackTitle).font(Typography.bodySemibold)
                     Text(l.bonusPackBody(window: grant.windowName, set: setName, count: grant.count))
-                        .font(.caption2).foregroundStyle(.secondary)
+                        .font(Typography.label).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
                 Button {
                     wallet.consumeGrant()
                 } label: {
-                    Image(systemName: "xmark").font(.system(size: 9))
+                    Image(systemName: "xmark").font(.system(size: 14))
                 }
                 .buttonStyle(.borderless)
             }
@@ -181,15 +302,15 @@ struct PopoverView: View {
             HStack(spacing: 7) {
                 Image(systemName: "sparkles").foregroundStyle(Color.accentColor)
                 Text(l.releaseNotesWhatsNew(version))
-                    .font(.caption.weight(.semibold))
+                    .font(Typography.bodySemibold)
                     .lineLimit(1).minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 Button(l.releaseNotesOpen) { nav.showReleaseNotes = true }
-                    .buttonStyle(.borderless).controlSize(.small)
+                    .buttonStyle(.borderless).font(Typography.button)
                 Button {
                     store.lastSeenReleaseVersion = version
                 } label: {
-                    Image(systemName: "xmark").font(.system(size: 9))
+                    Image(systemName: "xmark").font(.system(size: 14))
                 }
                 .buttonStyle(.borderless)
             }

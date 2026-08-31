@@ -62,7 +62,7 @@ struct SettingsView: View {
             Divider()
             footer
         }
-        .frame(height: 460)
+        .frame(height: PopoverMetrics.tabHeight)
     }
 
     private var header: some View {
@@ -96,7 +96,7 @@ struct SettingsView: View {
             }
             Spacer()
         }
-        .font(.caption2)
+        .font(Typography.label)
         .foregroundStyle(.tertiary)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -142,10 +142,10 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(l.launchAtLogin)
                     if !isBundledApp {
-                        Text(l.bundledOnly).font(.caption2).foregroundStyle(.tertiary)
+                        Text(l.bundledOnly).font(Typography.label).foregroundStyle(.tertiary)
                     }
                     if let launchAtLoginError {
-                        Text(launchAtLoginError).font(.caption2).foregroundStyle(.red)
+                        Text(launchAtLoginError).font(Typography.label).foregroundStyle(.red)
                     }
                 }
                 Spacer()
@@ -182,7 +182,7 @@ struct SettingsView: View {
                     groupRow { menuBarCardRow }
                 }
             }
-            Text(l.allOffHint).font(.caption2).foregroundStyle(.tertiary).padding(.leading, 4)
+            Text(l.allOffHint).font(Typography.label).foregroundStyle(.tertiary).padding(.leading, 4)
         }
     }
 
@@ -193,17 +193,17 @@ struct SettingsView: View {
             CardImageView(cardID: card.id, width: 20)
             VStack(alignment: .leading, spacing: 0) {
                 Text(card.displayName(wallet.language))
-                    .font(.caption).lineLimit(1).truncationMode(.tail)
+                    .font(Typography.body).lineLimit(1).truncationMode(.tail)
                 if wallet.favoriteCardID != card.id {
-                    Text(l.favoriteCardAuto).font(.system(size: 9)).foregroundStyle(.tertiary)
+                    Text(l.favoriteCardAuto).font(.system(size: 14)).foregroundStyle(.tertiary)
                 }
             }
             Spacer()
             if wallet.favoriteCardID == card.id {
-                Button(l.favoriteCardClear) { wallet.setFavorite(nil) }.controlSize(.small)
+                Button(l.favoriteCardClear) { wallet.setFavorite(nil) }.font(Typography.button)
             }
         } else {
-            Text(l.favoriteCardNone).font(.caption).foregroundStyle(.secondary)
+            Text(l.favoriteCardNone).font(Typography.body).foregroundStyle(.secondary)
             Spacer()
         }
     }
@@ -216,24 +216,24 @@ struct SettingsView: View {
             if store.limitNotifications {
                 Divider()
                 groupRow {
-                    Text(l.warning).font(.callout)
+                    Text(l.warning).font(Typography.body)
                     Slider(value: $store.warnThreshold, in: 50...95, step: 5)
                     Text(TokenFormatter.percent(store.warnThreshold))
-                        .font(.caption).monospacedDigit().frame(width: 38, alignment: .trailing)
+                        .font(Typography.body).monospacedDigit().frame(width: 38, alignment: .trailing)
                 }
                 Divider()
                 groupRow {
-                    Text(l.critical).font(.callout)
+                    Text(l.critical).font(Typography.body)
                     Slider(value: $store.critThreshold, in: 80...100, step: 5)
                     Text(TokenFormatter.percent(store.critThreshold))
-                        .font(.caption).monospacedDigit().frame(width: 38, alignment: .trailing)
+                        .font(Typography.body).monospacedDigit().frame(width: 38, alignment: .trailing)
                 }
             }
             Divider()
             groupRow {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(l.bonusPackNotificationsLabel)
-                    Text(l.bonusPackNotificationsHint).font(.caption2).foregroundStyle(.tertiary)
+                    Text(l.bonusPackNotificationsHint).font(Typography.label).foregroundStyle(.tertiary)
                 }
                 Spacer()
                 Toggle("", isOn: $store.bonusPackNotifications)
@@ -243,7 +243,7 @@ struct SettingsView: View {
             groupRow {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(l.statusChecksLabel)
-                    Text(l.statusChecksHint).font(.caption2).foregroundStyle(.tertiary)
+                    Text(l.statusChecksHint).font(Typography.label).foregroundStyle(.tertiary)
                 }
                 Spacer()
                 Toggle("", isOn: $store.statusChecksEnabled)
@@ -281,18 +281,18 @@ struct SettingsView: View {
             groupRow {
                 Text(l.releaseNotesTitle)
                 Spacer()
-                Button(l.releaseNotesOpen) { onOpenReleaseNotes() }.controlSize(.small)
+                Button(l.releaseNotesOpen) { onOpenReleaseNotes() }.font(Typography.button)
             }
             // 확인 결과 — 알림을 꺼둔 사용자도 여기서 새 버전을 알고 바로 적용할 수 있게 업데이트 버튼을 함께 노출.
             if didCheckUpdate, !isCheckingUpdate {
                 Divider()
                 groupRow {
                     if let version = updater.available?.version {
-                        Text(l.updateFound(version)).font(.caption).foregroundStyle(.orange)
+                        Text(l.updateFound(version)).font(Typography.body).foregroundStyle(.orange)
                         Spacer()
-                        Button(l.updateButton) { updater.applyUpdate() }.controlSize(.small)
+                        Button(l.updateButton) { updater.applyUpdate() }.font(Typography.button)
                     } else {
-                        Text(l.upToDate(Self.appVersion)).font(.caption).foregroundStyle(.secondary)
+                        Text(l.upToDate(Self.appVersion)).font(Typography.body).foregroundStyle(.secondary)
                         Spacer()
                     }
                 }
@@ -310,7 +310,7 @@ struct SettingsView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.forward")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(Typography.body).foregroundStyle(.secondary)
                         .rotationEffect(.degrees(advancedExpanded ? 90 : 0))
                     Text(l.advancedDisclosureLabel)
                     Spacer()
@@ -331,7 +331,7 @@ struct SettingsView: View {
                 groupRow {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(l.disableKeychain)
-                        Text(l.disableKeychainHint).font(.caption2).foregroundStyle(.tertiary)
+                        Text(l.disableKeychainHint).font(Typography.label).foregroundStyle(.tertiary)
                     }
                     Spacer()
                     Toggle("", isOn: $store.disableKeychainAccess)
@@ -341,7 +341,7 @@ struct SettingsView: View {
                 groupRow {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(l.refreshLimitToken)
-                        Text(l.onlyOnPress).font(.caption2).foregroundStyle(.tertiary)
+                        Text(l.onlyOnPress).font(Typography.label).foregroundStyle(.tertiary)
                     }
                     Spacer()
                     Button {
@@ -350,23 +350,23 @@ struct SettingsView: View {
                         if store.isRefreshingLimitToken {
                             ProgressView().controlSize(.small)
                         } else {
-                            Text(l.refreshLimitToken)
+                            Text(l.refreshLimitToken).font(Typography.button)
                         }
                     }
                     .disabled(store.disableKeychainAccess || store.isRefreshingLimitToken)
                 }
                 if let limitTokenRefreshError = store.limitTokenRefreshError {
                     Text(limitTokenRefreshError)
-                        .font(.caption2).foregroundStyle(.orange).lineLimit(2)
+                        .font(Typography.label).foregroundStyle(.orange).lineLimit(2)
                         .padding(.horizontal, 12).padding(.bottom, 6)
                 }
                 Divider()
                 groupRow {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(l.customScanRootsLabel)
-                        Text(l.customScanRootsHint).font(.caption2).foregroundStyle(.tertiary)
+                        Text(l.customScanRootsHint).font(Typography.label).foregroundStyle(.tertiary)
                         HStack {
-                            Text(l.customScanProviderLabel).font(.caption)
+                            Text(l.customScanProviderLabel).font(Typography.body)
                             Spacer()
                             Picker("", selection: $selectedScanProviderID) {
                                 ForEach(store.registeredProviders, id: \.id) { provider in
@@ -376,12 +376,12 @@ struct SettingsView: View {
                             .labelsHidden().pickerStyle(.menu).fixedSize()
                         }
                         TextField(l.customScanRootsPlaceholder, text: $customScanDraft, axis: .vertical)
-                            .textFieldStyle(.roundedBorder).font(.caption)
+                            .textFieldStyle(.roundedBorder).font(Typography.body)
                             .focused($customScanFocused)
                             .onSubmit { commitCustomScanDraft() }
                         if !customScanDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             Text(l.customScanRootsMatches(customScanMatchCount))
-                                .font(.caption2).foregroundStyle(.tertiary)
+                                .font(Typography.label).foregroundStyle(.tertiary)
                         }
                     }
                 }
@@ -408,7 +408,7 @@ struct SettingsView: View {
                 }
                 Divider()
                 Text(l.aggregationNote)
-                    .font(.caption2).foregroundStyle(.tertiary)
+                    .font(Typography.label).foregroundStyle(.tertiary)
                     .padding(.horizontal, 12).padding(.vertical, 8)
             }
         }
@@ -421,10 +421,10 @@ struct SettingsView: View {
                 groupRow {
                     VStack(alignment: .leading, spacing: 1) {
                         Text(l.reportProblem)
-                        Text(l.reportAttachHint).font(.caption2).foregroundStyle(.tertiary)
+                        Text(l.reportAttachHint).font(Typography.label).foregroundStyle(.tertiary)
                     }
                     Spacer()
-                    Button(l.reportProblem) { reportProblem() }
+                    Button(l.reportProblem) { reportProblem() }.font(Typography.button)
                 }
                 Divider()
             }
@@ -438,7 +438,7 @@ struct SettingsView: View {
             }
             if let reportError {
                 Text(reportError)
-                    .font(.caption2).foregroundStyle(.orange).textSelection(.enabled)
+                    .font(Typography.label).foregroundStyle(.orange).textSelection(.enabled)
                     .padding(.horizontal, 12).padding(.bottom, 6)
             }
         }
@@ -453,7 +453,7 @@ struct SettingsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
+                .font(Typography.body).fontWeight(.semibold).foregroundStyle(.secondary)
                 .textCase(.uppercase).padding(.leading, 4)
             VStack(spacing: 0) { content() }
                 .background(Color(nsColor: .controlBackgroundColor),
