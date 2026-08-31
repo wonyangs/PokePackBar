@@ -259,7 +259,11 @@ extension L {
                                "Une boîte de 100 cartes tirées de tous les sets. Chaque tirage retire la carte.",
                                "Uma caixa de 100 cartas de todos os sets. Cada tiragem remove a carta.") }
     var oripaPull: String { t("뽑기", "Pull", "引く", "Tirar", "Tirer", "Tirar") }
-    var oripaDrawing: String { t("뽑는 중", "Drawing", "抽選中", "Sacando", "Tirage", "Sorteando") }
+    var oripaDrawHint: String { t("밀어서 확인", "Slide to reveal", "スライドして確認",
+                                  "Desliza para ver", "Fais glisser pour voir",
+                                  "Deslize para ver") }
+    var oripaPullConfirm: String { t("뽑을까요?", "Draw?", "引きますか？",
+                                     "¿Tirar?", "Tirer ?", "Tirar?") }
     var oripaSeeDetail: String { t("자세히 보기", "See details", "詳しく見る",
                                     "Ver detalles", "Voir la carte", "Ver detalhes") }
     var oripaContents: String { t("박스에 남은 카드", "Left in the box", "箱の残り",

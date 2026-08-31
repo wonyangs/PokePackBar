@@ -245,8 +245,20 @@ private struct RevealView: View {
         .onChange(of: opened.id) { position = 0 }
     }
 
+    /// 다음 장으로. **카드끼리 넘어갈 때는 애니메이션 트랜잭션을 열지 않는다.**
+    ///
+    /// `SpotlightCard` 는 `.id(card.id)` 로 매번 새로 만들어진다. 그 교체를 애니메이션 안에서
+    /// 하면 SwiftUI 가 기본 전환(페이드)을 걸어, 나가는 카드와 들어오는 카드가 동시에 반투명해
+    /// 지면서 밑장이 비쳐 보인다 — 카드가 커질 때 깜빡이는 것처럼 보이던 것이 이것이다.
+    /// 올라오는 움직임은 카드 자신의 `onAppear` 스프링이 맡으므로 여기서 열 이유가 없다.
+    ///
+    /// 마지막 장에서 요약으로 넘어갈 때만 화면이 통째로 바뀌므로 그때는 애니메이션을 준다.
     private func advance() {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { position += 1 }
+        if position + 1 >= opened.cards.count {
+            withAnimation(.easeOut(duration: 0.22)) { position += 1 }
+        } else {
+            position += 1
+        }
     }
 
     /// 한번에 열기 — 남은 카드를 한 장씩 넘기지 않고 결과 화면으로 바로 간다.
@@ -258,6 +270,11 @@ private struct RevealView: View {
     }
 
     // MARK: 한 장씩
+
+    /// 다음 장. 마지막 장에서는 없다 — 밑에 깔 것이 없다.
+    private var nextCard: PulledCard? {
+        position + 1 < opened.cards.count ? opened.cards[position + 1] : nil
+    }
 
     private var current: some View {
         let l = wallet.l
@@ -281,9 +298,10 @@ private struct RevealView: View {
             Spacer(minLength: 0)
 
             RevealStack(card: card,
-                        next: position + 1 < opened.cards.count ? opened.cards[position + 1] : nil,
+                        next: nextCard,
                         newBadge: l.newCardBadge,
                         preloaded: opened.hires[card.id],
+                        nextPreloaded: nextCard.map { opened.hires[$0.id] } ?? nil,
                         onAdvance: advance)
 
             VStack(spacing: 2) {
@@ -352,38 +370,52 @@ private struct RevealView: View {
 
 /// 한 장씩 넘기는 자리. 카드를 누르거나 끌어서 넘긴다.
 ///
-/// 끌면 카드가 손을 따라 들리고 그 아래에서 **다음 장의 등급 후광**이 배어 나온다.
-/// 실물 카드깡에서 위 카드를 살짝 들춰 다음 장의 반사광을 훔쳐보는 동작을 옮긴 것이다.
-/// 커먼·에너지의 후광 세기는 0 이므로 "아무것도 안 비친다" 도 그대로 정보가 된다 —
-/// 빛이 없으면 다음 장은 기대할 것이 없다는 뜻이고, 그 실망까지가 카드깡이다.
+/// **다음 장이 실제로 이 카드 밑에 깔려 있다.** 위 카드를 끌어 올리면 가려져 있던 만큼
+/// 그대로 드러난다 — 실물 덱에서 맨 위 카드를 들춰 다음 장을 훔쳐보는 그 동작이다.
+/// 빛만 비추던 이전 방식은 무엇이 오는지가 아니라 등급만 알려 줘서 들춰 볼 이유가 약했다.
+///
+/// 밑장은 조금 작게, 살짝 아래로 내려 깔고 어둡게 둔다. 같은 자리에 같은 크기로 두면
+/// 가만히 있을 때 카드가 한 장인지 여러 장인지 구분되지 않는다. 들출수록 밝아져
+/// 올라오는 카드가 된다.
 @MainActor
 private struct RevealStack: View {
     let card: PulledCard
     let next: PulledCard?
     let newBadge: String
     let preloaded: NSImage?
+    /// 다음 장의 그림. 개봉 준비 단계에서 이미 받아 둔 것이라 들출 때 기다릴 것이 없다.
+    let nextPreloaded: NSImage?
     let onAdvance: () -> Void
 
     @State private var drag: CGSize = .zero
 
-    /// 얼마나 들췄는가(0~1). 다음 장 후광의 세기와 그림자에 함께 쓴다.
+    /// 얼마나 들췄는가(0~1). 밑장의 밝기와 후광, 위 카드의 그림자에 함께 쓴다.
     private var peek: Double { RevealPeek.amount(drag) }
 
     var body: some View {
         ZStack {
-            // 다음 장은 그림을 보여주지 않는다. 빛만 새어 나와야 다음 장이 기대된다.
             if let next {
-                TierGlow(tier: next.tier, width: 196)
-                    .opacity(peek)
-                    .scaleEffect(0.94 + 0.06 * peek)
-                    .allowsHitTesting(false)
+                ZStack {
+                    TierGlow(tier: next.tier, width: RevealPeek.cardWidth).opacity(peek)
+                    CardImageView(cardID: next.id, hires: true, width: RevealPeek.cardWidth,
+                                  preloaded: nextPreloaded)
+                }
+                .scaleEffect(RevealPeek.deckScale)
+                .offset(y: RevealPeek.deckOffset)
+                // 덮여 있는 동안은 그늘에 있다. 들어 올릴수록 제 색을 찾는다.
+                .brightness(-0.16 * (1 - peek))
+                .allowsHitTesting(false)
             }
             SpotlightCard(card: card, newBadge: newBadge, preloaded: preloaded)
                 // 카드가 바뀔 때마다 뷰를 새로 만든다 — 첫 장을 포함해 매번 등장 애니메이션이 돈다.
                 .id(card.id)
+                // 교체는 즉시. 기본 전환(페이드)이 걸리면 두 장이 겹쳐 반투명해진다.
+                .transition(.identity)
                 .offset(drag)
                 .rotationEffect(.degrees(RevealPeek.tilt(drag)), anchor: .bottom)
-                .shadow(color: .black.opacity(0.35 * peek), radius: 10 * peek, y: 5 * peek)
+                // 가만히 있어도 옅은 그림자를 남긴다 — 밑장과 겹쳐 보이지 않게 하는 층 표시다.
+                .shadow(color: .black.opacity(0.18 + 0.24 * peek),
+                        radius: 4 + 9 * peek, y: 2 + 5 * peek)
         }
         .contentShape(Rectangle())
         // 누르면 바로 넘어간다. 끌기에 최소 거리를 두었으므로 탭과 부딪히지 않는다.
@@ -410,7 +442,11 @@ private struct RevealStack: View {
     }
 }
 
-/// 한 장씩 보여줄 때의 카드. 나타날 때마다 부풀어 오른다.
+/// 한 장씩 보여줄 때의 카드. 밑장 자리에서 제자리로 올라온다.
+///
+/// 예전에는 0.86 배에서 부풀어 올랐다. 밑장을 실제로 깔아 두게 되면서 그 연출이 어긋났다 —
+/// 눈에 보이던 밑장이 사라졌다가 엉뚱한 크기로 다시 튀어나오는 것처럼 보인다. 그래서
+/// 시작 위치를 밑장이 놓여 있던 자리(`RevealPeek.deckScale`·`deckOffset`)로 맞췄다.
 ///
 /// 별도 뷰로 둔 이유는 첫 장 때문이다. 바깥에서 transition 만 걸면 이미 자리에 있는
 /// 첫 장은 상태 변화가 없어 애니메이션이 돌지 않는다. 뷰가 새로 생기면서
@@ -425,15 +461,16 @@ private struct SpotlightCard: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            TierGlow(tier: card.tier, width: 196)
-            CardImageView(cardID: card.id, hires: true, width: 196, preloaded: preloaded)
+            TierGlow(tier: card.tier, width: RevealPeek.cardWidth)
+            CardImageView(cardID: card.id, hires: true, width: RevealPeek.cardWidth,
+                          preloaded: preloaded)
             if card.isNew {
                 NewBadge(text: newBadge)
                     .padding(5)
             }
         }
-        .scaleEffect(landed ? 1 : 0.86)
-        .opacity(landed ? 1 : 0)
+        .scaleEffect(landed ? 1 : RevealPeek.deckScale)
+        .offset(y: landed ? 0 : RevealPeek.deckOffset)
         .onAppear {
             withAnimation(.spring(response: 0.34, dampingFraction: 0.7)) { landed = true }
         }
@@ -521,6 +558,30 @@ enum RevealPeek {
 
     static func advances(_ translation: CGSize) -> Bool {
         distance(translation) >= threshold
+    }
+
+    /// 개봉 화면에서 카드를 그리는 폭(pt).
+    ///
+    /// 탭 높이 470 안에서 머리글·등급 표기·버튼·여백이 115pt 남짓을 쓰고, 밑장이 7pt 더
+    /// 삐져나온다. 남는 세로를 카드가 다 먹으면 위아래가 답답해지므로 35pt 정도를 남긴 값이다.
+    /// 더 키우려면 이 폭이 아니라 주변 요소부터 줄여야 한다.
+    static let cardWidth: CGFloat = 230
+
+    // MARK: 덱 — 밑에 깔리는 다음 장
+
+    /// 밑장을 아래로 내리는 정도(pt).
+    static let deckOffset: CGFloat = 10
+    /// 밑장을 줄이는 비율. 조금 작아야 뒤에 있는 것으로 읽힌다.
+    static let deckScale = 0.98
+
+    /// 가만히 있을 때 밑장이 아래로 삐져나오는 높이(pt).
+    ///
+    /// 줄인 만큼 아래 모서리가 올라오므로 내린 거리에서 그것을 빼야 한다. 이 값이 0 에
+    /// 가까워지면 카드가 한 장인지 덱인지 구분되지 않는다 — 실제로 그렇게 보인다는 지적을
+    /// 받고 고친 자리다.
+    static func visibleDeckEdge(cardWidth: CGFloat, aspect: CGFloat = 0.717) -> CGFloat {
+        let height = cardWidth / aspect
+        return deckOffset - height * (1 - deckScale) / 2
     }
 }
 

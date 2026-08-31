@@ -93,6 +93,21 @@ actor CardImageStore {
 
 @MainActor
 enum CardImageLoader {
+
+    /// 이번 프레임에 그릴 그림을 고른다.
+    ///
+    /// 미리 받아 둔 그림이 있으면 **첫 프레임부터** 그것을 쓴다. `.task` 는 첫 렌더가 끝난
+    /// 뒤에 돌기 때문에, 그것만 믿으면 새 카드가 나올 때마다 회색 자리표시가 한 프레임
+    /// 스쳐 지나간다(개봉 화면에서 깜빡임으로 보인 원인이다).
+    ///
+    /// 이미 불러 둔 그림은 **그것이 이 카드의 것일 때만** 쓴다. 뷰가 재사용되면서 `cardID`
+    /// 만 바뀌면 이전 카드 그림이 남아 있어, 확인하지 않으면 엉뚱한 카드가 한 프레임 보인다.
+    static func displayed(_ loaded: NSImage?, loadedKey: String?,
+                          key: String, preloaded: NSImage?) -> NSImage? {
+        if let loaded, loadedKey == key { return loaded }
+        return preloaded
+    }
+
     /// 디스크 캐시에 이미 있으면 네트워크 없이 즉시 반환한다.
     /// 격자를 다시 그릴 때 매번 비동기로 가면 화면이 한 번 빈 뒤 채워져 깜빡인다.
     static func cachedImage(cardID: String, hires: Bool) -> NSImage? {
@@ -192,12 +207,18 @@ struct CardImageView: View {
     var preloaded: NSImage?
 
     @State private var image: NSImage?
+    /// `image` 가 어느 카드 것인지. 뷰가 재사용되면서 `cardID` 만 바뀌는 경로가 있어,
+    /// 꼬리표가 없으면 새 카드 자리에 이전 카드 그림이 한 프레임 그려진다.
+    @State private var imageKey: String?
 
     private var height: CGFloat { (width / 0.717).rounded() }
 
+    private var key: String { "\(cardID)-\(hires)" }
+
     var body: some View {
         ZStack {
-            if let image {
+            if let image = CardImageLoader.displayed(image, loadedKey: imageKey,
+                                                     key: key, preloaded: preloaded) {
                 Image(nsImage: image)
                     .resizable()
                     .interpolation(.high)
@@ -216,16 +237,19 @@ struct CardImageView: View {
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: width * 0.05))
-        .task(id: "\(cardID)-\(hires)") {
+        .task(id: key) {
+            let wanted = key
             if let preloaded {
-                image = preloaded
+                image = preloaded; imageKey = wanted
                 return
             }
             if let cached = CardImageLoader.cachedImage(cardID: cardID, hires: hires) {
-                image = cached
+                image = cached; imageKey = wanted
                 return
             }
-            image = await CardImageLoader.image(cardID: cardID, hires: hires)
+            let fetched = await CardImageLoader.image(cardID: cardID, hires: hires)
+            guard wanted == key else { return }   // 받는 동안 다른 카드로 넘어갔다
+            image = fetched; imageKey = wanted
         }
     }
 }

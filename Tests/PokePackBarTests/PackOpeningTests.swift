@@ -537,6 +537,70 @@ final class PackArtAndGlowTests: XCTestCase {
     }
 }
 
+/// 카드를 넘길 때 두 장이 겹쳐 반투명해지지 않아야 한다.
+///
+/// `SpotlightCard` 는 `.id(card.id)` 로 매번 새로 만들어진다. 그 교체가 애니메이션 트랜잭션
+/// 안에서 일어나면 SwiftUI 가 기본 전환인 페이드를 걸어, 나가는 카드와 들어오는 카드가 동시에
+/// 반투명해지고 밑장이 비친다. 사용자에게 "카드가 커질 때 깜빡인다" 로 보고된 결함이다.
+/// `.transition(.identity)` 는 트랜잭션이 열려 있어도 그 페이드를 막는다.
+final class RevealTransitionTests: XCTestCase {
+
+    func testCardSwapDoesNotCrossFade() throws {
+        let source = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokePackBar/UI/PacksView.swift")
+        let text = try String(contentsOf: source, encoding: .utf8)
+        // 호출 지점을 기준으로 삼는다. 모디파이어 이름만 찾으면 그것을 설명하는 주석이
+        // 먼저 걸린다(실제로 한 번 걸렸다).
+        let anchor = try XCTUnwrap(text.range(of: "SpotlightCard(card: card"),
+                                   "SpotlightCard 호출 지점을 찾지 못했다")
+        let modifiers = text[anchor.upperBound...].prefix(400)
+        XCTAssertTrue(modifiers.contains(".id(card.id)"), "카드마다 뷰를 새로 만들어야 한다")
+        XCTAssertTrue(modifiers.contains(".transition(.identity)"),
+                      "SpotlightCard 에 .transition(.identity) 가 있어야 한다 — "
+                      + "없으면 카드 교체에 기본 페이드가 걸려 두 장이 겹쳐 보인다")
+    }
+}
+
+/// 카드 그림을 어느 프레임에 그리는가. 개봉 화면에서 카드가 깜빡이던 원인이 여기였다.
+@MainActor
+final class CardImageDisplayTests: XCTestCase {
+
+    private func image() -> NSImage { NSImage(size: NSSize(width: 2, height: 2)) }
+
+    /// 아직 아무것도 못 불렀어도 미리 받아 둔 그림이 있으면 그것을 그린다.
+    /// `.task` 는 첫 렌더 뒤에 돌기 때문에, 이걸 안 하면 회색 자리표시가 한 프레임 보인다.
+    func testPreloadedShowsOnFirstFrame() {
+        let ready = image()
+        XCTAssertIdentical(CardImageLoader.displayed(nil, loadedKey: nil,
+                                                     key: "sv10-1-true", preloaded: ready), ready)
+    }
+
+    /// 이전 카드 그림이 남아 있으면 쓰지 않는다. 뷰가 재사용되면서 cardID 만 바뀌는
+    /// 경로가 있어, 확인하지 않으면 엉뚱한 카드가 한 프레임 보인다.
+    func testStaleImageFromAnotherCardIsNotUsed() {
+        let old = image(), ready = image()
+        let shown = CardImageLoader.displayed(old, loadedKey: "sv10-1-true",
+                                              key: "sv10-2-true", preloaded: ready)
+        XCTAssertIdentical(shown, ready)
+    }
+
+    /// 미리 받아 둔 것이 없고 이전 카드 그림뿐이면 아무것도 그리지 않는다 —
+    /// 엉뚱한 카드를 보여 주느니 자리표시가 낫다.
+    func testStaleImageWithoutPreloadedShowsNothing() {
+        XCTAssertNil(CardImageLoader.displayed(image(), loadedKey: "sv10-1-true",
+                                               key: "sv10-2-true", preloaded: nil))
+    }
+
+    /// 제 카드 것으로 불러 둔 그림은 미리 받아 둔 것보다 우선한다(해상도가 더 높을 수 있다).
+    func testLoadedImageForThisCardWins() {
+        let loaded = image(), ready = image()
+        let shown = CardImageLoader.displayed(loaded, loadedKey: "sv10-1-true",
+                                              key: "sv10-1-true", preloaded: ready)
+        XCTAssertIdentical(shown, loaded)
+    }
+}
+
 /// 카드를 들춰 다음 장을 훔쳐보는 동작. 손맛을 결정하는 값이라 값으로 못박아 둔다.
 final class RevealPeekTests: XCTestCase {
 
@@ -584,6 +648,27 @@ final class RevealPeekTests: XCTestCase {
         XCTAssertLessThan(RevealPeek.tilt(CGSize(width: -30, height: 0)), 0)
         XCTAssertEqual(RevealPeek.tilt(CGSize(width: 9999, height: 0)), RevealPeek.maxTilt)
         XCTAssertEqual(RevealPeek.tilt(CGSize(width: -9999, height: 0)), -RevealPeek.maxTilt)
+    }
+
+    /// 카드가 팝오버 폭을 넘으면 좌우가 잘리고, 넘치는 자식이 팝오버 자체를 밀어 넓힌다.
+    @MainActor
+    func testRevealCardFitsPopoverWidth() {
+        XCTAssertLessThanOrEqual(RevealPeek.cardWidth, PopoverMetrics.contentWidth,
+                                 "개봉 카드가 팝오버 안쪽 폭보다 넓다")
+    }
+
+    /// 밑장이 눈에 보일 만큼 삐져나와야 한다. 줄이는 비율과 내리는 거리가 서로 상쇄돼
+    /// 0 에 가까워지면 카드가 한 장으로 보인다 — "뒤에 카드가 안 보인다" 는 지적이 그것이었다.
+    func testNextCardPeeksOutFromUnderTheTop() {
+        let edge = RevealPeek.visibleDeckEdge(cardWidth: RevealPeek.cardWidth)
+        XCTAssertGreaterThan(edge, 4, "밑장이 \(edge)pt 밖에 안 나온다 — 덱으로 안 읽힌다")
+        XCTAssertLessThan(edge, RevealPeek.deckOffset, "줄인 만큼은 반드시 깎여야 한다")
+    }
+
+    /// 밑장은 위 카드보다 작아야 뒤에 있는 것으로 읽히고, 너무 작으면 다른 카드처럼 보인다.
+    func testDeckScaleStaysSubtle() {
+        XCTAssertGreaterThan(RevealPeek.deckScale, 0.9)
+        XCTAssertLessThan(RevealPeek.deckScale, 1.0)
     }
 
     /// 커먼·에너지는 후광 세기가 0 이다 — 들춰도 아무것도 안 비치는 것이 정상이고,

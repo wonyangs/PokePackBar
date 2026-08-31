@@ -1,3 +1,4 @@
+import SwiftUI
 import XCTest
 @testable import PokePackBar
 
@@ -645,6 +646,33 @@ final class DexPerkRoutingTests: XCTestCase {
             도감 혜택을 전달하지 않는 호출부가 있다. 표시와 실제 동작이 갈라진다.
             perks: wallet.perks 를 넘긴다: \(offenders.joined(separator: ", "))
             """)
+    }
+}
+
+/// 오리파 가림막이 밑에 깔린 카드를 완전히 가리는가.
+///
+/// 카드를 미리 그려 두고 그 위를 덮는 구조라, 막에 조금이라도 틈이 있으면 열기 전에 카드가
+/// 보인다. 실제로 두 번 샜다 — 색이 22% 불투명이라 그대로 비쳤고, 숨쉬는 애니메이션이
+/// 0.96 배로 줄어들며 가장자리가 삐져나왔다. 둘 다 눈으로만 확인되는 성질이라 값으로 묶는다.
+@MainActor
+final class OripaCoverTests: XCTestCase {
+
+    func testCoverColoursAreOpaque() {
+        for (name, color) in [("바탕", OripaCover.back), ("테두리", OripaCover.rim),
+                              ("표식", OripaCover.mark)] {
+            XCTAssertTrue(OripaCover.isOpaque(color), "\(name) 색이 반투명하다 — 카드가 비친다")
+        }
+    }
+
+    /// 반투명한 색을 넣으면 검사가 실제로 잡는지 확인한다. 늘 통과하는 검사는 검사가 아니다.
+    func testOpacityCheckCatchesTranslucentColour() {
+        XCTAssertFalse(OripaCover.isOpaque(Color.orange.opacity(0.22)))
+    }
+
+    func testCoverNeverShrinksBelowTheCard() {
+        XCTAssertGreaterThanOrEqual(OripaCover.restScale, 1,
+                                    "가림막이 카드보다 작아지면 가장자리가 드러난다")
+        XCTAssertGreaterThanOrEqual(OripaCover.pulseScale, OripaCover.restScale)
     }
 }
 

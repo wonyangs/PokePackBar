@@ -34,6 +34,26 @@ extension L {
 
     var releaseNotes: [ReleaseNote] {
         [
+            ReleaseNote(version: "0.3.3", items: [
+                t("카드깡 시 뒤에 카드 보이도록 UI 수정",
+                  "The next card now sits under the one in your hand",
+                  "次のカードが手にしているカードの下に見えるように",
+                  "La siguiente carta ahora asoma bajo la que tienes",
+                  "La carte suivante apparaît sous celle que tu tiens",
+                  "A próxima carta agora aparece sob a que você segura"),
+                t("오리파 카드깡 시 확인 문구 추가, 가림막 추가",
+                  "Oripa asks before drawing, and the card comes out under a cover",
+                  "オリパは引く前に確認し、カードは覆いの下から出てくる",
+                  "El oripa pregunta antes de tirar y la carta sale bajo una tapa",
+                  "L'oripa demande avant de tirer, et la carte sort sous un cache",
+                  "O oripa pergunta antes de tirar, e a carta sai sob uma capa"),
+                t("카드깡 시 카드 크기가 기존보다 20% 더 커짐",
+                  "Cards are about 20% bigger while you open",
+                  "開封中のカードが約20%大きく",
+                  "Las cartas son un 20% más grandes al abrir",
+                  "Les cartes sont environ 20% plus grandes à l'ouverture",
+                  "As cartas ficam cerca de 20% maiores na abertura"),
+            ]),
             ReleaseNote(version: "0.3.2", items: [
                 t("카드명 한글화",
                   "Korean card names",
