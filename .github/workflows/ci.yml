@@ -14,9 +14,12 @@ concurrency:
 jobs:
   build-test:
     name: build-test
-    # macos-15 ships Xcode 16 / Swift 6, which Package.swift requires
-    # (swift-tools-version: 6.0, platform macOS 14).
-    runs-on: macos-15
+    # Package.swift declares swift-tools-version 6.0, but the sources need Swift 6.2:
+    # HolographicCardView uses an isolated `@MainActor Animatable` conformance, and the
+    # image cache relies on the newer SDK's NSImage sendability. macos-15 ships Swift 6.0
+    # and fails both, which is why every run since v0.1.8 was red. macos-26 ships Xcode 26
+    # / Swift 6.2 — the toolchain the app is actually built and released with.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
 

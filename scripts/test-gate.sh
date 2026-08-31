@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# test-gate.sh — 안정성 가드레일. 커밋/머지 전 수동 실행 (1인 로컬, CI 없음).
+# test-gate.sh — 안정성 가드레일. CI 의 build-test 잡이 이걸 돌리고, 손으로도 돌린다.
 #
 #   1) swift test 전체 통과
 #   2) "로직 코어" 파일 집합의 라인 커버리지 >= THRESHOLD
@@ -18,9 +18,9 @@ cd "$(dirname "$0")/.."
 
 THRESHOLD="${THRESHOLD:-75}"
 
+# companion 을 걷어낼 때 CompanionModel·CompanionStore 가 사라졌다. llvm-cov 가 없는 경로를
+# 조용히 건너뛰어 수치는 맞았지만, 목록만 보면 아직 있는 파일처럼 읽힌다.
 LOGIC_CORE=(
-  "Sources/PokePackBar/Core/CompanionModel.swift"
-  "Sources/PokePackBar/Core/CompanionStore.swift"
   "Sources/PokePackBar/Core/UsageStore.swift"
   "Sources/PokePackBar/Core/Models.swift"
   "Sources/PokePackBar/Core/TokenFormatter.swift"
