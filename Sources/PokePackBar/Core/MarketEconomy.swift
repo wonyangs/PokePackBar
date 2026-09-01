@@ -31,13 +31,49 @@ enum MarketEconomy {
     /// 시세를 모르는 카드에 쓸 값. 0 으로 두면 갈 수도 없는 카드가 된다.
     static let unknownUSD: Double = 0.05
 
-    /// 달러를 토큰으로. 1 미만으로 내려가지 않는다.
-    static func tokens(usd: Double) -> Int { max(1, Int((usd * tokensPerUSD).rounded())) }
+    /// 값의 최소 단위(원). 이보다 잘게 매기지 않는다.
+    ///
+    /// 예전에는 토큰으로 값을 매기고 화면에서만 천 단위로 반올림했다. 그러면 **적힌 값과
+    /// 실제로 빠지는 값이 달라진다** — 3,006,432원짜리 팩이 3,006,000원으로 보여서 살 수
+    /// 있을 것 같은데 못 사고, 사고 나면 남은 돈이 계산과 맞지 않는다. 이제 값 자체가
+    /// 100원 칸에만 존재하고, 화면은 그것을 그대로 적는다.
+    static let wonStep = 100
 
-    /// 토큰을 원으로. 화면 표기 전용이다 — 모으고 쓰는 것은 여전히 토큰이다.
+    /// 100원 한 칸이 몇 토큰인가. 스냅샷 환율에서 나오므로 배포 안에서는 고정이다.
+    static func stepTokens(_ prices: CardPrices? = CardPrices.shared) -> Int {
+        guard let prices, prices.krwPerUSD > 0 else { return 1 }
+        return max(1, Int((Double(wonStep) * tokensPerUSD / prices.krwPerUSD).rounded()))
+    }
+
+    /// 토큰 값을 100원 칸에 맞춰 끊는다. **모든 가격은 이 함수를 지나야 한다.**
+    ///
+    /// 할인이나 추가금을 곱하면 칸에서 벗어나므로, 곱한 **뒤에** 다시 끊는다.
+    static func quantized(_ tokens: Int, prices: CardPrices? = CardPrices.shared) -> Int {
+        let step = stepTokens(prices)
+        guard step > 1 else { return max(1, tokens) }
+        return max(step, ((tokens + step / 2) / step) * step)
+    }
+
+    /// 달러를 토큰으로. 100원 칸에 맞춰 끊는다.
+    static func tokens(usd: Double, prices: CardPrices? = CardPrices.shared) -> Int {
+        quantized(max(1, Int((usd * tokensPerUSD).rounded())), prices: prices)
+    }
+
+    /// 토큰을 원으로.
+    ///
+    /// 칸의 배수는 **정확히** 100원의 배수로 돌아와야 한다. 실수로 나누면 1,000칸쯤에서
+    /// 1원이 어긋나 화면의 값이 가격과 달라진다. 칸 단위는 정수로 세고 나머지만 환산한다.
     static func won(tokens: Int, prices: CardPrices? = CardPrices.shared) -> Int {
         guard let prices else { return 0 }
-        return Int((Double(tokens) / tokensPerUSD * prices.krwPerUSD).rounded())
+        let step = stepTokens(prices)
+        guard step > 1 else {
+            return Int((Double(tokens) / tokensPerUSD * prices.krwPerUSD).rounded())
+        }
+        // 남는 토큰은 **버린다.** 반올림하면 한 칸에서 1토큰 모자란 잔액이 그 칸을 채운 것으로
+        // 보여, 살 수 있다고 나오는데 실제로는 못 사는 경우가 다시 생긴다.
+        let steps = tokens / step
+        let rest = tokens % step
+        return steps * wonStep + Int(Double(rest) / Double(step) * Double(wonStep))
     }
 
     /// 토큰 금액을 화면에 쓸 원화 문자열로.

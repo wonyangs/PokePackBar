@@ -51,6 +51,47 @@ final class CardGridTests: XCTestCase {
     }
 }
 
+/// 탭 줄이 주어진 폭을 다 쓰는가.
+///
+/// macOS 기본 세그먼트 컨트롤은 OS 판에 따라 제 내용 크기로 줄어든다. macOS 26 에서 네 탭이
+/// 창 한가운데로 몰렸고, `maxWidth: .infinity` 로도 채워지지 않았다. 직접 그린 뒤로는 폭을
+/// 다 쓰지만, 다시 기본 컨트롤로 돌아가면 같은 일이 반복되므로 값으로 묶는다.
+@MainActor
+final class SegmentedTabsTests: XCTestCase {
+
+    private func width(of view: some View, proposing width: CGFloat) -> CGFloat {
+        let controller = NSHostingController(rootView: AnyView(view.frame(width: width)))
+        controller.view.layoutSubtreeIfNeeded()
+        return controller.sizeThatFits(in: CGSize(width: width, height: 100)).width
+    }
+
+    func testTabsFillTheWidthTheyAreGiven() {
+        for count in 2...5 {
+            let items = (0..<count).map {
+                SegmentedTabs<Int>.Item(value: $0, label: "탭 \($0)")
+            }
+            let tabs = SegmentedTabs(items: items, selection: .constant(0))
+            XCTAssertEqual(width(of: tabs, proposing: PopoverMetrics.contentWidth),
+                           PopoverMetrics.contentWidth, accuracy: 0.5,
+                           "\(count)칸 탭이 주어진 폭을 다 쓰지 않는다")
+        }
+    }
+
+    /// 팝오버의 탭 줄과 상점의 구역 줄은 직접 그린 것을 쓴다.
+    /// 기본 세그먼트 컨트롤로 돌아가면 OS 판에 따라 다시 몰린다.
+    func testTabRowsDoNotUseTheSystemSegmentedControl() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        for name in ["PopoverView", "CardShopView"] {
+            let text = try String(contentsOf: root.appendingPathComponent(
+                "Sources/PokePackBar/UI/\(name).swift"), encoding: .utf8)
+            XCTAssertFalse(text.contains("pickerStyle(.segmented)"),
+                           "\(name): 기본 세그먼트 컨트롤로 돌아갔다")
+            XCTAssertTrue(text.contains("SegmentedTabs("), "\(name): 탭 줄이 사라졌다")
+        }
+    }
+}
+
 /// 화면에 쓰이지 않는 문구가 남아 있는가.
 ///
 /// `packTotalValue` 를 문구 표에는 넣고 화면에 붙이는 편집이 조용히 실패한 적이 있다.

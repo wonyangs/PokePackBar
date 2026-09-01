@@ -343,13 +343,19 @@ private struct RevealView: View {
 
             Spacer(minLength: 0)
 
-            // 마지막 장에는 누를 것이 없다 — 카드를 넘기면 결과로 간다.
-            // 자리는 남겨 둔다. 버튼이 사라지면 카드가 아래로 내려앉아 흔들린다.
-            Button(l.openAll, action: skipToSummary)
-                .buttonStyle(.bordered).font(Typography.button)
-                .opacity(isLast ? 0 : 1)
-                .disabled(isLast)
-                .accessibilityHidden(isLast)
+            // 마지막 장에서는 「결과 보기」로 바뀐다. 예전에는 버튼을 투명하게 지웠는데,
+            // 다 넘긴 순간 누를 것이 사라져 무엇을 해야 결과를 보는지 알 수 없었다.
+            // 자리는 어느 쪽이든 같은 크기라 카드가 흔들리지 않는다.
+            Group {
+                if isLast {
+                    Button(l.packSeeResult, action: advance)
+                        .buttonStyle(.borderedProminent)
+                } else {
+                    Button(l.openAll, action: skipToSummary)
+                        .buttonStyle(.bordered)
+                }
+            }
+            .font(Typography.button)
         }
         .padding(.vertical, 2)
     }

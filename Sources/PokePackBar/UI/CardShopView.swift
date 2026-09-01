@@ -56,14 +56,10 @@ struct CardShopView: View {
     }
 
     private var sectionPicker: some View {
-        Picker("", selection: $section) {
-            Text(wallet.l.shopPacksSection).tag(Section.packs)
-            Text(wallet.l.oripaTitle).tag(Section.oripa)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        // 폭을 명시한다 — 상단 탭과 같은 이유다(OS 판마다 기본 크기 정책이 다르다).
-        .frame(maxWidth: .infinity)
+        SegmentedTabs(items: [
+            .init(value: Section.packs, label: wallet.l.shopPacksSection),
+            .init(value: Section.oripa, label: wallet.l.oripaTitle),
+        ], selection: $section)
     }
 
     private func consumeRequestedSet() {
@@ -222,10 +218,13 @@ private struct PackDetailView: View {
                 let all = (pool[entry.tier] ?? []).count
                 let owned = (pool[entry.tier] ?? []).filter { wallet.cardCount($0) > 0 }.count
                 HStack(spacing: 5) {
+                    // 칸이 30pt 였다. 14pt 헤비에서 "SAR"·"RRR" 이 그보다 넓어 두 줄로
+                    // 꺾였다. 가장 긴 배지가 들어갈 만큼 넓히고 꺾이지 않게 못 박는다.
                     Text(entry.tier.rawValue)
                         .font(.system(size: 14, weight: .heavy))
                         .foregroundStyle(tierColor(entry.tier))
-                        .frame(width: 30, alignment: .leading)
+                        .lineLimit(1).fixedSize()
+                        .frame(width: 38, alignment: .leading)
                     Text("\(owned)/\(all)")
                         .font(.system(size: 14)).foregroundStyle(.tertiary).monospacedDigit()
                     Spacer()

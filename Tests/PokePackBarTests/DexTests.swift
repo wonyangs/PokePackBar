@@ -402,7 +402,11 @@ final class DexPerkEffectTests: XCTestCase {
         let full = PackPricing.price(setID: "s", index: index)
         let cut = PackPricing.price(setID: "s", index: index,
                                     perks: DexPerks(packDiscount: 0.25))
-        XCTAssertEqual(cut, Int(Double(full) * 0.75))
+        // 할인가도 100원 칸 위에 있어야 한다 — 그래야 적힌 값과 빠지는 값이 같다.
+        // 칸에 맞추느라 정확히 0.75배는 아니고, 반 칸 안쪽에서 만난다.
+        let step = MarketEconomy.stepTokens()
+        XCTAssertEqual(Double(cut), Double(full) * 0.75, accuracy: Double(step))
+        XCTAssertEqual(cut % step, 0, "할인가가 100원 칸에서 벗어났다")
         XCTAssertEqual(PackPricing.price(setID: "s", index: index, perks: .none), full,
                        "혜택이 없으면 정가 그대로여야 한다")
     }
@@ -411,7 +415,11 @@ final class DexPerkEffectTests: XCTestCase {
         let card = "sv10-1"
         let base = CardSale.price(cardID: card)
         let boosted = CardSale.price(cardID: card, perks: DexPerks(dustBonus: 0.3))
-        XCTAssertEqual(boosted, Int(Double(base) * 1.3))
+        // 추가금이 붙은 값도 100원 칸 위에 있어야 한다.
+        let step = MarketEconomy.stepTokens()
+        XCTAssertEqual(Double(boosted), Double(base) * 1.3, accuracy: Double(step))
+        XCTAssertEqual(boosted % step, 0, "판매가가 100원 칸에서 벗어났다")
+        XCTAssertGreaterThan(boosted, base)
         XCTAssertEqual(CardSale.price(cardID: card, perks: .none), base)
     }
 

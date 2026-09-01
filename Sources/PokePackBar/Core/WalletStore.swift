@@ -249,6 +249,122 @@ final class WalletStore {
         return refund
     }
 
+    // MARK: 한번에 판매
+
+    /// 한번에 판매의 결과. 미리보기와 실제 판매가 같은 값을 쓴다 —
+    /// 미리 본 것과 실제로 팔린 것이 다르면 되돌릴 수 없는 동작에서 신뢰가 무너진다.
+    struct BulkSale: Equatable, Sendable {
+        var kinds = 0        // 종류 수
+        var copies = 0       // 장수
+        var tokens = 0       // 받는 값
+
+        static let none = BulkSale()
+        var isEmpty: Bool { copies == 0 }
+    }
+
+    /// 값이 임계값 이하인 카드의 **중복분**을 고른다.
+    ///
+    /// 순수 함수로 분리해 검증할 수 있게 둔다. 「마지막 한 장은 남긴다」와 「임계값을 넘는
+    /// 카드는 건드리지 않는다」가 이 기능의 전부이고, 눈으로만 확인하면 조용히 어긋난다.
+    ///
+    /// 임계값은 **카드 한 장 값**을 본다. 합계로 두면 많이 가진 카드가 비싼 카드가 된다.
+    /// 시세를 모르는 카드는 `MarketEconomy.unknownUSD`(69원)로 잡혀 늘 대상에 든다 —
+    /// 값을 모르는 카드는 잡카드로 보는 것이 맞다.
+    static func bulkSaleTargets(_ entries: [CardEntry], maxWon: Int,
+                                spares: (String) -> Int,
+                                prices: CardPrices? = CardPrices.shared) -> [String] {
+        entries.compactMap { entry in
+            guard spares(entry.id) > 0 else { return nil }
+            let usd = MarketEconomy.usd(cardID: entry.id, prices: prices)
+            guard let prices, prices.krw(usd) <= maxWon else { return nil }
+            return entry.id
+        }
+    }
+
+    /// 팔면 무엇이 얼마인가. 상태를 바꾸지 않는다 — 화면이 매 프레임 부른다.
+    func bulkSalePreview(_ targets: [String]) -> BulkSale {
+        targets.reduce(into: BulkSale()) { sale, cardID in
+            let spare = spareCount(cardID)
+            guard spare > 0 else { return }
+            sale.kinds += 1
+            sale.copies += spare
+            sale.tokens += CardSale.price(cardID: cardID, perks: perks) * spare
+        }
+    }
+
+    /// 고른 카드의 중복분을 전부 판다.
+    ///
+    /// **저장은 한 번만 한다.** 종류마다 `sellSpares(cardID:tier:count:)` 를 부르면 164종
+    /// 정리에 저장이 164번 돌고 도감 혜택도 164번 다시 계산된다.
+    @discardableResult
+    func sellSpares(_ targets: [String]) -> BulkSale {
+        let sale = bulkSalePreview(targets)
+        guard !sale.isEmpty else { return .none }
+
+        for cardID in targets {
+            let spare = spareCount(cardID)
+            guard spare > 0 else { continue }
+            state.cards[cardID] = cardCount(cardID) - spare
+        }
+        state.refundedTokens += sale.tokens
+        state.cardsDisenchanted += sale.copies
+        save()
+        AppLog.write("bulk sold \(sale.copies)x from \(sale.kinds) kinds for \(sale.tokens)")
+        return sale
+    }
+
+    // MARK: 한 번만 주는 보상
+
+    /// 사과나 안내로 한 번만 주는 것. 값은 코드에 적고 지급 여부만 세이브에 남는다.
+    struct Gift: Sendable, Equatable {
+        /// 지급 기록에 남는 이름. 버전이 아니라 **보상마다** 다르게 붙인다.
+        let id: String
+        let tokens: Int
+        /// 세트마다 몇 팩을 줄지.
+        let packsPerSet: Int
+    }
+
+    /// 받은 보상. 팝오버가 한 번 알리고 지운다.
+    var lastGift: Gift?
+
+    /// v0.4.1 사죄의 사료.
+    ///
+    /// v0.4.0 이 값을 반올림해 보여 준 탓에 적힌 값과 실제로 빠지는 값이 달랐다.
+    /// 살 수 있다고 나오는 팩을 못 사고, 사고 나면 남은 돈이 계산과 맞지 않았다.
+    static let apologyGift = Gift(id: "v0.4.1-apology", tokens: 212_120_000, packsPerSet: 1)
+
+    /// 준 적이 없고 대상이면 준다. 이미 줬으면 아무것도 하지 않는다.
+    ///
+    /// **이미 팩을 사 본 세이브만** 받는다. 겪지도 않은 일로 229만원을 들고 시작하면
+    /// 초반에 무엇을 살지 고르는 재미가 통째로 사라진다.
+    ///
+    /// 대상이 아니어도 기록은 남긴다 — 안 남기면 나중에 팩을 하나 사는 순간 대상이 되어
+    /// 뒤늦게 지급된다.
+    @discardableResult
+    func claim(_ gift: Gift, index: CardIndex? = CardIndex.shared) -> Bool {
+        guard !state.grantedGifts.contains(gift.id) else { return false }
+        state.grantedGifts.append(gift.id)
+
+        let affected = state.packsOpened > 0 || state.spentTokens > 0
+        guard affected else {
+            save()
+            AppLog.write("gift \(gift.id) skipped — 대상 아님")
+            return false
+        }
+
+        state.perkTokens += gift.tokens
+        if let index, gift.packsPerSet > 0 {
+            for setID in index.setIDs { state.packs[setID, default: 0] += gift.packsPerSet }
+        }
+        save()
+        lastGift = gift
+        AppLog.write("gift \(gift.id) granted tokens=\(gift.tokens) packs=\(gift.packsPerSet)/set")
+        return true
+    }
+
+    /// 안내를 봤다. 다시 띄우지 않는다.
+    func consumeGift() { lastGift = nil }
+
     // MARK: 최애 카드 (메뉴바)
 
     var favoriteCardID: String? { state.favoriteCardID }
@@ -382,7 +498,8 @@ final class WalletStore {
     func oripaPrice(index: CardIndex? = CardIndex.shared) -> Int {
         let base = index.map { OripaConfig.slotPrice(index: $0) } ?? 30_000_000
         guard perks.packDiscount > 0 else { return base }
-        return max(1, Int((Double(base) * (1 - perks.packDiscount)).rounded()))
+        // 할인을 곱하면 100원 칸에서 벗어난다. 곱한 뒤에 다시 끊는다.
+        return MarketEconomy.quantized(Int((Double(base) * (1 - perks.packDiscount)).rounded()))
     }
 
     /// 한 슬롯을 뽑는다. 잔액이 모자라면 아무것도 하지 않고 nil.

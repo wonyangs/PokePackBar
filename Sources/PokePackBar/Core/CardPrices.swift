@@ -29,8 +29,14 @@ struct CardPrices: Sendable {
         return one * Double(count)
     }
 
-    /// 원화로 환산한 값.
-    func krw(_ usd: Double) -> Int { Int((usd * krwPerUSD).rounded()) }
+    /// 원화로 환산한 값. **100원 칸에 맞춘다.**
+    ///
+    /// 카드에 적히는 값은 그 카드를 팔 때 받는 값과 **같은 숫자**여야 한다. 표기와 판매가가
+    /// 각자 반올림하면 757원이라 적어 두고 800원을 주는 일이 생긴다. 그래서 표기도 판매가와
+    /// 같은 길(토큰으로 옮겼다가 되돌리기)을 지난다.
+    func krw(_ usd: Double) -> Int {
+        MarketEconomy.won(tokens: MarketEconomy.tokens(usd: usd, prices: self), prices: self)
+    }
 
     // MARK: 표시
 

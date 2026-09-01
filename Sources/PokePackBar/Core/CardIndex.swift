@@ -77,6 +77,13 @@ struct CardIndex: Sendable {
     /// 세트 ID → 계층 → 그 계층의 카드 ID 목록. 팩 뽑기가 이 풀에서 고른다.
     let pools: [String: [CardTier: [String]]]
 
+    /// 시세가 비싼 것부터 세워 둔 전체 목록. **읽을 때 정렬하지 않으려고 미리 세운다.**
+    ///
+    /// 컬렉션 화면이 매번 1,284장을 다시 정렬하고 있었다. 카드 그림이 하나 도착할 때마다
+    /// 화면이 다시 그려지고 그때마다 정렬이 돌아, 컬렉션을 훑으면 덜컹거렸다. 정렬 기준인
+    /// 시세는 실행 중에 바뀌지 않으므로 한 번만 세우면 된다.
+    let cardsByValue: [CardEntry]
+
     private let byID: [String: CardEntry]
 
     func card(_ id: String) -> CardEntry? { byID[id] }
@@ -129,6 +136,24 @@ struct CardIndex: Sendable {
         let names: [String: String]
     }
 
+    /// 값이 비싼 것부터. **보유 여부는 순서에 넣지 않는다.**
+    ///
+    /// 가진 카드를 통째로 위로 올리면 값의 사다리가 두 토막으로 끊겨, 전체 중 내가 어디까지
+    /// 왔는지도 위쪽에 무엇이 아직 없는지도 알 수 없다. 가진 것만 보려면 목록을 거른다.
+    ///
+    /// 등급으로 세우지 않는 이유: 순서가 시장과 어긋난다. 1999년 커먼 한 장이 최신 SR 보다
+    /// 비싸고, 같은 등급 안에서도 40배가 갈린다.
+    static func byValue(_ entries: [CardEntry],
+                        prices: CardPrices? = CardPrices.shared) -> [CardEntry] {
+        entries.sorted { a, b in
+            let priceA = MarketEconomy.usd(cardID: a.id, prices: prices)
+            let priceB = MarketEconomy.usd(cardID: b.id, prices: prices)
+            if priceA != priceB { return priceA > priceB }
+            if a.tier.rank != b.tier.rank { return a.tier.rank > b.tier.rank }
+            return a.id < b.id                                  // 나머지는 안정적으로
+        }
+    }
+
     static func decode(_ data: Data, korean: [String: String] = [:]) -> CardIndex? {
         guard let payload = try? JSONDecoder().decode(Payload.self, from: data) else {
             AppLog.write("card index decode failed")
@@ -157,6 +182,7 @@ struct CardIndex: Sendable {
             CardSet(id: $0.id, name: $0.name, released: $0.released, cardCount: $0.cardCount)
         }
         return CardIndex(sets: sets, cards: entries, pools: pools,
+                         cardsByValue: byValue(entries),
                          byID: Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }))
     }
 }

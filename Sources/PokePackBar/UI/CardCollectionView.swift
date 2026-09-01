@@ -13,6 +13,8 @@ struct CardCollectionView: View {
     @State private var selectedSet: String?
     @State private var selectedTier: CardTier?
     @State private var selectedCard: String?
+    /// 한번에 판매 화면을 열었는가. 탭 안에서 화면만 바꾼다.
+    @State private var bulkSelling = false
 
     /// 가진 카드만 볼 것인가. 기본은 꺼짐 — 전체 목록에서 값순으로 봐야 무엇이 없는지
     /// 알 수 있다. 켜고 끈 선택은 기억한다.
@@ -23,14 +25,18 @@ struct CardCollectionView: View {
 
     /// 세트·등급 필터만 건 목록. 「몇 장 중 몇 장」의 분모가 여기서 나온다 —
     /// 보유 필터까지 건 목록으로 세면 늘 "90 / 90" 이 되어 아무것도 말해 주지 않는다.
+    /// 세트·등급 필터만 건 목록. 「몇 장 중 몇 장」의 분모가 여기서 나온다 —
+    /// 보유 필터까지 건 목록으로 세면 늘 "90 / 90" 이 되어 아무것도 말해 주지 않는다.
+    ///
+    /// **미리 세워 둔 값 순 목록에서 거른다.** 거르기는 순서를 지키므로 여기서 다시 정렬할
+    /// 이유가 없고, 정렬을 매번 돌리면 카드 그림이 도착할 때마다 화면이 덜컹거린다.
     private var pool: [CardEntry] {
         guard let index else { return [] }
-        return Self.filtered(index.cards, set: selectedSet, tier: selectedTier)
+        return Self.filtered(index.cardsByValue, set: selectedSet, tier: selectedTier)
     }
 
     private var visible: [CardEntry] {
-        let shown = ownedOnly ? pool.filter { wallet.cardCount($0.id) > 0 } : pool
-        return Self.sorted(shown)
+        ownedOnly ? pool.filter { wallet.cardCount($0.id) > 0 } : pool
     }
 
     /// 세트와 등급을 함께 건다. 둘 다 nil 이면 전체다.
@@ -43,25 +49,11 @@ struct CardCollectionView: View {
         }
     }
 
-    /// 값이 비싼 것부터 정렬한다. **보유 여부는 순서에 넣지 않는다.**
-    ///
-    /// 예전에는 가진 카드를 통째로 위로 올렸다. 그러면 값의 사다리가 두 토막으로 끊겨,
-    /// 전체 중 내가 어디까지 왔는지도, 위쪽에 무엇이 아직 없는지도 알 수 없다. 가진 것만
-    /// 보고 싶을 때는 목록 자체를 거르면 된다 — 정렬로 흉내 낼 일이 아니다.
-    ///
-    /// 등급으로 세우지 않는 이유: 순서가 시장과 어긋난다. 1999년 커먼 한 장이 최신 SR 보다
-    /// 비싸고, 같은 등급 안에서도 40배가 갈린다.
-    ///
-    /// 순수 함수로 분리해 검증할 수 있게 둔다. 격자 정렬은 눈으로만 확인하면 조용히 어긋난다.
+    /// 값이 비싼 것부터. 실제 정렬은 `CardIndex.byValue` 가 하고 여기서는 이름만 빌려 쓴다 —
+    /// 목록은 인덱스를 만들 때 한 번 세워지므로 화면은 거르기만 한다.
     static func sorted(_ entries: [CardEntry],
                        prices: CardPrices? = CardPrices.shared) -> [CardEntry] {
-        entries.sorted { a, b in
-            let priceA = MarketEconomy.usd(cardID: a.id, prices: prices)
-            let priceB = MarketEconomy.usd(cardID: b.id, prices: prices)
-            if priceA != priceB { return priceA > priceB }
-            if a.tier.rank != b.tier.rank { return a.tier.rank > b.tier.rank }
-            return a.id < b.id                                  // 나머지는 안정적으로
-        }
+        CardIndex.byValue(entries, prices: prices)
     }
 
     var body: some View {
@@ -71,6 +63,9 @@ struct CardCollectionView: View {
                 Text(l.cardIndexMissing)
                     .font(Typography.body).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if bulkSelling {
+                // 지금 목록에 걸린 카드만 넘긴다 — 화면에 안 보이는 카드가 팔리면 안 된다.
+                BulkSaleView(wallet: wallet, pool: pool) { bulkSelling = false }
             } else if let selectedCard, let entry = index?.card(selectedCard) {
                 // 하단에 작게 붙이면 카드를 제대로 볼 수 없다. 화면을 통째로 내준다.
                 CardSpotlightView(wallet: wallet, cardID: entry.id,
@@ -164,6 +159,19 @@ struct CardCollectionView: View {
                 .toggleStyle(.checkbox)
                 .font(Typography.label)
             Spacer(minLength: 4)
+            // 잡카드 정리로 들어가는 문. 중복이 없으면 누를 것이 없으므로 감춘다.
+            if hasSpares {
+                Button { bulkSelling = true } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "wonsign.circle")
+                        Text(l.bulkSell)
+                    }
+                    .font(Typography.label)
+                    .foregroundStyle(Color.accentColor)
+                }
+                .buttonStyle(.plain)
+                .help(l.bulkSellPrompt)
+            }
             Button {
                 showTiers.toggle()
             } label: {
@@ -177,6 +185,12 @@ struct CardCollectionView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// 팔 중복이 하나라도 있는가. 없으면 정리 버튼을 띄우지 않는다 —
+    /// 누를 수 없는 버튼을 두면 그 줄만 복잡해진다.
+    private var hasSpares: Bool {
+        pool.contains { wallet.cardCount($0.id) > 1 }
     }
 
     /// 등급별 보유 현황. 두 줄로 전부 보여준다 — 가로로 흘리면 뒤쪽 등급이 가려진다.

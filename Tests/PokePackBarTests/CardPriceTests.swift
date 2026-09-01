@@ -62,31 +62,62 @@ final class CardPriceTests: XCTestCase {
         XCTAssertTrue(line.contains("원 ("), line)
     }
 
-    /// 끝자리를 끊는 규칙. 천원 위는 천 단위 반올림, 그 아래는 100원 절삭.
-    func testWonRounding() {
-        XCTAssertEqual(WonFormatter.rounded(36_412), 36_000)
-        XCTAssertEqual(WonFormatter.rounded(36_500), 37_000, "반올림이다")
-        XCTAssertEqual(WonFormatter.rounded(1_499), 1_000)
-        XCTAssertEqual(WonFormatter.rounded(999), 900, "천원 아래는 100원 단위로 자른다")
-        XCTAssertEqual(WonFormatter.rounded(413), 400)
+    /// 끝자리를 끊는 규칙. **100원 단위로 버린다. 올리지 않는다.**
+    ///
+    /// 올리면 「보이는 잔액 ≥ 보이는 가격」인데 실제로는 못 사는 경우가 생긴다.
+    func testWonFallsToTheStep() {
+        XCTAssertEqual(WonFormatter.rounded(36_412), 36_400)
+        XCTAssertEqual(WonFormatter.rounded(36_500), 36_500, "이미 칸 위에 있다")
+        XCTAssertEqual(WonFormatter.rounded(36_599), 36_500, "올리지 않는다")
+        XCTAssertEqual(WonFormatter.rounded(1_499), 1_400)
+        XCTAssertEqual(WonFormatter.rounded(999), 900)
         XCTAssertEqual(WonFormatter.rounded(50), 0)
         XCTAssertEqual(WonFormatter.rounded(0), 0)
     }
 
+    /// **보이는 잔액으로 살 수 있다고 나오면 실제로도 살 수 있다.**
+    ///
+    /// 이 앱이 값을 100원 칸에 묶는 이유가 이것이다. 예전에는 천 단위로 반올림해서
+    /// 3,006,432원짜리 팩이 3,006,000원으로 보였고, 3,006,200원을 들고 살 수 있을 줄 알았다가
+    /// 못 샀다. 가격은 칸 위에 있고 잔액은 버리므로 이제 그런 경우가 없다.
+    func testWhatYouSeeIsWhatYouCanAfford() throws {
+        let prices = try XCTUnwrap(Self.prices)
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        for setID in index.setIDs {
+            let price = PackPricing.price(setID: setID, index: index, prices: prices)
+            let shownPrice = WonFormatter.rounded(MarketEconomy.won(tokens: price, prices: prices))
+            XCTAssertEqual(shownPrice % MarketEconomy.wonStep, 0, "\(setID): 팩값이 칸에 없다")
+
+            // 잔액을 가격 언저리에서 훑으며 「보이는 값」과 「실제」가 어긋나지 않는지 본다.
+            for delta in [-2_000, -1, 0, 1, 2_000] {
+                let balance = price + delta
+                let shownBalance = WonFormatter.rounded(MarketEconomy.won(tokens: balance,
+                                                                          prices: prices))
+                if shownBalance >= shownPrice {
+                    XCTAssertGreaterThanOrEqual(balance, price,
+                        "\(setID): 살 수 있다고 보이는데 실제로는 못 산다 "
+                        + "(잔액 \(shownBalance)원 / 가격 \(shownPrice)원)")
+                }
+            }
+        }
+    }
+
     /// 세 자리 쉼표로 읽는다. 끝자리는 이미 끊겨 있다.
-    func testWonReadsInGroupedDigits() {
+    /// **100원 단위로 버린다.** 올림하지 않는다 — 올리면 보이는 잔액으로 못 사는 값이 생긴다.
+    func testWonFallsToTheHundredStep() {
         let ko = Locale(identifier: "ko_KR")
-        XCTAssertEqual(WonFormatter.money(36_412, language: .ko, locale: ko), "36,000원")
-        XCTAssertEqual(WonFormatter.money(1_195_741, language: .ko, locale: ko), "1,196,000원")
+        XCTAssertEqual(WonFormatter.money(36_412, language: .ko, locale: ko), "36,400원")
+        XCTAssertEqual(WonFormatter.money(1_195_741, language: .ko, locale: ko), "1,195,700원")
         XCTAssertEqual(WonFormatter.money(413, language: .ko, locale: ko), "400원")
+        XCTAssertEqual(WonFormatter.money(99, language: .ko, locale: ko), "0원")
         XCTAssertEqual(WonFormatter.money(100_000_000, language: .ko, locale: ko), "100,000,000원")
     }
 
     /// 단위 기호는 언어를 따른다.
     func testCurrencyMarkFollowsLanguage() {
         let us = Locale(identifier: "en_US")
-        XCTAssertEqual(WonFormatter.money(36_412, language: .en, locale: us), "₩36,000")
-        XCTAssertEqual(WonFormatter.money(36_412, language: .ja, locale: us), "36,000円")
+        XCTAssertEqual(WonFormatter.money(36_412, language: .en, locale: us), "₩36,400")
+        XCTAssertEqual(WonFormatter.money(36_412, language: .ja, locale: us), "36,400円")
     }
 
     /// 등급만으로 값을 매기던 표가 시장과 어긋난다는 것 — 이 격차가 개편의 근거다.
@@ -117,9 +148,10 @@ final class CardPriceTests: XCTestCase {
             let shown = prices.krw(usd)
             let paid = MarketEconomy.won(tokens: CardSale.price(cardID: entry.id, prices: prices),
                                          prices: prices)
-            // 토큰이 정수라 1원 안쪽으로 어긋날 수 있다. 그 이상은 배율이 낀 것이다.
-            XCTAssertEqual(Double(paid), Double(shown), accuracy: 1,
-                           "\(entry.id): 적힌 값 \(shown)원, 판매가 \(paid)원")
+            // 값은 100원 칸에만 있으므로 **정확히** 같아야 한다.
+            XCTAssertEqual(paid, shown, "\(entry.id): 적힌 값 \(shown)원, 판매가 \(paid)원")
+            XCTAssertEqual(shown % MarketEconomy.wonStep, 0,
+                           "\(entry.id): 카드값이 100원 칸에 없다")
         }
     }
 

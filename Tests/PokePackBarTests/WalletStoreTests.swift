@@ -363,3 +363,289 @@ final class DisenchantTests: XCTestCase {
         XCTAssertEqual(reloaded.state.cardsDisenchanted, 1)
     }
 }
+
+/// 한번에 판매 — 되돌릴 수 없는 동작이라 규칙을 값으로 묶는다.
+@MainActor
+final class BulkSaleTests: XCTestCase {
+
+    private var dir: URL!
+
+    override func setUp() {
+        super.setUp()
+        dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("bulk-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        super.tearDown()
+    }
+
+    private func makeStore() -> WalletStore {
+        WalletStore(fileURL: dir.appendingPathComponent("game-state.json"))
+    }
+
+    /// 값이 낮은 순으로 카드를 갈라 (싼 카드, 비싼 카드) 를 돌려준다.
+    private func split(_ index: CardIndex, _ prices: CardPrices,
+                       at won: Int) -> (cheap: CardEntry, dear: CardEntry) {
+        let cheap = index.cards.first { prices.krw(prices.price($0.id) ?? 99) < won / 2 }!
+        let dear = index.cards.first { prices.krw(prices.price($0.id) ?? 0) > won * 10 }!
+        return (cheap, dear)
+    }
+
+    /// **마지막 한 장은 절대 팔리지 않는다.** 팔리면 도감 진행이 되돌아가고
+    /// 컬렉션에서 카드가 사라지는데 되돌릴 방법이 없다.
+    func testTheLastCopyIsNeverSold() throws {
+        let s = makeStore()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.shared)
+        let (cheap, _) = split(index, prices, at: 1_000)
+
+        s.collect([cheap.id])                       // 한 장만
+        let targets = WalletStore.bulkSaleTargets([cheap], maxWon: 1_000,
+                                                  spares: { s.spareCount($0) }, prices: prices)
+        XCTAssertTrue(targets.isEmpty, "한 장뿐인 카드가 대상에 들었다")
+        XCTAssertEqual(s.sellSpares(targets), .none)
+        XCTAssertEqual(s.cardCount(cheap.id), 1)
+
+        s.collect([cheap.id, cheap.id])             // 이제 세 장
+        let three = WalletStore.bulkSaleTargets([cheap], maxWon: 1_000,
+                                                spares: { s.spareCount($0) }, prices: prices)
+        let sale = s.sellSpares(three)
+        XCTAssertEqual(sale.copies, 2)
+        XCTAssertEqual(s.cardCount(cheap.id), 1, "정리 뒤에도 한 장은 남아야 한다")
+    }
+
+    /// 임계값을 넘는 카드는 한 장도 팔리지 않는다.
+    func testCardsAboveTheThresholdAreLeftAlone() throws {
+        let s = makeStore()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.shared)
+        let (cheap, dear) = split(index, prices, at: 1_000)
+
+        s.collect([cheap.id, cheap.id, dear.id, dear.id])
+        let targets = WalletStore.bulkSaleTargets([cheap, dear], maxWon: 1_000,
+                                                  spares: { s.spareCount($0) }, prices: prices)
+        XCTAssertEqual(targets, [cheap.id])
+        s.sellSpares(targets)
+        XCTAssertEqual(s.cardCount(cheap.id), 1)
+        XCTAssertEqual(s.cardCount(dear.id), 2, "비싼 카드가 팔렸다")
+    }
+
+    /// 미리 본 것과 실제로 팔린 것이 같다. 다르면 확인 화면이 거짓말을 한 셈이다.
+    func testPreviewMatchesTheSale() throws {
+        let s = makeStore()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.shared)
+        let pool = Array(index.cards.prefix(200))
+        for entry in pool { s.collect([entry.id, entry.id, entry.id]) }
+
+        let targets = WalletStore.bulkSaleTargets(pool, maxWon: 5_000,
+                                                  spares: { s.spareCount($0) }, prices: prices)
+        XCTAssertFalse(targets.isEmpty)
+        let preview = s.bulkSalePreview(targets)
+        let sale = s.sellSpares(targets)
+        XCTAssertEqual(preview, sale)
+
+        // 받은 값은 장수마다의 판매가 합계와 같아야 한다(판매 추가금 포함).
+        let expected = targets.reduce(0) { $0 + CardSale.price(cardID: $1, perks: s.perks) * 2 }
+        XCTAssertEqual(sale.tokens, expected)
+        XCTAssertEqual(sale.copies, targets.count * 2)
+        XCTAssertEqual(sale.kinds, targets.count)
+    }
+
+    /// 잔액에 그만큼 들어오고, 종수는 줄지 않는다.
+    func testBalanceRisesAndKindCountHolds() throws {
+        let s = makeStore()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.shared)
+        let pool = Array(index.cards.prefix(60))
+        for entry in pool { s.collect([entry.id, entry.id]) }
+
+        let kinds = s.distinctCardCount
+        let before = s.availableTokens
+        let targets = WalletStore.bulkSaleTargets(pool, maxWon: 10_000,
+                                                  spares: { s.spareCount($0) }, prices: prices)
+        let sale = s.sellSpares(targets)
+        XCTAssertEqual(s.availableTokens, before + sale.tokens)
+        XCTAssertEqual(s.distinctCardCount, kinds, "종수가 줄었다 — 마지막 장이 팔렸다")
+    }
+
+    /// 종류마다 저장하면 164종 정리에 저장이 164번 돈다. 한 번만 써야 한다.
+    func testWritesTheSaveFileOnlyOnce() throws {
+        let s = makeStore()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.shared)
+        let pool = Array(index.cards.prefix(120))
+        for entry in pool { s.collect([entry.id, entry.id]) }
+
+        let file = dir.appendingPathComponent("game-state.json")
+        let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+        let before = attributes[.modificationDate] as? Date ?? .distantPast
+
+        // 쓰기 횟수를 직접 셀 수는 없으므로, 정리 한 번이 한 번의 쓰기로 끝나는지를
+        // 파일 크기 변화와 소요 시간으로 본다. 120종을 한 번에 파는 데 1초를 넘기면
+        // 종류마다 저장하고 있다는 뜻이다.
+        let targets = WalletStore.bulkSaleTargets(pool, maxWon: 10_000,
+                                                  spares: { s.spareCount($0) }, prices: prices)
+        XCTAssertGreaterThan(targets.count, 50, "표본이 너무 작다")
+        let clock = ContinuousClock()
+        let elapsed = clock.measure { _ = s.sellSpares(targets) }
+        XCTAssertLessThan(elapsed, .seconds(1), "종류마다 저장하고 있다")
+        XCTAssertNotEqual((try FileManager.default
+            .attributesOfItem(atPath: file.path)[.modificationDate] as? Date) ?? before, .distantPast)
+    }
+
+    /// 시세를 모르는 카드는 잡카드로 본다 — 값을 모르면 남겨 둘 근거도 없다.
+    func testUnknownPricesCountAsJunk() throws {
+        let s = makeStore()
+        let prices = try XCTUnwrap(CardPrices.shared)
+        let ghost = CardEntry(id: "no-such-card", name: "?", tier: .common, setID: "no-such")
+        s.collect([ghost.id, ghost.id])
+        let targets = WalletStore.bulkSaleTargets([ghost], maxWon: 1_000,
+                                                  spares: { s.spareCount($0) }, prices: prices)
+        XCTAssertEqual(targets, [ghost.id])
+    }
+
+    /// 임계값 후보는 실제 시세 분포를 갈라야 한다. 다섯 개가 모두 같은 카드를
+    /// 잡으면 고를 이유가 없다.
+    func testThresholdsActuallySplitThePool() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.shared)
+        func count(_ won: Int) -> Int {
+            index.cards.filter { prices.krw(prices.price($0.id) ?? 0.05) <= won }.count
+        }
+        let counts = BulkSaleView.thresholds.map(count)
+        for (lower, upper) in zip(counts, counts.dropFirst()) {
+            XCTAssertLessThan(lower, upper, "임계값 후보가 같은 범위를 잡는다: \(counts)")
+        }
+    }
+}
+
+/// 한 번만 주는 보상 — 재화를 넣는 일이라 규칙을 값으로 묶는다.
+@MainActor
+final class GiftTests: XCTestCase {
+
+    private var dir: URL!
+
+    override func setUp() {
+        super.setUp()
+        dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("gift-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        super.tearDown()
+    }
+
+    private var file: URL { dir.appendingPathComponent("game-state.json") }
+    private func makeStore() -> WalletStore { WalletStore(fileURL: file) }
+
+    private let gift = WalletStore.Gift(id: "test-gift", tokens: 1_000, packsPerSet: 1)
+
+    /// 잔액을 채운다. 사용량 관찰이 유일한 통로다.
+    private func fund(_ s: WalletStore, _ tokens: Int) {
+        s.update(todayTokensByProvider: ["claude_code": 0], todayDate: "2026-09-01",
+                 hasUsageData: true)
+        s.update(todayTokensByProvider: ["claude_code": tokens], todayDate: "2026-09-01",
+                 hasUsageData: true)
+    }
+
+    /// 팩을 사 본 적이 있어야 대상이다.
+    private func makeAffected() throws -> (WalletStore, CardIndex) {
+        let s = makeStore()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        fund(s, 100_000_000)
+        s.addPack(setID: try XCTUnwrap(index.setIDs.first))
+        XCTAssertTrue(s.consumePack(setID: try XCTUnwrap(index.setIDs.first)))
+        return (s, index)
+    }
+
+    /// **두 번 불러도 한 번만 들어온다.**
+    func testAGiftArrivesOnlyOnce() throws {
+        let (s, index) = try makeAffected()
+        let before = s.availableTokens
+
+        XCTAssertTrue(s.claim(gift, index: index))
+        let afterFirst = s.availableTokens
+        XCTAssertEqual(afterFirst, before + gift.tokens)
+
+        XCTAssertFalse(s.claim(gift, index: index), "두 번째 지급이 일어났다")
+        XCTAssertEqual(s.availableTokens, afterFirst)
+        for setID in index.setIDs {
+            XCTAssertEqual(s.packCount(setID: setID), 1, "\(setID): 팩이 두 번 들어왔다")
+        }
+    }
+
+    /// 앱을 다시 켜도 다시 들어오지 않는다 — 기록이 세이브에 남아야 한다.
+    func testTheRecordSurvivesRelaunch() throws {
+        let (s, index) = try makeAffected()
+        XCTAssertTrue(s.claim(gift, index: index))
+        let tokens = s.availableTokens
+
+        let reopened = makeStore()
+        XCTAssertFalse(reopened.claim(gift, index: index), "다시 켜니 또 들어왔다")
+        XCTAssertEqual(reopened.availableTokens, tokens)
+    }
+
+    /// 팩을 사 본 적 없는 세이브는 받지 않는다. **그래도 기록은 남는다** —
+    /// 안 남기면 나중에 팩을 하나 사는 순간 대상이 되어 뒤늦게 지급된다.
+    func testFreshSavesGetNothingButAreStillMarked() throws {
+        let s = makeStore()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        fund(s, 100_000_000)
+        let before = s.availableTokens
+
+        XCTAssertFalse(s.claim(gift, index: index))
+        XCTAssertEqual(s.availableTokens, before)
+        XCTAssertNil(s.lastGift, "안 준 보상을 알렸다")
+
+        // 이제 팩을 사도 뒤늦게 들어오면 안 된다.
+        s.addPack(setID: try XCTUnwrap(index.setIDs.first))
+        XCTAssertTrue(s.consumePack(setID: try XCTUnwrap(index.setIDs.first)))
+        XCTAssertFalse(s.claim(gift, index: index), "뒤늦게 지급됐다")
+        XCTAssertEqual(s.availableTokens, before)
+    }
+
+    /// 잔액만 오르고 사용량 통계는 그대로다. 통계를 건드리면 화면의 사용량이 거짓이 된다.
+    func testUsageStatsAreUntouched() throws {
+        let (s, index) = try makeAffected()
+        let used = s.usedSinceInstall
+        let before = s.availableTokens
+        XCTAssertTrue(s.claim(gift, index: index))
+        XCTAssertEqual(s.usedSinceInstall, used, "사용량 통계가 늘었다")
+        XCTAssertEqual(s.availableTokens, before + gift.tokens)
+    }
+
+    /// 세트마다 정확히 지정한 만큼 들어온다.
+    func testOnePackPerSet() throws {
+        let (s, index) = try makeAffected()
+        XCTAssertTrue(s.claim(WalletStore.Gift(id: "two", tokens: 0, packsPerSet: 2),
+                              index: index))
+        for setID in index.setIDs {
+            XCTAssertEqual(s.packCount(setID: setID), 2, "\(setID)")
+        }
+    }
+
+    /// id 가 다르면 따로 한 번씩 나간다. 다음 보상이 이 칸을 두고 다투지 않아야 한다.
+    func testDifferentGiftsAreIndependent() throws {
+        let (s, index) = try makeAffected()
+        let before = s.availableTokens
+        XCTAssertTrue(s.claim(WalletStore.Gift(id: "a", tokens: 100, packsPerSet: 0), index: index))
+        XCTAssertTrue(s.claim(WalletStore.Gift(id: "b", tokens: 100, packsPerSet: 0), index: index))
+        XCTAssertFalse(s.claim(WalletStore.Gift(id: "a", tokens: 100, packsPerSet: 0), index: index))
+        XCTAssertEqual(s.availableTokens, before + 200)
+    }
+
+    /// 배포에 실린 사과 보상의 값이 계획과 같은가 — 손이 미끄러져 0 이 하나 더 붙으면
+    /// 되돌릴 수 없다.
+    func testTheShippedApologyGiftIsWhatWePlanned() {
+        XCTAssertEqual(WalletStore.apologyGift.id, "v0.4.1-apology")
+        XCTAssertEqual(WalletStore.apologyGift.packsPerSet, 1)
+        XCTAssertEqual(MarketEconomy.won(tokens: WalletStore.apologyGift.tokens), 1_000_000,
+                       "현금 보상이 100만원이 아니다")
+    }
+}

@@ -240,6 +240,64 @@ extension L {
         t("+\(money)", "+\(money)", "+\(money)", "+\(money)", "+\(money)", "+\(money)")
     }
 
+    // MARK: 사죄의 사료
+
+    var giftTitle: String { t("사죄의 사료", "An apology treat", "おわびのごはん",
+                               "Un obsequio de disculpa", "Un cadeau d'excuse",
+                               "Um agrado de desculpas") }
+    /// 무엇이 들어왔는지 숫자로 적는다. 「보상을 드렸습니다」만 있으면 확인하러 탭을 뒤져야 한다.
+    func giftBody(_ packs: Int, _ money: String) -> String {
+        t("값이 잘못 보이던 문제로 불편을 드렸어요. 팩 \(packs)개와 \(money)을 넣어 뒀습니다.",
+           "Sorry about the prices showing wrong. \(packs) packs and \(money) are in your wallet.",
+           "価格の表示が誤っていた件、失礼しました。パック \(packs)個と \(money) を入れておきました。",
+           "Perdón por los precios mal mostrados. Te dejamos \(packs) sobres y \(money).",
+           "Désolé pour les prix mal affichés. \(packs) boosters et \(money) t'attendent.",
+           "Desculpe pelos preços exibidos errado. \(packs) pacotes e \(money) estão na carteira.")
+    }
+
+    // MARK: 한번에 판매
+
+    var bulkSell: String { t("한번에 판매", "Sell in bulk", "まとめて売る",
+                              "Vender en lote", "Vendre en lot", "Vender em lote") }
+    /// 무엇을 고르는 화면인지 한 줄로. 「중복분만」이 규칙의 핵심이라 여기 적는다.
+    var bulkSellPrompt: String { t("얼마 이하인 카드의 중복분을 팔까요?",
+                                    "Sell spare copies of cards worth up to…",
+                                    "いくら以下のカードの重複を売りますか？",
+                                    "¿Vender repetidas de cartas hasta…?",
+                                    "Vendre les doubles des cartes jusqu'à…",
+                                    "Vender repetidas de cartas até…?") }
+    /// 임계값 칩. "1,000원 이하" 처럼 읽힌다.
+    func bulkSellUpTo(_ money: String) -> String {
+        t("\(money) 이하", "up to \(money)", "\(money) 以下",
+           "hasta \(money)", "jusqu'à \(money)", "até \(money)")
+    }
+    /// 팔릴 것의 요약.
+    func bulkSellSummary(_ kinds: Int, _ copies: Int, _ money: String) -> String {
+        t("\(kinds)종 · \(copies)장 · +\(money)",
+           "\(kinds) kinds · \(copies) cards · +\(money)",
+           "\(kinds)種 · \(copies)枚 · +\(money)",
+           "\(kinds) tipos · \(copies) cartas · +\(money)",
+           "\(kinds) types · \(copies) cartes · +\(money)",
+           "\(kinds) tipos · \(copies) cartas · +\(money)")
+    }
+    var bulkSellNothing: String { t("팔 중복이 없어요", "No spares to sell", "売る重複がありません",
+                                     "No hay repetidas", "Aucun double", "Nenhuma repetida") }
+    /// 되돌릴 수 없다는 것을 확인 앞에 적는다.
+    var bulkSellConfirm: String { t("한 종류에 한 장씩은 남습니다. 되돌릴 수 없어요.",
+                                     "One copy of each stays. This can't be undone.",
+                                     "各1枚は残ります。取り消せません。",
+                                     "Se conserva una de cada. No se puede deshacer.",
+                                     "Un exemplaire de chaque reste. Irréversible.",
+                                     "Uma cópia de cada fica. Não pode ser desfeito.") }
+    func bulkSellDone(_ copies: Int, _ money: String) -> String {
+        t("\(copies)장을 팔아 \(money)을 받았어요",
+           "Sold \(copies) cards for \(money)",
+           "\(copies)枚を売って \(money)",
+           "Vendiste \(copies) cartas por \(money)",
+           "\(copies) cartes vendues pour \(money)",
+           "Vendeu \(copies) cartas por \(money)")
+    }
+
     // MARK: 등급
 
     /// 등급 배지 — 국내 커뮤니티가 쓰는 약칭을 그대로 쓴다. 카드에 인쇄된 표기라 언어와 무관하다.
@@ -300,6 +358,9 @@ extension L {
                                   "Deslize para ver") }
     var oripaPullConfirm: String { t("뽑을까요?", "Draw?", "引きますか？",
                                      "¿Tirar?", "Tirer ?", "Tirar?") }
+    /// 마지막 장에서 요약으로 넘어가는 버튼.
+    var packSeeResult: String { t("결과 보기", "See results", "結果を見る",
+                                   "Ver resultados", "Voir les résultats", "Ver resultados") }
     var oripaSeeDetail: String { t("자세히 보기", "See details", "詳しく見る",
                                     "Ver detalles", "Voir la carte", "Ver detalhes") }
     func oripaRemaining(_ left: Int, _ total: Int) -> String {

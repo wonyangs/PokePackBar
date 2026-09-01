@@ -71,6 +71,7 @@ struct PopoverView: View {
                              onOpenReleaseNotes: { nav.showReleaseNotes = true })
             } else {
                 walletHeader
+                giftToast
                 bonusToast
                 releaseNotesToast
                 tabPicker
@@ -266,6 +267,35 @@ struct PopoverView: View {
         store.bonusEligibleWindows.max { $0.utilization < $1.utilization }
     }
 
+    /// 한 번만 주는 보상 안내. 받은 것을 숫자로 적고, 닫으면 사라진다.
+    @ViewBuilder
+    private var giftToast: some View {
+        if let gift = wallet.lastGift {
+            HStack(spacing: 7) {
+                Image(systemName: "takeoutbag.and.cup.and.straw.fill")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(l.giftTitle).font(Typography.bodySemibold)
+                    Text(l.giftBody(gift.packsPerSet * (Self.index?.setIDs.count ?? 0),
+                                    MarketEconomy.money(tokens: gift.tokens,
+                                                        language: wallet.language)))
+                        .font(Typography.label).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Button {
+                    wallet.consumeGift()
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 14))
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding(8)
+            .background(Color.orange.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
     /// 보너스 팩 지급 알림. 팝오버 안에서 한 번 보여주고 지운다.
     @ViewBuilder
     private var bonusToast: some View {
@@ -322,20 +352,16 @@ struct PopoverView: View {
 
     // MARK: 탭
 
+    /// 탭 줄. `SegmentedTabs` 로 직접 그린다 — 기본 세그먼트 컨트롤은 OS 판에 따라 제 내용
+    /// 크기로 줄어들고, macOS 26 에서 네 탭이 창 한가운데로 몰렸다.
     private var tabPicker: some View {
         @Bindable var nav = nav
-        return Picker("", selection: $nav.tab) {
-            Text(l.shop).tag(PopoverTab.shop)
-            Text(packsLabel).tag(PopoverTab.packs)
-            Text(l.collection).tag(PopoverTab.collection)
-            Text(l.dexTab).tag(PopoverTab.dex)
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        // 폭을 명시한다. 안 적으면 세그먼트 컨트롤이 제 내용 크기로 줄어 왼쪽에 몰리는
-        // macOS 가 있다(테스터 보고). 어느 쪽이 기본인지는 OS 판마다 다르고, 내 기기에서만
-        // 꽉 차게 보이면 이 차이를 영영 못 본다.
-        .frame(maxWidth: .infinity)
+        return SegmentedTabs(items: [
+            .init(value: PopoverTab.shop, label: l.shop),
+            .init(value: PopoverTab.packs, label: packsLabel),
+            .init(value: PopoverTab.collection, label: l.collection),
+            .init(value: PopoverTab.dex, label: l.dexTab),
+        ], selection: $nav.tab)
     }
 
     /// 미개봉 팩이 있으면 개수를 붙인다 — 뜯을 것이 있는지 탭을 열지 않고 알 수 있어야 한다.

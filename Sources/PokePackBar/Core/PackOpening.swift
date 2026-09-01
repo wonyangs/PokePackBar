@@ -146,7 +146,9 @@ enum PackPricing {
                       perks: DexPerks = .none) -> Int {
         let base = basePrice(setID: setID, index: index, prices: prices)
         guard perks.packDiscount > 0 else { return base }
-        return max(1, Int((Double(base) * (1 - perks.packDiscount)).rounded()))
+        // 할인을 곱하면 100원 칸에서 벗어난다. 곱한 뒤에 다시 끊는다.
+        return MarketEconomy.quantized(Int((Double(base) * (1 - perks.packDiscount)).rounded()),
+                                       prices: prices)
     }
 
     /// 혜택을 빼고 본 팩값.
@@ -184,9 +186,12 @@ enum CardSale {
     /// 한 장 값. `perks.dustBonus` 가 도감이 주는 판매 추가금이다.
     static func price(cardID: String, prices: CardPrices? = CardPrices.shared,
                       perks: DexPerks = .none) -> Int {
-        let base = MarketEconomy.tokens(usd: MarketEconomy.usd(cardID: cardID, prices: prices))
+        let base = MarketEconomy.tokens(usd: MarketEconomy.usd(cardID: cardID, prices: prices),
+                                        prices: prices)
         guard perks.dustBonus > 0 else { return base }
-        return Int((Double(base) * (1 + perks.dustBonus)).rounded())
+        // 추가금을 곱하면 100원 칸에서 벗어난다. 곱한 뒤에 다시 끊는다.
+        return MarketEconomy.quantized(Int((Double(base) * (1 + perks.dustBonus)).rounded()),
+                                       prices: prices)
     }
 }
 

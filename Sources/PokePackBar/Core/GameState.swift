@@ -89,6 +89,15 @@ struct GameState: Codable, Sendable {
     /// 설치 직후 이미 100% 였던 창에 소급 지급하지 않기 위해 필요하다.
     var packGrantSeeded = false
 
+    // MARK: 한 번만 주는 보상
+
+    /// 이미 준 일회성 보상의 id.
+    ///
+    /// 버전 번호가 아니라 **보상 id** 로 적는다. 버전으로 적으면 다음에 다른 이유로 또 줄 때
+    /// 같은 칸을 두고 다투게 된다. 대상이 아니어서 안 준 경우에도 id 는 남긴다 — 안 남기면
+    /// 나중에 팩을 하나 사는 순간 대상이 되어 뒤늦게 지급된다.
+    var grantedGifts: [String] = []
+
     // MARK: 설정
 
     var language: AppLanguage = .systemDefault   // 신규 설치 = 시스템 로케일
@@ -132,6 +141,7 @@ struct GameState: Codable, Sendable {
         oripa = try? c.decodeIfPresent(OripaBox.self, forKey: .oripa)
         packGrantTier = value(.packGrantTier, [:])
         packGrantSeeded = value(.packGrantSeeded, false)
+        grantedGifts = value(.grantedGifts, [String]())
         language = value(.language, AppLanguage.systemDefault)
     }
 }
