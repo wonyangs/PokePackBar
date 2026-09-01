@@ -58,13 +58,7 @@ struct BulkSaleView: View {
 
     private func header(_ l: L) -> some View {
         HStack(spacing: 6) {
-            Button(action: onClose) {
-                Image(systemName: "chevron.left")
-                    .font(Typography.labelSemibold)
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(.plain)
-            .help(l.close)
+            BackButton(action: onClose, hint: l.close)
             Text(l.bulkSell).font(Typography.title)
             Spacer(minLength: 0)
         }

@@ -47,6 +47,11 @@ actor CardImageStore {
         await data(key: Self.packCacheKey(setID: setID), url: CardImageSource.packURL(setID: setID))
     }
 
+    /// 디스크에 이미 받아 둔 팩 아트. 없으면 nil — 네트워크를 타지 않는다.
+    static func cachedPackData(setID: String) -> Data? {
+        try? Data(contentsOf: file(for: packCacheKey(setID: setID)))
+    }
+
     /// 카드와 팩이 같은 캐시·중복요청 억제를 쓴다. 키와 주소만 다르다.
     private func data(key: String, url source: URL?) async -> Data? {
 
@@ -111,36 +116,65 @@ enum CardImageLoader {
     /// 디스크 캐시에 이미 있으면 네트워크 없이 즉시 반환한다.
     /// 격자를 다시 그릴 때 매번 비동기로 가면 화면이 한 번 빈 뒤 채워져 깜빡인다.
     static func cachedImage(cardID: String, hires: Bool) -> NSImage? {
+        if let image = readCache(cardID: cardID, hires: hires) { return image }
+        // 큰 그림이 없으면 작은 그림으로라도 그린다 — 아래 `image(cardID:hires:)` 와 같은 이유다.
+        return hires ? readCache(cardID: cardID, hires: false) : nil
+    }
+
+    private static func readCache(cardID: String, hires: Bool) -> NSImage? {
         let key = CardImageStore.cacheKey(cardID: cardID, hires: hires)
         let f = CardImageStore.cacheDir.appendingPathComponent("\(key).webp")
         guard let d = try? Data(contentsOf: f), let img = NSImage(data: d) else { return nil }
         return img
     }
 
+    /// **큰 그림이 없으면 작은 그림으로 물러난다.**
+    ///
+    /// 큰 그림은 장당 160KB 라 17,666장을 다 올리면 2.8GB 다(작은 그림은 전부 합쳐 480MB).
+    /// 스토리지 한도가 1GB 이므로 새로 넣은 세트는 작은 그림만 올린다. 물러나지 않으면
+    /// 개봉 연출과 카드 상세가 그 세트에서 **빈 자리**가 된다 — 조금 흐린 그림이 훨씬 낫다.
     static func image(cardID: String, hires: Bool) async -> NSImage? {
-        guard let d = await CardImageStore.shared.data(cardID: cardID, hires: hires) else { return nil }
+        if let d = await CardImageStore.shared.data(cardID: cardID, hires: hires) {
+            return NSImage(data: d)
+        }
+        guard hires,
+              let d = await CardImageStore.shared.data(cardID: cardID, hires: false) else {
+            return nil
+        }
         return NSImage(data: d)
     }
 
-    /// 번들에 들어 있는 팩 아트. 판매 중인 세트는 여기서 즉시 나온다 —
-    /// 네트워크도 디스크 캐시도 타지 않아 대기 화면에서 기다릴 것이 없다.
-    static func bundledPackImage(setID: String) -> NSImage? {
-        if let cached = bundledPacks[setID] { return cached }
-        guard let url = AppResources.bundle?.url(forResource: setID, withExtension: "webp",
-                                          subdirectory: "packs"),
-              let data = try? Data(contentsOf: url),
+    /// 곧바로 내놓을 수 있는 팩 아트. 메모리에 있거나 번들에 있으면 기다릴 것이 없다.
+    ///
+    /// 팩이 130개가 되면서 번들에서 뺐다 — 열 장에 615KB 였으니 130개면 10.5MB 이고,
+    /// 앱 전체가 2.2MB 다. 카드 그림과 같은 길(네트워크 → 디스크 캐시)로 보낸다.
+    /// 대신 **디코딩한 것을 메모리에 들고 있는다.** 목록을 오르내릴 때마다 디스크에서
+    /// 읽어 다시 디코딩하면 그만큼 버벅인다.
+    static func readyPackImage(setID: String) -> NSImage? {
+        if let cached = packCache[setID] { return cached }
+        // 예전 배포에서 번들에 넣어 둔 것이 남아 있으면 그대로 쓴다.
+        if let url = AppResources.bundle?.url(forResource: setID, withExtension: "webp",
+                                              subdirectory: "packs"),
+           let data = try? Data(contentsOf: url), let image = NSImage(data: data) {
+            packCache[setID] = image
+            return image
+        }
+        // 디스크 캐시에 있으면 네트워크를 타지 않는다.
+        guard let data = CardImageStore.cachedPackData(setID: setID),
               let image = NSImage(data: data) else { return nil }
-        bundledPacks[setID] = image
+        packCache[setID] = image
         return image
     }
 
-    /// 번들 팩은 열 장뿐이라 전부 들고 있어도 부담이 없다. 매 렌더마다 디코딩하지 않게 한다.
-    private static var bundledPacks: [String: NSImage] = [:]
+    /// 디코딩한 팩 아트를 들고 있는다. 한 장이 180×330 남짓이라 130장이어도 가볍다.
+    private static var packCache: [String: NSImage] = [:]
 
     static func packImage(setID: String) async -> NSImage? {
-        if let bundled = bundledPackImage(setID: setID) { return bundled }
-        guard let d = await CardImageStore.shared.packData(setID: setID) else { return nil }
-        return NSImage(data: d)
+        if let ready = readyPackImage(setID: setID) { return ready }
+        guard let d = await CardImageStore.shared.packData(setID: setID),
+              let image = NSImage(data: d) else { return nil }
+        packCache[setID] = image
+        return image
     }
 
     /// 세트들의 팩 아트를 미리 받아 둔다.
@@ -271,8 +305,9 @@ struct PackImageView: View {
         self.setID = setID
         self.width = width
         self.preloaded = preloaded
-        // 번들에 있으면 첫 렌더부터 그려 둔다. task 를 기다리면 한 프레임 빈 상자가 스친다.
-        _image = State(initialValue: preloaded ?? CardImageLoader.bundledPackImage(setID: setID))
+        // 메모리나 디스크에 있으면 첫 렌더부터 그려 둔다. task 를 기다리면 한 프레임
+        // 빈 상자가 스치고, 목록을 오르내릴 때마다 그 깜빡임이 반복된다.
+        _image = State(initialValue: preloaded ?? CardImageLoader.readyPackImage(setID: setID))
     }
 
     private var height: CGFloat { (width / 0.55).rounded() }

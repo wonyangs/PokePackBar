@@ -67,15 +67,8 @@ struct SettingsView: View {
 
     private var header: some View {
         HStack(spacing: 6) {
-            Button(action: onClose) {
-                HStack(spacing: 2) {
-                    Image(systemName: "chevron.backward")
-                    Text(l.back)
-                }
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.accentColor)
-            .keyboardShortcut(.cancelAction)
+            BackButton(action: onClose, label: l.back)
+                .keyboardShortcut(.cancelAction)
             Spacer()
             Text(l.settings).font(.headline)
             Spacer()

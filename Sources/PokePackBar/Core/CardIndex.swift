@@ -60,8 +60,14 @@ struct CardEntry: Sendable, Identifiable {
 struct CardSet: Sendable, Identifiable {
     let id: String
     let name: String
+    /// 시대(Base·Neo·XY·Scarlet & Violet…). 상점이 세트를 이걸로 묶는다.
+    /// 옛 인덱스에는 없으므로 빈 문자열이면 「그 밖」으로 본다.
+    var series: String = ""
     let released: String
     let cardCount: Int
+
+    /// 발매 연도. 시대 줄에 「2023~2025」를 적는 데 쓴다.
+    var year: String { String(released.prefix(4)) }
 }
 
 /// 앱에 번들된 카드 인덱스.
@@ -69,6 +75,43 @@ struct CardSet: Sendable, Identifiable {
 /// 카드 데이터를 런타임에 API 로 받지 않는다. 출처 API 는 성공률이 40% 안팎이고
 /// 키 없이 하루 1,000회로 제한돼, 사용자마다 82페이지를 받게 하는 방식이 성립하지 않는다.
 /// 미리 만든 인덱스를 함께 배포하고, 이미지만 필요할 때 받는다.
+/// 한 시대에 속한 세트 묶음. 상점의 첫 화면이 이것을 늘어놓는다.
+struct CardEra: Sendable, Identifiable {
+    let name: String
+    let sets: [CardSet]
+    var id: String { name }
+
+    /// 「2023 ~ 2025」. 한 해뿐이면 한 번만 적는다.
+    var years: String {
+        let all = sets.map(\.year).sorted()
+        guard let first = all.first, let last = all.last else { return "" }
+        return first == last ? first : "\(first) ~ \(last)"
+    }
+
+    /// 시대를 대표할 세트. 목록에 그림 한 장을 붙이는 데 쓴다 —
+    /// 가장 최근 것이 그 시대를 가장 잘 알아보게 한다.
+    var cover: CardSet? { sets.first }
+
+    /// 최신 시대가 앞, 그 안에서도 최신 세트가 앞.
+    ///
+    /// **「그 밖」 칸을 만들지 않는다.** 시대 이름이 아니라 「분류를 못 했다」는 표시라,
+    /// 목록에 서 있어도 무엇이 들었는지 읽히지 않는다. 시리즈를 모르는 세트는 제 이름으로
+    /// 혼자 선다 — 그편이 적어도 무엇인지는 알려 준다. 인덱스를 만들 때 시리즈가 비면
+    /// 빌드가 서므로(`build_card_index.py`) 여기까지 오는 일은 없어야 한다.
+    static func group(_ sets: [CardSet]) -> [CardEra] {
+        var bySeries: [String: [CardSet]] = [:]
+        for set in sets {
+            bySeries[set.series.nonEmpty ?? set.name, default: []].append(set)
+        }
+        return bySeries
+            .map { CardEra(name: $0.key, sets: $0.value.sorted { $0.released > $1.released }) }
+            .sorted { (a, b) in
+                let (x, y) = (a.sets.first?.released ?? "", b.sets.first?.released ?? "")
+                return x == y ? a.name < b.name : x > y
+            }
+    }
+}
+
 struct CardIndex: Sendable {
 
     let sets: [CardSet]
@@ -77,6 +120,12 @@ struct CardIndex: Sendable {
     /// 세트 ID → 계층 → 그 계층의 카드 ID 목록. 팩 뽑기가 이 풀에서 고른다.
     let pools: [String: [CardTier: [String]]]
 
+    /// 시대별로 묶은 세트. 최신 시대가 앞이고, 그 안에서는 최신 세트가 앞이다.
+    ///
+    /// 세트가 130개가 되면서 한 목록에 늘어놓을 수 없게 됐다. 묶는 일을 화면에서 매번 하면
+    /// 그릴 때마다 돌므로 인덱스를 만들 때 한 번 세운다.
+    let eras: [CardEra]
+
     /// 시세가 비싼 것부터 세워 둔 전체 목록. **읽을 때 정렬하지 않으려고 미리 세운다.**
     ///
     /// 컬렉션 화면이 매번 1,284장을 다시 정렬하고 있었다. 카드 그림이 하나 도착할 때마다
@@ -84,10 +133,22 @@ struct CardIndex: Sendable {
     /// 시세는 실행 중에 바뀌지 않으므로 한 번만 세우면 된다.
     let cardsByValue: [CardEntry]
 
+    /// 오리파 후보를 값 구간별로 미리 나눈 선반. 상점 화면은 이 값을 그대로 재사용한다.
+    let oripaShelf: OripaConfig.Shelf
+
     private let byID: [String: CardEntry]
+    private let bySetID: [String: CardSet]
 
     func card(_ id: String) -> CardEntry? { byID[id] }
-    func set(_ id: String) -> CardSet? { sets.first { $0.id == id } }
+    func set(_ id: String) -> CardSet? { bySetID[id] }
+
+    /// 이 세트의 팩 시대. 팩 구성과 봉입률이 여기서 갈린다.
+    ///
+    /// 세트를 훑어 찾지 않는다 — 팩 하나를 뜯을 때마다, 확률표를 그릴 때마다 불리는 자리라
+    /// 122개를 훑으면 그만큼 쌓인다.
+    func era(_ setID: String) -> PackEra {
+        PackEra.of(released: bySetID[setID]?.released ?? "")
+    }
 
     var setIDs: [String] { sets.map(\.id) }
 
@@ -97,6 +158,7 @@ struct CardIndex: Sendable {
         struct SetDTO: Decodable {
             let id: String
             let name: String
+            let series: String?
             let released: String
             let cardCount: Int
         }
@@ -145,13 +207,18 @@ struct CardIndex: Sendable {
     /// 비싸고, 같은 등급 안에서도 40배가 갈린다.
     static func byValue(_ entries: [CardEntry],
                         prices: CardPrices? = CardPrices.shared) -> [CardEntry] {
-        entries.sorted { a, b in
-            let priceA = MarketEconomy.usd(cardID: a.id, prices: prices)
-            let priceB = MarketEconomy.usd(cardID: b.id, prices: prices)
-            if priceA != priceB { return priceA > priceB }
-            if a.tier.rank != b.tier.rank { return a.tier.rank > b.tier.rank }
-            return a.id < b.id                                  // 나머지는 안정적으로
+        // **값을 먼저 뽑아 두고 정렬한다.** 비교 안에서 시세를 조회하면 한 번 정렬에
+        // 사전 조회가 50만 번 일어난다 — 18,327장에서 122ms 였다. 장당 한 번만 조회하면
+        // 그 일이 사라진다.
+        let keyed = entries.map {
+            (price: MarketEconomy.usd(cardID: $0.id, prices: prices),
+             rank: $0.tier.rank, entry: $0)
         }
+        return keyed.sorted { a, b in
+            if a.price != b.price { return a.price > b.price }
+            if a.rank != b.rank { return a.rank > b.rank }
+            return a.entry.id < b.entry.id                      // 나머지는 안정적으로
+        }.map(\.entry)
     }
 
     static func decode(_ data: Data, korean: [String: String] = [:]) -> CardIndex? {
@@ -179,11 +246,15 @@ struct CardIndex: Sendable {
         for e in entries { pools[e.setID, default: [:]][e.tier, default: []].append(e.id) }
 
         let sets = payload.sets.map {
-            CardSet(id: $0.id, name: $0.name, released: $0.released, cardCount: $0.cardCount)
+            CardSet(id: $0.id, name: $0.name, series: $0.series ?? "",
+                    released: $0.released, cardCount: $0.cardCount)
         }
         return CardIndex(sets: sets, cards: entries, pools: pools,
+                         eras: CardEra.group(sets),
                          cardsByValue: byValue(entries),
-                         byID: Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }))
+                         oripaShelf: OripaConfig.shelf(cards: entries),
+                         byID: Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }),
+                         bySetID: Dictionary(sets.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }))
     }
 }
 

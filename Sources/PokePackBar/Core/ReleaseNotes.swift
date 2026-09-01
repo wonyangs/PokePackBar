@@ -56,6 +56,33 @@ extension L {
 
     var releaseNotes: [ReleaseNote] {
         [
+            ReleaseNote(version: "0.5.0", items: [
+                ReleaseNoteItem(text: t("전체 팩 추가",
+                                         "Every pack is now on sale",
+                                         "全パックを追加",
+                                         "Todos los sobres a la venta",
+                                         "Tous les boosters en vente",
+                                         "Todos os pacotes à venda"), details: [
+                    t("전체 팩 데이터 추가 / 시세 연동",
+                      "Every set added, with live market prices",
+                      "全セットのデータと相場を追加",
+                      "Todos los sets con precios de mercado",
+                      "Tous les sets avec les prix du marché",
+                      "Todos os sets com preços de mercado"),
+                    t("총 팩 122종류, 카드 17,666개",
+                      "122 packs, 17,666 cards",
+                      "パック 122種類・カード 17,666枚",
+                      "122 sobres, 17,666 cartas",
+                      "122 boosters, 17,666 cartes",
+                      "122 pacotes, 17,666 cartas"),
+                ]),
+                ReleaseNoteItem(text: t("팩 정보에서 카드 라인업 확인하는 기능 추가",
+                                         "See every card a pack can hold",
+                                         "パック情報から収録カードを確認できます",
+                                         "Mira todas las cartas que puede traer un sobre",
+                                         "Voir toutes les cartes qu'un booster peut contenir",
+                                         "Veja todas as cartas que um pacote pode trazer")),
+            ]),
             ReleaseNote(version: "0.4.2", items: [
                 ReleaseNoteItem(text: t("버그 수정",
                                          "Fixes",

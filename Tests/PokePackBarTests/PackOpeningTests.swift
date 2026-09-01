@@ -4,7 +4,10 @@ import XCTest
 final class PackOpeningTests: XCTestCase {
 
     /// 계층별 장수를 지정해 인덱스를 만든다.
-    private func makeIndex(_ setID: String, _ counts: [CardTier: Int]) -> CardIndex {
+    ///
+    /// `released` 가 팩 시대를 정한다 — 기본은 최신 구성(Scarlet & Violet, 10장)이다.
+    private func makeIndex(_ setID: String, _ counts: [CardTier: Int],
+                           released: String = "2024/01/01") -> CardIndex {
         var rows: [[String]] = []
         var n = 0
         for (tier, count) in counts.sorted(by: { $0.key.rawValue < $1.key.rawValue }) {
@@ -15,7 +18,7 @@ final class PackOpeningTests: XCTestCase {
         }
         let payload: [String: Any] = [
             "version": 1,
-            "sets": [["id": setID, "name": setID, "released": "2000/01/01", "cardCount": n]],
+            "sets": [["id": setID, "name": setID, "released": released, "cardCount": n]],
             "cards": rows,
         ]
         let data = try! JSONSerialization.data(withJSONObject: payload)
@@ -31,8 +34,8 @@ final class PackOpeningTests: XCTestCase {
 
     func testBundledIndexLoadsWithExpectedSets() throws {
         let index = try bundledIndex()
-        XCTAssertEqual(index.sets.count, 10)
-        XCTAssertEqual(index.cards.count, 1284)
+        XCTAssertEqual(index.sets.count, 122)
+        XCTAssertEqual(index.cards.count, 17_666)
         // 세트 ID 가 카드 ID 접두사와 맞아야 풀이 구성된다.
         for s in index.sets {
             XCTAssertFalse((index.pools[s.id] ?? [:]).isEmpty, "\(s.id) 풀이 비었다")
@@ -58,7 +61,57 @@ final class PackOpeningTests: XCTestCase {
         let index = makeIndex("s", [.common: 40, .uncommon: 30, .rare: 15, .doubleRare: 10, .superRare: 5, .ultraRare: 2])
         var g = SeededGenerator(seed: 1)
         let pack = PackOpening.draw(setID: "s", index: index, alreadyOwned: [], using: &g)
-        XCTAssertEqual(pack.count, PackConfig.cardsPerPack)
+        XCTAssertEqual(pack.count, PackConfig.cardsPerPack(.scarletViolet))
+    }
+
+    /// **팩 장수는 시대에서 나온다.** 1999년 팩은 11장, e-Card·EX 는 9장이다.
+    /// 한 값으로 못박으면 어느 시대에도 맞지 않는 팩이 된다.
+    func testPackSizeFollowsTheEra() {
+        let counts: [CardTier: Int] = [.common: 40, .uncommon: 30, .rare: 15, .doubleRare: 10]
+        for (released, era) in [("1999/01/09", PackEra.wotc), ("2003/07/01", .ex),
+                                ("2009/02/11", .diamondPearl), ("2014/02/05", .blackWhite),
+                                ("2017/02/03", .sunMoon), ("2020/02/07", .swordShield),
+                                ("2025/03/28", .scarletViolet)] {
+            let index = makeIndex("s", counts, released: released)
+            XCTAssertEqual(index.era("s"), era, "\(released) 가 \(era) 로 안 간다")
+            var g = SeededGenerator(seed: 1)
+            let pack = PackOpening.draw(setID: "s", index: index, alreadyOwned: [], using: &g)
+            XCTAssertEqual(pack.count, PackConfig.cardsPerPack(era), "\(era) 팩 장수")
+        }
+    }
+
+    /// **상점에 「그 밖」 칸이 서면 안 된다.**
+    ///
+    /// 시대 이름이 아니라 「분류를 못 했다」는 표시라, 목록에 있어도 무엇이 들었는지 읽히지
+    /// 않는다. 출처 데이터가 레전드 컬렉션의 시대를 "Other" 로 주는데, 그 한 세트 때문에
+    /// 칸이 하나 서 있었다(세트 ID 가 base1~base5 를 잇는 base6 이라 Base 로 넣었다).
+    func testNoCatchAllEraInTheShop() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        for era in index.eras {
+            XCTAssertNotEqual(era.name, "Other", "상점에 「그 밖」 칸이 있다")
+            XCTAssertFalse(era.name.isEmpty, "이름 없는 시대가 있다")
+            XCTAssertFalse(era.sets.isEmpty, "\(era.name): 세트가 없는 시대가 있다")
+        }
+        // 세트가 하나도 새지 않는다 — 묶다가 빠지면 그 팩은 살 길이 없어진다.
+        XCTAssertEqual(index.eras.reduce(0) { $0 + $1.sets.count }, index.sets.count)
+        XCTAssertEqual(index.set("base6")?.series, "Base", "레전드 컬렉션이 Base 에 없다")
+    }
+
+    /// 시대 경계는 발매일 하나로 정해진다. 한 칸 어긋나면 세트 하나가 통째로 다른 팩이 된다.
+    func testEraBoundaries() {
+        XCTAssertEqual(PackEra.of(released: "2002/05/24"), .wotc)          // 레전드 컬렉션
+        XCTAssertEqual(PackEra.of(released: "2002/09/15"), .ex)            // Expedition
+        XCTAssertEqual(PackEra.of(released: "2007/02/02"), .ex)            // Power Keepers
+        XCTAssertEqual(PackEra.of(released: "2007/05/01"), .diamondPearl)
+        XCTAssertEqual(PackEra.of(released: "2011/02/09"), .diamondPearl)  // Call of Legends
+        XCTAssertEqual(PackEra.of(released: "2011/04/25"), .blackWhite)
+        XCTAssertEqual(PackEra.of(released: "2016/11/02"), .blackWhite)    // Evolutions
+        XCTAssertEqual(PackEra.of(released: "2017/02/03"), .sunMoon)
+        XCTAssertEqual(PackEra.of(released: "2020/02/07"), .swordShield)
+        XCTAssertEqual(PackEra.of(released: "2023/01/20"), .swordShield)   // Crown Zenith
+        XCTAssertEqual(PackEra.of(released: "2023/03/31"), .scarletViolet)
+        // 날짜를 모르면 최신 구성으로 본다 — 빈 팩보다 낫다.
+        XCTAssertEqual(PackEra.of(released: ""), .scarletViolet)
     }
 
     /// common 이 없는 특별 세트는 작은 팩으로 뽑는다.
@@ -110,31 +163,64 @@ final class PackOpeningTests: XCTestCase {
         XCTAssertNil(PackOpening.pick(tier: .common, from: [:], avoiding: [], using: &g))
     }
 
-    /// **어떤 칸도 상위 등급을 못 뽑는 칸이어서는 안 된다.**
+    /// **커먼 칸에서는 커먼만 나온다.** 실물이 그렇다.
     ///
-    /// 예전 구조는 아홉 칸이 커먼·언커먼 확정이었다. 그러면 확률을 정직하게 공시할수록
-    /// "열 장 중 아홉 장은 절대 레어가 아니다" 가 드러나 불쾌해진다. 실물 팩도 포일 칸이
-    /// 세 개라 레어가 나올 자리가 여럿이다.
-    func testEverySlotCanRollRareOrBetter() {
-        for (weights, count) in PackOpening.standardSlotTables(perks: .none) {
-            XCTAssertGreaterThan(count, 0)
-            let total = weights.reduce(0) { $0 + $1.weight }
-            let rareOrBetter = weights
-                .filter { $0.tier.rank >= CardTier.rare.rank }
-                .reduce(0) { $0 + $1.weight }
-            XCTAssertGreaterThan(Double(rareOrBetter) / Double(total), 0,
-                                 "상위 등급을 못 뽑는 칸이 있다: \(weights)")
+    /// 예전에는 열 칸이 전부 추첨이라 커먼 자리에서도 UR 이 나올 수 있었다. 후하긴 했지만
+    /// 실물 팩과 다른 확률이었고, 이제는 실물 구조를 그대로 쓴다.
+    func testCommonSlotsHoldOnlyCommons() {
+        for era in PackEra.allCases {
+            let tables = PackOpening.standardSlotTables(era: era, perks: .none)
+            let common = try! XCTUnwrap(tables.first)
+            XCTAssertTrue(common.weights.allSatisfy { $0.tier.rank <= CardTier.common.rank },
+                          "\(era) 커먼 칸에 상위 등급이 섞였다: \(common.weights)")
         }
     }
 
     /// 마지막 칸 하나는 레어 이상만 뽑는다. 팩마다 최소 한 장을 보장하는 자리다.
     func testTheLastSlotIsAlwaysRareOrBetter() {
-        let tables = PackOpening.standardSlotTables(perks: .none)
-        let hit = try! XCTUnwrap(tables.last)
-        XCTAssertEqual(hit.count, PackConfig.hitSlots)
-        XCTAssertTrue(hit.weights.allSatisfy { $0.tier.rank >= CardTier.rare.rank },
-                      "확정 칸에 커먼·언커먼이 섞였다")
-        XCTAssertEqual(tables.reduce(0) { $0 + $1.count }, PackConfig.cardsPerPack)
+        for era in PackEra.allCases {
+            let tables = PackOpening.standardSlotTables(era: era, perks: .none)
+            let hit = try! XCTUnwrap(tables.last)
+            XCTAssertEqual(hit.count, PackConfig.hitSlots, "\(era)")
+            XCTAssertTrue(hit.weights.allSatisfy { $0.tier.rank >= CardTier.rare.rank },
+                          "\(era) 확정 칸에 커먼·언커먼이 섞였다")
+            XCTAssertEqual(tables.reduce(0) { $0 + $1.count }, PackConfig.cardsPerPack(era),
+                           "\(era) 칸 수 합이 팩 장수와 다르다")
+        }
+    }
+
+    /// 실측 봉입률을 옮겨 적은 값이라, 표가 흔들리면 여기서 드러난다.
+    ///
+    /// Scarlet & Violet 은 676팩 표본에서 레어 78.85%, 더블레어 14.05%, 울트라레어 6.51%,
+    /// 그리고 역홀로 칸에서 일러스트레어 7.69%, 스페셜아트레어 3.11%, 하이퍼레어 1.92% 다.
+    func testScarletVioletMatchesTheMeasuredRates() {
+        func share(_ table: [(tier: CardTier, weight: Int)], _ tier: CardTier) -> Double {
+            let total = table.reduce(0) { $0 + $1.weight }
+            return Double(table.first { $0.tier == tier }?.weight ?? 0) / Double(total) * 100
+        }
+        let rare = PackConfig.scarletVioletRare
+        XCTAssertEqual(share(rare, .rare), 78.85, accuracy: 0.01)
+        XCTAssertEqual(share(rare, .doubleRare), 14.05, accuracy: 0.01)
+        XCTAssertEqual(share(rare, .superRare), 6.51, accuracy: 0.01)
+
+        let reverse = PackConfig.scarletVioletReverse
+        XCTAssertEqual(share(reverse, .artRare), 7.69, accuracy: 0.01)
+        XCTAssertEqual(share(reverse, .specialArtRare), 3.11, accuracy: 0.01)
+        XCTAssertEqual(share(reverse, .ultraRare), 1.92, accuracy: 0.01)
+    }
+
+    /// Sword & Shield 실측 — V 10.56%, VMAX 5.60%, 풀아트 2.78%, 레인보우 0.84%.
+    /// V 는 홀로레어와 같은 RR 칸이라 RR 몫이 그보다 크다.
+    func testSwordShieldMatchesTheMeasuredRates() {
+        let table = PackConfig.swordShieldRare
+        let total = Double(table.reduce(0) { $0 + $1.weight })
+        func share(_ tier: CardTier) -> Double {
+            Double(table.first { $0.tier == tier }?.weight ?? 0) / total * 100
+        }
+        XCTAssertEqual(share(.tripleRare), 5.60, accuracy: 0.01)
+        XCTAssertEqual(share(.superRare), 2.78, accuracy: 0.01)
+        XCTAssertEqual(share(.ultraRare), 0.84, accuracy: 0.01)
+        XCTAssertGreaterThan(share(.doubleRare), 10.56, "V 몫보다 작으면 홀로레어가 빠진 것이다")
     }
 
     /// 천장 — 연속으로 레어만 나오면 다음은 RR 이상을 보장한다.
@@ -178,7 +264,7 @@ final class PackOpeningTests: XCTestCase {
                                         pity: &pity, using: &g)
             guard pack.isGodPack else { continue }
             found += 1
-            XCTAssertEqual(pack.cards.count, PackConfig.cardsPerPack)
+            XCTAssertEqual(pack.cards.count, PackConfig.cardsPerPack(.scarletViolet))
             XCTAssertTrue(pack.cards.allSatisfy { $0.tier.rank >= CardTier.rare.rank },
                           "seed \(seed): 갓팩에 레어 미만이 섞였다")
             XCTAssertEqual(pity, 0, "갓팩은 천장을 초기화한다")
@@ -210,10 +296,14 @@ final class PackOpeningTests: XCTestCase {
         let odds = PackOpening.packOdds(setID: "s", index: index)
         let ultra = odds.first { $0.tier == .ultraRare }?.probability ?? 0
 
-        // 갓팩을 뺀 값 — 확정 칸의 UR 몫만 남는다.
-        let hitTotal = PackConfig.hitWeights.reduce(0) { $0 + $1.weight }
-        let hitOnly = Double(1) / Double(hitTotal) / Double(PackConfig.cardsPerPack)
-        XCTAssertGreaterThan(ultra, hitOnly, "확률표가 갓팩을 세지 않았다")
+        // 갓팩을 뺀 값 — 레어 칸과 역홀로 칸의 UR 몫만 남는다.
+        let withoutGod = PackOpening.standardSlotTables(era: .scarletViolet, perks: .none)
+            .reduce(0.0) { sum, table in
+                let total = Double(table.weights.reduce(0) { $0 + $1.weight })
+                let ur = Double(table.weights.first { $0.tier == .ultraRare }?.weight ?? 0)
+                return sum + ur / total * Double(table.count)
+            } / Double(PackConfig.cardsPerPack(.scarletViolet))
+        XCTAssertGreaterThan(ultra, withoutGod, "확률표가 갓팩을 세지 않았다")
     }
 
     /// 특별 세트에는 갓팩이 없다. 원래 전 칸이 레어 이상이라 구분이 성립하지 않는다.
@@ -247,7 +337,7 @@ final class PackOpeningTests: XCTestCase {
             var g = SeededGenerator(seed: seed)
             let pack = PackOpening.draw(setID: "n", index: without, alreadyOwned: [], using: &g)
             XCTAssertEqual(pack.filter { $0.tier == .energy }.count, 0)
-            XCTAssertEqual(pack.count, PackConfig.cardsPerPack)
+            XCTAssertEqual(pack.count, PackConfig.cardsPerPack(.scarletViolet))
         }
     }
 
@@ -277,23 +367,25 @@ final class PackOpeningTests: XCTestCase {
         XCTAssertEqual(a, b)
     }
 
-    /// 히트 계층 분포가 설정한 가중치를 따라간다. 확률표를 건드리면 여기서 드러난다.
-    func testHitDistributionApproximatesConfiguredWeights() {
-        // 가중치에 등장하는 등급을 모두 담아야 재정규화가 개입하지 않는다.
-        // 하나라도 빠지면 그 등급의 가중치가 나머지로 분배되어 분포가 어긋난다.
-        let pool: [CardTier: [String]] = Dictionary(
-            uniqueKeysWithValues: PackConfig.hitWeights.map { ($0.tier, ["\($0.tier.rawValue)-1"]) })
-        var counts: [CardTier: Int] = [:]
-        let trials = 20_000
-        for seed in 1...trials {
-            var g = SeededGenerator(seed: UInt64(seed))
-            counts[PackOpening.hitTier(available: pool, using: &g), default: 0] += 1
-        }
-        let total = Double(trials)
-        for (tier, weight) in PackConfig.hitWeights {
-            let observed = Double(counts[tier] ?? 0) / total * 100
-            XCTAssertEqual(observed, Double(weight), accuracy: 2.0,
-                           "\(tier) 기대 \(weight)% 관측 \(String(format: "%.1f", observed))%")
+    /// 레어 칸 분포가 그 시대의 표를 따라간다. 확률표를 건드리면 여기서 드러난다.
+    func testRareSlotDistributionApproximatesConfiguredWeights() {
+        for era in PackEra.allCases {
+            let table = PackConfig.rareWeights(era)
+            // 가중치에 등장하는 등급을 모두 담아야 재정규화가 개입하지 않는다.
+            // 하나라도 빠지면 그 등급의 가중치가 나머지로 분배되어 분포가 어긋난다.
+            let pool: [CardTier: [String]] = Dictionary(
+                uniqueKeysWithValues: table.map { ($0.tier, ["\($0.tier.rawValue)-1"]) })
+            var counts: [CardTier: Int] = [:]
+            let trials = 20_000
+            for seed in 1...trials {
+                var g = SeededGenerator(seed: UInt64(seed))
+                counts[PackOpening.hitTier(available: pool, era: era, using: &g), default: 0] += 1
+            }
+            for (tier, weight) in table {
+                let observed = Double(counts[tier] ?? 0) / Double(trials) * 10_000
+                XCTAssertEqual(observed, Double(weight), accuracy: 200,
+                               "\(era) \(tier) 기대 \(weight) 관측 \(Int(observed))")
+            }
         }
     }
 
@@ -304,7 +396,9 @@ final class PackOpeningTests: XCTestCase {
             var g = SeededGenerator(seed: 11)
             let pack = PackOpening.draw(setID: s.id, index: index, alreadyOwned: [], using: &g)
             XCTAssertFalse(pack.isEmpty, "\(s.id) 에서 빈 팩이 나왔다")
-            XCTAssertLessThanOrEqual(pack.count, PackConfig.cardsPerPack)
+            XCTAssertLessThanOrEqual(pack.count, PackConfig.maxCardsPerPack)
+            XCTAssertTrue(pack.contains { $0.tier.rank >= CardTier.rare.rank },
+                          "\(s.id): 레어 이상이 한 장도 없다")
         }
     }
 }
@@ -509,22 +603,24 @@ final class CardImagePrefetchTests: XCTestCase {
 @MainActor
 final class PackArtAndGlowTests: XCTestCase {
 
-    /// 판매하는 세트는 팩 아트가 번들에 있어야 한다. 없으면 상점과 대기 화면이
-    /// 네트워크를 기다리게 되는데, 그러라고 번들에 넣은 것이다.
-    func testEveryShippedSetHasBundledPackArt() throws {
+    /// 팩 아트는 두 번째 조회부터 **같은 객체**를 돌려준다.
+    ///
+    /// 팩이 130개가 되면서 번들에서 뺐다(열 장에 615KB 였으니 130개면 10.5MB 인데 앱 전체가
+    /// 2.2MB 다). 네트워크와 디스크 캐시로 가는 대신, 디코딩한 것을 메모리에 들고 있어야
+    /// 목록을 오르내릴 때마다 다시 디코딩하지 않는다.
+    func testPackArtIsKeptInMemoryOnceDecoded() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
-        for set in index.sets {
-            XCTAssertNotNil(CardImageLoader.bundledPackImage(setID: set.id),
-                            "\(set.id) (\(set.name)) 팩 아트가 번들에 없다")
+        let setID = try XCTUnwrap(index.setIDs.first)
+        guard let first = CardImageLoader.readyPackImage(setID: setID) else {
+            throw XCTSkip("아직 받아 둔 팩 아트가 없다 — 캐시가 비었을 뿐이다")
         }
+        let second = try XCTUnwrap(CardImageLoader.readyPackImage(setID: setID))
+        XCTAssertTrue(first === second, "두 번째 조회에서 다시 디코딩했다")
     }
 
-    /// 번들 팩 아트는 두 번째 조회부터 같은 객체를 돌려준다 —
-    /// 격자를 다시 그릴 때마다 디코딩하면 스크롤이 걸린다.
-    func testBundledPackArtIsCached() throws {
-        let first = try XCTUnwrap(CardImageLoader.bundledPackImage(setID: "base1"))
-        let second = try XCTUnwrap(CardImageLoader.bundledPackImage(setID: "base1"))
-        XCTAssertTrue(first === second)
+    /// 받아 둔 것이 없으면 곧바로 nil 이다 — 여기서 네트워크를 타면 화면이 멈춘다.
+    func testReadyPackArtNeverBlocks() {
+        XCTAssertNil(CardImageLoader.readyPackImage(setID: "no-such-set-\(UUID().uuidString)"))
     }
 
     /// 후광 세기는 등급이 오를수록 약해지지 않아야 한다.
@@ -750,16 +846,33 @@ final class PackOddsTests: XCTestCase {
         }
     }
 
-    /// 희귀할수록 확률이 낮다. 뒤집히면 등급 체계가 의미를 잃는다.
-    /// 에너지는 등급 축이 아니라 별도 슬롯이므로 뺀다.
-    func testRarerTiersAreNotMoreLikely() throws {
+    /// 커먼 → 언커먼 → 레어 이상 순으로 드물어진다.
+    ///
+    /// **등급 사다리 전체를 확률 순서로 잠그지는 않는다.** 실측을 옮기고 나니 그게 사실이
+    /// 아니다 — Scarlet & Violet 에서 일러스트레어(AR)는 팩의 7.7% 인데 ACE SPEC(RRR)은
+    /// 0.6% 다. 우리 등급 사다리는 AR 을 RRR 위에 두므로 순서가 뒤집힌다. 실물이 그러하니
+    /// 확률을 바꿀 것이 아니라 사다리를 확률 순서로 읽지 않으면 된다.
+    ///
+    /// 대신 표 오타로 상위 등급이 흔해지는 것은 여기서 잡는다.
+    func testCommonTiersStayCommon() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         for set in index.sets {
-            let odds = PackOpening.packOdds(setID: set.id, index: index)
-                .filter { $0.tier != .energy }
-            for (a, b) in zip(odds, odds.dropFirst()) {
-                XCTAssertLessThanOrEqual(a.probability, b.probability,
-                                         "\(set.id): \(a.tier.rawValue) 가 \(b.tier.rawValue) 보다 흔하다")
+            let odds = Dictionary(uniqueKeysWithValues:
+                PackOpening.packOdds(setID: set.id, index: index).map { ($0.tier, $0.probability) })
+            let pool = index.pools[set.id] ?? [:]
+            guard !(pool[.common] ?? []).isEmpty else { continue }   // 특별 세트는 전 칸이 레어 이상
+
+            let common = odds[.common] ?? 0
+            let uncommon = odds[.uncommon] ?? 0
+            let rareOrBetter = odds
+                .filter { $0.key.rank >= CardTier.rare.rank }
+                .reduce(0) { $0 + $1.value }
+            XCTAssertGreaterThan(common, uncommon, "\(set.id): 커먼이 언커먼보다 드물다")
+            XCTAssertGreaterThan(uncommon, rareOrBetter, "\(set.id): 언커먼이 레어 이상보다 드물다")
+
+            // 레어보다 위 등급은 어느 것도 팩의 10% 를 넘지 않는다.
+            for (tier, p) in odds where tier.rank > CardTier.rare.rank {
+                XCTAssertLessThan(p, 0.10, "\(set.id): \(tier.rawValue) 가 \(p) 로 너무 흔하다")
             }
         }
     }

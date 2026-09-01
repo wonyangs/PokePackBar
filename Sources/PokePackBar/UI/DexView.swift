@@ -335,13 +335,7 @@ private struct DexDetailView: View {
         let state = status
         return VStack(spacing: 0) {
             HStack {
-                Button(action: onClose) {
-                    Image(systemName: "chevron.left")
-                        .font(Typography.labelSemibold)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help(l.close)
+                BackButton(action: onClose, hint: l.close)
                 Spacer()
             }
 

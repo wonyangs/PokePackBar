@@ -19,14 +19,14 @@
    ],
    "tier": 1,
    "medianPacks": 9,
-   "medianTokens": 125310204,
-   "valueUSD": 0.82,
+   "medianTokens": 119764530,
+   "valueUSD": 0.88,
    "hardPacks": 18,
    "reward": {
     "packs": 1,
     "perks": [
      {
-      "kind": "dustBonus",
+      "kind": "hitOdds",
       "value": 0.002
      }
     ]
@@ -49,16 +49,16 @@
     "sv10-174"
    ],
    "tier": 1,
-   "medianPacks": 31,
-   "medianTokens": 195486651,
-   "valueUSD": 0.99,
-   "hardPacks": 64,
+   "medianPacks": 30,
+   "medianTokens": 220639290,
+   "valueUSD": 0.94,
+   "hardPacks": 63,
    "reward": {
-    "packs": 4,
+    "packs": 3,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.003
+      "kind": "hitOdds",
+      "value": 0.004
      }
     ]
    }
@@ -81,12 +81,17 @@
    ],
    "tier": 1,
    "medianPacks": 24,
-   "medianTokens": 151344504,
+   "medianTokens": 176511432,
    "valueUSD": 0.67,
    "hardPacks": 51,
    "reward": {
-    "packs": 7,
-    "perks": []
+    "packs": 4,
+    "perks": [
+     {
+      "kind": "hitOdds",
+      "value": 0.002
+     }
+    ]
    }
   },
   {
@@ -107,15 +112,15 @@
     "sv10-125"
    ],
    "tier": 1,
-   "medianPacks": 32,
-   "medianTokens": 201792672,
-   "valueUSD": 1.08,
-   "hardPacks": 63,
+   "medianPacks": 31,
+   "medianTokens": 227993933,
+   "valueUSD": 1.06,
+   "hardPacks": 62,
    "reward": {
-    "packs": 3,
+    "packs": 5,
     "perks": [
      {
-      "kind": "hitOdds",
+      "kind": "dustBonus",
       "value": 0.002
      }
     ]
@@ -141,15 +146,15 @@
    ],
    "tier": 1,
    "medianPacks": 24,
-   "medianTokens": 346401864,
-   "valueUSD": 1.36,
+   "medianTokens": 367515024,
+   "valueUSD": 1.46,
    "hardPacks": 45,
    "reward": {
     "packs": 3,
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.003
+      "value": 0.006
      }
     ]
    }
@@ -172,14 +177,14 @@
    ],
    "tier": 1,
    "medianPacks": 19,
-   "medianTokens": 274234809,
-   "valueUSD": 1.21,
-   "hardPacks": 40,
+   "medianTokens": 290949394,
+   "valueUSD": 1.29,
+   "hardPacks": 39,
    "reward": {
-    "packs": 1,
+    "packs": 2,
     "perks": [
      {
-      "kind": "dustBonus",
+      "kind": "hitOdds",
       "value": 0.006
      }
     ]
@@ -202,16 +207,16 @@
     "base1-102"
    ],
    "tier": 2,
-   "medianPacks": 16,
-   "medianTokens": 991796800,
-   "valueUSD": 1.67,
-   "hardPacks": 33,
+   "medianPacks": 9,
+   "medianTokens": 515519946,
+   "valueUSD": 1.73,
+   "hardPacks": 19,
    "reward": {
     "packs": 1,
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.014
+      "value": 0.01
      }
     ]
    }
@@ -235,15 +240,15 @@
    ],
    "tier": 2,
    "medianPacks": 16,
-   "medianTokens": 2089152256,
-   "valueUSD": 11.17,
-   "hardPacks": 33,
+   "medianTokens": 1997972480,
+   "valueUSD": 11.18,
+   "hardPacks": 34,
    "reward": {
     "packs": 2,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.025
+      "kind": "tokenGain",
+      "value": 0.005
      }
     ]
    }
@@ -265,16 +270,16 @@
     "sv10-150"
    ],
    "tier": 2,
-   "medianPacks": 79,
-   "medianTokens": 498175659,
-   "valueUSD": 2.23,
-   "hardPacks": 168,
+   "medianPacks": 176,
+   "medianTokens": 1294417168,
+   "valueUSD": 2.35,
+   "hardPacks": 375,
    "reward": {
-    "packs": 3,
+    "packs": 10,
     "perks": [
      {
       "kind": "dustBonus",
-      "value": 0.013
+      "value": 0.027
      }
     ]
    }
@@ -299,15 +304,15 @@
    ],
    "tier": 2,
    "medianPacks": 24,
-   "medianTokens": 346401864,
-   "valueUSD": 2.57,
+   "medianTokens": 367515024,
+   "valueUSD": 2.48,
    "hardPacks": 45,
    "reward": {
     "packs": 3,
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.003
+      "value": 0.006
      }
     ]
    }
@@ -328,16 +333,16 @@
     "swsh45-18"
    ],
    "tier": 2,
-   "medianPacks": 102,
-   "medianTokens": 281642706,
-   "valueUSD": 2.2,
+   "medianPacks": 103,
+   "medianTokens": 279491942,
+   "valueUSD": 2.15,
    "hardPacks": 294,
    "reward": {
     "packs": 9,
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.003
+      "value": 0.006
      }
     ]
    }
@@ -360,16 +365,16 @@
     "swsh45-51"
    ],
    "tier": 2,
-   "medianPacks": 234,
-   "medianTokens": 646121502,
-   "valueUSD": 9.79,
+   "medianPacks": 233,
+   "medianTokens": 632248762,
+   "valueUSD": 9.83,
    "hardPacks": 463,
    "reward": {
-    "packs": 2,
+    "packs": 9,
     "perks": [
      {
       "kind": "dustBonus",
-      "value": 0.021
+      "value": 0.013
      }
     ]
    }
@@ -392,16 +397,16 @@
     "base1-29"
    ],
    "tier": 3,
-   "medianPacks": 64,
-   "medianTokens": 3967187200,
-   "valueUSD": 91.61,
-   "hardPacks": 137,
+   "medianPacks": 73,
+   "medianTokens": 4181439562,
+   "valueUSD": 91.34,
+   "hardPacks": 154,
    "reward": {
-    "packs": 9,
+    "packs": 10,
     "perks": [
      {
       "kind": "packDiscount",
-      "value": 0.023
+      "value": 0.019
      }
     ]
    }
@@ -422,12 +427,12 @@
     "neo1-25"
    ],
    "tier": 3,
-   "medianPacks": 20,
-   "medianTokens": 2611440320,
-   "valueUSD": 25.74,
-   "hardPacks": 48,
+   "medianPacks": 29,
+   "medianTokens": 3621325120,
+   "valueUSD": 26.21,
+   "hardPacks": 68,
    "reward": {
-    "packs": 6,
+    "packs": 9,
     "perks": []
    }
   },
@@ -449,16 +454,16 @@
     "neo1-70"
    ],
    "tier": 3,
-   "medianPacks": 23,
-   "medianTokens": 1169886635,
-   "valueUSD": 62.65,
-   "hardPacks": 70,
+   "medianPacks": 21,
+   "medianTokens": 943320222,
+   "valueUSD": 62.92,
+   "hardPacks": 65,
    "reward": {
     "packs": 2,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.015
+      "kind": "tokenGain",
+      "value": 0.002
      }
     ]
    }
@@ -480,16 +485,16 @@
     "sv3pt5-146"
    ],
    "tier": 3,
-   "medianPacks": 211,
-   "medianTokens": 3045449721,
-   "valueUSD": 97.59,
-   "hardPacks": 697,
+   "medianPacks": 149,
+   "medianTokens": 2281655774,
+   "valueUSD": 97.27,
+   "hardPacks": 489,
    "reward": {
-    "packs": 4,
+    "packs": 10,
     "perks": [
      {
       "kind": "tokenGain",
-      "value": 0.023
+      "value": 0.008
      }
     ]
    }
@@ -516,16 +521,16 @@
     "sv8pt5-60"
    ],
    "tier": 3,
-   "medianPacks": 181,
-   "medianTokens": 1045838815,
-   "valueUSD": 34.54,
-   "hardPacks": 315,
+   "medianPacks": 409,
+   "medianTokens": 2935035943,
+   "valueUSD": 35.37,
+   "hardPacks": 713,
    "reward": {
-    "packs": 4,
+    "packs": 10,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.006
+      "kind": "dustBonus",
+      "value": 0.108
      }
     ]
    }
@@ -548,16 +553,16 @@
     "base1-44"
    ],
    "tier": 4,
-   "medianPacks": 56,
-   "medianTokens": 2282441575,
-   "valueUSD": 196.69,
-   "hardPacks": 175,
+   "medianPacks": 89,
+   "medianTokens": 2789741726,
+   "valueUSD": 192.25,
+   "hardPacks": 286,
    "reward": {
-    "packs": 1,
+    "packs": 7,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.044
+      "kind": "packDiscount",
+      "value": 0.007
      }
     ]
    }
@@ -580,16 +585,16 @@
     "base1-63"
    ],
    "tier": 4,
-   "medianPacks": 56,
-   "medianTokens": 2282441575,
-   "valueUSD": 241.68,
-   "hardPacks": 175,
+   "medianPacks": 89,
+   "medianTokens": 2789741726,
+   "valueUSD": 241.7,
+   "hardPacks": 286,
    "reward": {
-    "packs": 4,
+    "packs": 7,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.01
+      "kind": "packDiscount",
+      "value": 0.008
      }
     ]
    }
@@ -611,16 +616,16 @@
     "neo1-53"
    ],
    "tier": 4,
-   "medianPacks": 36,
-   "medianTokens": 4700592576,
+   "medianPacks": 40,
+   "medianTokens": 4994931200,
    "valueUSD": 167.07,
-   "hardPacks": 111,
+   "hardPacks": 125,
    "reward": {
-    "packs": 2,
+    "packs": 5,
     "perks": [
      {
       "kind": "tokenGain",
-      "value": 0.042
+      "value": 0.024
      }
     ]
    }
@@ -643,16 +648,16 @@
     "sv10-174"
    ],
    "tier": 4,
-   "medianPacks": 585,
-   "medianTokens": 3689022285,
-   "valueUSD": 502.84,
-   "hardPacks": 1413,
+   "medianPacks": 411,
+   "medianTokens": 3022758273,
+   "valueUSD": 497.72,
+   "hardPacks": 969,
    "reward": {
-    "packs": 6,
+    "packs": 9,
     "perks": [
      {
       "kind": "tokenGain",
-      "value": 0.039
+      "value": 0.024
      }
     ]
    }
@@ -676,16 +681,16 @@
     "base1-63"
    ],
    "tier": 5,
-   "medianPacks": 64,
-   "medianTokens": 3967187200,
-   "valueUSD": 1128.6,
-   "hardPacks": 137,
+   "medianPacks": 72,
+   "medianTokens": 4124159568,
+   "valueUSD": 1123.4,
+   "hardPacks": 154,
    "reward": {
-    "packs": 9,
+    "packs": 10,
     "perks": [
      {
       "kind": "packDiscount",
-      "value": 0.023
+      "value": 0.019
      }
     ]
    }
@@ -707,16 +712,16 @@
     "base1-46"
    ],
    "tier": 5,
-   "medianPacks": 31,
-   "medianTokens": 1921606300,
-   "valueUSD": 874.86,
-   "hardPacks": 94,
+   "medianPacks": 34,
+   "medianTokens": 1947519796,
+   "valueUSD": 874.77,
+   "hardPacks": 105,
    "reward": {
     "packs": 5,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.018
+      "kind": "tokenGain",
+      "value": 0.004
      }
     ]
    }
@@ -751,16 +756,16 @@
     "base1-16"
    ],
    "tier": 5,
-   "medianPacks": 128,
-   "medianTokens": 7934374400,
-   "valueUSD": 1886.65,
-   "hardPacks": 204,
+   "medianPacks": 145,
+   "medianTokens": 8305599130,
+   "valueUSD": 1878.7,
+   "hardPacks": 230,
    "reward": {
-    "packs": 1,
+    "packs": 10,
     "perks": [
      {
-      "kind": "extraHitSlot",
-      "value": 1
+      "kind": "packDiscount",
+      "value": 0.055
      }
     ]
    }
@@ -784,16 +789,16 @@
     "xy12-11"
    ],
    "tier": 5,
-   "medianPacks": 478,
-   "medianTokens": 7013543494,
-   "valueUSD": 1362.66,
-   "hardPacks": 1584,
+   "medianPacks": 426,
+   "medianTokens": 6402534134,
+   "valueUSD": 1361.85,
+   "hardPacks": 1408,
    "reward": {
     "packs": 10,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.054
+      "kind": "tokenGain",
+      "value": 0.038
      }
     ]
    }

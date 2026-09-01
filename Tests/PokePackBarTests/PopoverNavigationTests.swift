@@ -30,6 +30,47 @@ final class PopoverNavigationTests: XCTestCase {
                       "트리를 열 때마다 새로 만들고 있다")
     }
 
+    /// **카드 상세에서 그 카드가 나오는 팩을 사러 갈 수 있어야 한다.**
+    ///
+    /// 갖고 싶은 카드를 크게 보고 있을 때 다음에 하고 싶은 일이 그것이다. 예전에는 팩
+    /// 이름만 적혀 있어서, 상점으로 가 시대를 짚어 가며 같은 팩을 눈으로 다시 찾아야 했다.
+    ///
+    /// 상점 쪽에는 그 요청을 받아 팩 상세를 여는 자리가 이미 있다(도감의 「이 팩 사러 가기」
+    /// 가 쓰던 길이다). 두 쪽이 다 있어야 이어지므로 함께 검사한다.
+    func testCardDetailCanReachThePackInTheShop() throws {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokePackBar/UI")
+        let spotlight = try String(contentsOf: sources.appendingPathComponent("CardSpotlightView.swift"),
+                                   encoding: .utf8)
+        let shop = try String(contentsOf: sources.appendingPathComponent("CardShopView.swift"),
+                              encoding: .utf8)
+
+        XCTAssertTrue(spotlight.contains("nav.shopSet = setID"),
+                      "카드 상세에서 팩을 눌러도 상점으로 가지 않는다")
+        XCTAssertTrue(spotlight.contains("nav.tab = .shop"),
+                      "팩을 지목만 하고 상점 탭으로 옮기지 않는다 — 아무 일도 안 일어난다")
+        XCTAssertTrue(shop.contains("nav.shopSet = nil"),
+                      "상점이 요청을 지우지 않는다 — 다음에 상점을 열 때 또 그 팩이 뜬다")
+        // 이미 그 팩 안에서 연 카드에는 링크를 걸지 않는다 — 눌러도 제자리다.
+        XCTAssertTrue(shop.contains("canVisitPack: false"),
+                      "팩 안에서 연 카드에 제자리로 가는 버튼이 남아 있다")
+    }
+
+    /// **팩 상세에서 그 팩의 카드를 다 볼 수 있어야 한다.**
+    ///
+    /// 확률표는 등급별 비중만 말해 준다. 「이 팩에 무엇이 들었나」는 결국 카드를 봐야 알고,
+    /// 그걸 모르면 살지 말지 정할 수가 없다.
+    func testPackDetailListsItsCards() throws {
+        let shop = try String(contentsOf: URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokePackBar/UI/CardShopView.swift"), encoding: .utf8)
+        XCTAssertTrue(shop.contains("browsingCards = true"), "카드 목록으로 들어갈 길이 없다")
+        // 못 얻은 카드도 보여야 한다. 가진 것만 보여 주면 무엇을 노리고 사는지 알 수 없다.
+        XCTAssertTrue(shop.contains("index.cardsByValue.filter { $0.setID == set.id }"),
+                      "목록이 세트 전체가 아니거나 값순이 아니다")
+    }
+
     /// 끝없이 도는 애니메이션은 팝오버가 보일 때만 돌아야 한다.
     ///
     /// 트리를 닫아도 버리지 않으므로, 걸어 둔 `repeatForever` 는 닫힌 채로도 계속 다시

@@ -56,15 +56,26 @@ struct CardGrid: Sendable {
     static let oripa = fitting(inScroll(inset: 2), columns: 5, spacing: 5)
     /// 도감 한 줄에 늘어놓는 카드 띠. 줄 카드의 좌우 여백 안쪽이라 그만큼 좁다.
     static let dexStrip = fitting(inScroll(inset: dexRowPadding * 2), columns: 5, spacing: 5)
-    /// 개봉 결과 요약.
+    /// 개봉 결과 요약. **팩 장수에 맞춰 열을 정한다.**
     ///
-    /// 열을 넷에서 다섯으로 늘렸다. 팩은 열 장이라 넷씩이면 세 줄이 되고, 세 줄은 머리글과
-    /// 「확인」 버튼까지 더해 탭 높이를 넘어 스크롤이 생긴다. 다섯씩이면 두 줄로 끝난다 —
-    /// 개봉 결과는 한 화면에 다 보여야 무엇을 건졌는지 한눈에 읽힌다.
-    static let packSummary = fitting(onScreen(inset: 4), columns: 5, spacing: 8)
+    /// 세 줄이 되면 머리글과 「확인」 버튼까지 더해 탭 높이를 넘어 스크롤이 생기고, 개봉
+    /// 결과는 한 화면에 다 보여야 무엇을 건졌는지 한눈에 읽힌다. 그런데 팩 장수가 시대마다
+    /// 다르다 — 1999년 팩은 11장이고 e-Card·EX 는 9장이다. 열을 다섯으로 못박으면 11장이
+    /// 세 줄이 되므로, 두 줄에 담기는 가장 적은 열 수를 쓴다(열이 적을수록 카드가 크다).
+    static func packSummary(_ cards: Int) -> CardGrid {
+        let columns = max(5, Int((Double(cards) / 2).rounded(.up)))
+        return fitting(onScreen(inset: 4), columns: columns, spacing: 8)
+    }
+
+    /// 상점의 팩 격자.
+    ///
+    /// 두 열이던 것을 **세 열**로 늘렸다. 팩이 130개가 되면서 두 열로는 한 화면에 네 개밖에
+    /// 안 보여 훑을 수가 없다. 칸이 작아지는 만큼 한눈에 들어오는 수가 늘어난다.
+    static let packShelf = fitting(inScroll(inset: 2), columns: 3, spacing: 8)
 
     static let all: [(name: String, grid: CardGrid)] = [
-        ("collection", collection), ("oripa", oripa),
-        ("dexStrip", dexStrip), ("packSummary", packSummary),
+        ("collection", collection), ("oripa", oripa), ("dexStrip", dexStrip),
+        ("packSummary", packSummary(10)), ("packSummary11", packSummary(PackConfig.maxCardsPerPack)),
+        ("packShelf", packShelf),
     ]
 }

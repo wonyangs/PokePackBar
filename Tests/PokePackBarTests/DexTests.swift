@@ -55,25 +55,6 @@ final class BundledDexTests: XCTestCase {
         }
     }
 
-    /// 「인권 조합」이 실재하고, 제일 비싼 축에 있어야 한다.
-    ///
-    /// 개봉 자체가 좋아지는 혜택(`extraHitSlot`)은 상한이 1 이라 한 조합에만 붙는다.
-    /// 그 조합은 반드시 완성 비용이 제일 비싼 축이어야 한다.
-    func testFlagshipDexesAreTheMostExpensive() throws {
-        let (_, dexes) = try loadIndexes()
-        let flagship = dexes.dexes.filter { $0.reward.perks.contains { $0.kind.isStructural } }
-        XCTAssertEqual(flagship.count, 1, "판을 바꾸는 혜택은 한 조합에만 붙는다")
-
-        // 견주는 기준은 **완성 비용**이다. 카드값 합계로 보면 순서가 어긋난다 —
-        // 값비싼 카드 몇 장짜리 조합이 흔한 카드 여럿짜리보다 싸게 끝나는 경우가 있다.
-        let median = dexes.dexes.map(\.medianTokens).sorted()[dexes.dexes.count / 2]
-        for dex in flagship {
-            XCTAssertGreaterThan(dex.medianTokens, median,
-                                 "\(dex.id): 인권 조합인데 완성 비용이 중간값 아래다")
-        }
-        // 패시브를 몇 개 주는지는 세지 않는다. 히트 칸 하나가 팩 기대값을 50% 올려
-        // 그것만으로 그 도감의 보상 예산이 차므로, 하나만 주는 것이 정상이다.
-    }
 
     /// 지급 팩은 **부수**다 — 목표를 넘지 않고, 개수도 상한 안이다.
     ///
@@ -83,8 +64,11 @@ final class BundledDexTests: XCTestCase {
     func testRewardPacksStayASideTreat() throws {
         let (cards, dexes) = try loadIndexes()
         for dex in dexes.dexes {
-            XCTAssertTrue((1...DexDifficulty.maxRewardPacks).contains(dex.reward.packs),
-                          "\(dex.id): 지급 팩 \(dex.reward.packs)개는 1~"
+            // 0 개도 정상이다. 세트가 126개가 되면서 팩 한 개가 830만원인 세트가 생겼고,
+            // 그런 세트를 홈으로 둔 도감이 한 개라도 주면 보상이 목표의 몇 배가 된다.
+            // 값이 맞지 않는 팩은 아예 얹지 않고 패시브가 다 맡는다.
+            XCTAssertTrue((0...DexDifficulty.maxRewardPacks).contains(dex.reward.packs),
+                          "\(dex.id): 지급 팩 \(dex.reward.packs)개는 0~"
                           + "\(DexDifficulty.maxRewardPacks) 범위를 벗어난다")
             let packPrice = Double(PackPricing.price(setID: dex.homeSet, index: cards))
             let paid = Double(dex.reward.packs) * packPrice
@@ -125,25 +109,6 @@ final class BundledDexTests: XCTestCase {
         }
     }
 
-    /// 판을 바꾸는 혜택은 **가장 비싼 두 조합**에서만 나온다.
-    ///
-    /// 히트 칸 하나와 중복 회피는 한 번 얻으면 이후 모든 개봉이 달라진다. 중간 난이도에
-    /// 붙어 있으면 그 위를 모을 이유가 사라진다 — 로켓단 총수가 중복 회피를 들고 있던 것이
-    /// 그 상태였다.
-    func testStructuralPerksBelongToThePriciestDexes() throws {
-        let (_, dexes) = try loadIndexes()
-        let priciest = Set(dexes.dexes.sorted { $0.medianTokens < $1.medianTokens }
-            .suffix(2).map(\.id))
-        var found = 0
-        for dex in dexes.dexes {
-            for perk in dex.reward.perks where perk.kind.isStructural {
-                found += 1
-                XCTAssertTrue(priciest.contains(dex.id),
-                              "\(dex.id): \(perk.kind) 는 가장 비싼 조합에서만 준다")
-            }
-        }
-        XCTAssertEqual(found, 1, "판을 바꾸는 혜택은 하나뿐이다 (상한이 1)")
-    }
 
     /// 혜택이 없는 조합은 지급 팩이 목표를 **정확히** 채운다.
     ///
@@ -180,7 +145,6 @@ final class BundledDexTests: XCTestCase {
         XCTAssertLessThanOrEqual(all.packDiscount, DexPerks.caps.packDiscount)
         XCTAssertLessThanOrEqual(all.dustBonus, DexPerks.caps.dustBonus)
         XCTAssertLessThanOrEqual(all.hitOdds, DexPerks.caps.hitOdds)
-        XCTAssertLessThanOrEqual(all.extraHitSlot, DexPerks.caps.extraHitSlot)
     }
 
     /// 난이도가 골고루 있어야 한다. 쉬운 것이 없으면 "우연히 완성했네" 가 일어나지 않고,
@@ -356,10 +320,10 @@ final class DexPerksTests: XCTestCase {
 
     /// 한 도감이 혜택 두 개를 줄 수 있다. 최고 난도 조합이 그렇다.
     func testOneDexCanCarryTwoPerks() {
-        let dexes = [dex("top", [DexPerk(kind: .extraHitSlot, value: 1),
+        let dexes = [dex("top", [DexPerk(kind: .tokenGain, value: 0.02),
                                  DexPerk(kind: .hitOdds, value: 0.05)])]
         let perks = DexPerks.total(completed: ["top"], dexes: dexes)
-        XCTAssertEqual(perks.extraHitSlot, 1)
+        XCTAssertEqual(perks.tokenGain, 0.02, accuracy: 0.0001)
         XCTAssertEqual(perks.hitOdds, 0.05, accuracy: 0.0001)
     }
 
@@ -423,26 +387,6 @@ final class DexPerkEffectTests: XCTestCase {
         XCTAssertEqual(CardSale.price(cardID: card, perks: .none), base)
     }
 
-    /// 카드 한 장이 늘고, 그 한 장이 히트 슬롯이어야 한다.
-    /// 장수만 늘고 히트가 안 늘면 커먼 한 장을 더 주는 것과 같아 보상이 되지 않는다.
-    func testExtraHitSlotAddsOneCardAndOneHit() {
-        let index = makeIndex()
-        let perks = DexPerks(extraHitSlot: 1)
-        XCTAssertEqual(PackPricing.cardCount(setID: "s", index: index), 10)
-        XCTAssertEqual(PackPricing.cardCount(setID: "s", index: index, perks: perks), 11)
-
-        let hitTiers: Set<CardTier> = [.rare, .doubleRare, .ultraRare]
-        func hitShare(_ perks: DexPerks) -> Double {
-            let odds = PackOpening.packOdds(setID: "s", index: index, perks: perks)
-            let cards = Double(PackPricing.cardCount(setID: "s", index: index, perks: perks))
-            return odds.filter { hitTiers.contains($0.tier) }
-                .reduce(0) { $0 + $1.probability * cards }
-        }
-        // 다른 칸에서도 레어가 나오므로 절대값이 아니라 증가분을 본다.
-        XCTAssertEqual(hitShare(perks) - hitShare(.none), 1, accuracy: 0.001,
-                       "레어 이상이 정확히 한 장 늘어야 한다")
-        XCTAssertGreaterThan(hitShare(.none), 1, "확정 한 장 위에 다른 칸의 몫이 얹힌다")
-    }
 
 
     /// 레어의 몫이 상위 등급으로 넘어간다. 전체 합은 여전히 1 이다.
@@ -457,24 +401,13 @@ final class DexPerkEffectTests: XCTestCase {
         XCTAssertGreaterThan(probability(.doubleRare, boosted), probability(.doubleRare, .none))
         XCTAssertGreaterThan(probability(.ultraRare, boosted), probability(.ultraRare, .none))
 
-        for perks in [DexPerks.none, boosted, DexPerks(extraHitSlot: 1), DexPerks.caps] {
+        for perks in [DexPerks.none, boosted, DexPerks.caps] {
             let total = PackOpening.packOdds(setID: "s", index: index, perks: perks)
                 .reduce(0) { $0 + $1.probability }
             XCTAssertEqual(total, 1, accuracy: 0.0001, "확률 합이 1 이 아니다")
         }
     }
 
-    /// 뽑기도 같은 슬롯 수를 써야 한다. 확률표만 늘어나고 실제 팩은 10장이면 표가 거짓이 된다.
-    func testDrawReturnsTheExtraCard() {
-        let index = makeIndex()
-        var g = SeededGenerator(seed: 99)
-        let plain = PackOpening.draw(setID: "s", index: index, alreadyOwned: [], using: &g)
-        var g2 = SeededGenerator(seed: 99)
-        let boosted = PackOpening.draw(setID: "s", index: index, alreadyOwned: [],
-                                       perks: DexPerks(extraHitSlot: 1), using: &g2)
-        XCTAssertEqual(plain.count, 10)
-        XCTAssertEqual(boosted.count, 11)
-    }
 
     /// 혜택을 전부 모은 상태에서도 팩을 사서 가는 것이 남는 장사가 되면 안 된다.
     ///
@@ -849,8 +782,8 @@ final class OripaTests: XCTestCase {
     func testOripaIsNeverWorthGrinding() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         let prices = try XCTUnwrap(CardPrices.loadBundled())
-        let pool = OripaConfig.eligible(index: index, prices: prices)
-        let slotUSD = OripaConfig.expectedSlotUSD(pool: pool, prices: prices)
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
+        let slotUSD = shelf.slotUSD
         let dust = Double(MarketEconomy.tokens(usd: slotUSD)) * (1 + DexPerks.caps.dustBonus)
         let paid = Double(OripaConfig.slotPrice(index: index, prices: prices))
             * (1 - DexPerks.caps.packDiscount)
@@ -863,16 +796,15 @@ final class OripaTests: XCTestCase {
     func testEveryBoxCarriesATopValueCard() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         let prices = try XCTUnwrap(CardPrices.loadBundled())
-        let ranked = OripaConfig.eligible(index: index, prices: prices)
-        let topFive = Set(ranked.prefix(OripaConfig.bounds(OripaConfig.composition[0].band,
-                                                          count: ranked.count).count))
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
+        let topBand = Set(try XCTUnwrap(shelf.bands.first))
+        XCTAssertFalse(topBand.isEmpty)
         var generator = SystemRandomNumberGenerator()
         for serial in 1...20 {
-            let box = Oripa.makeBox(index: index, serial: serial, prices: prices,
-                                    using: &generator)
+            let box = Oripa.makeBox(shelf: shelf, serial: serial, using: &generator)
             XCTAssertEqual(box.slots.count, OripaConfig.slotsPerBox)
             XCTAssertEqual(Set(box.slots).count, box.slots.count, "같은 카드가 두 번 들었다")
-            XCTAssertFalse(topFive.isDisjoint(with: box.slots),
+            XCTAssertFalse(topBand.isDisjoint(with: box.slots),
                            "박스 \(serial) 에 최상위권 카드가 없다")
         }
     }
@@ -881,14 +813,15 @@ final class OripaTests: XCTestCase {
     func testBoxValueIsStableAcrossBoxes() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
         var generator = SystemRandomNumberGenerator()
-        let totals = (1...12).map { serial -> Double in
-            Oripa.makeBox(index: index, serial: serial, prices: prices, using: &generator)
+        let totals = (1...100).map { serial -> Double in
+            Oripa.makeBox(shelf: shelf, serial: serial, using: &generator)
                 .slots.reduce(0.0) { $0 + MarketEconomy.usd(cardID: $1, prices: prices) }
         }
         let low = totals.min() ?? 0, high = totals.max() ?? 0
-        XCTAssertLessThan(high / max(low, 0.01), 3,
-                          "박스 값이 \(Int(high / low))배까지 갈린다 — 구간이 너무 넓다")
+        XCTAssertLessThan(high / max(low, 0.01), 1.10,
+                          "박스 값이 \(Int((high / low - 1) * 100))%까지 갈린다 — 구간이 너무 넓다")
     }
 }
 
@@ -909,7 +842,11 @@ final class KoreanCardNameTests: XCTestCase {
     /// 꼬리표(ex·V·GX)는 한국판도 영문 그대로 쓰므로 예외다.
     func testNoHalfTranslatedNames() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
-        let suffixes = ["ex", "EX", "GX", "V", "VMAX", "VSTAR", "BREAK", "M"]
+        // 한국판이 그대로 쓰는 등급 꼬리표와 고유 약칭. N·AZ는 인물 이름이고,
+        // FF·GL·WP는 홀론 에너지의 공식 코드다.
+        let suffixes = ["ex", "EX", "GX", "V", "VMAX", "VSTAR", "BREAK", "LEGEND", "M",
+                        "N", "AZ", "G", "C", "GL", "FB", "E4", "FF", "WP", "VIP",
+                        "TAG", "TEAM", "TV", "MAX", "LV", "UB", "A", "Z"]
         for entry in index.cards {
             guard let korean = entry.nameKo else { continue }
             let words = korean.split(separator: " ").map(String.init)
@@ -917,6 +854,64 @@ final class KoreanCardNameTests: XCTestCase {
                 XCTAssertTrue(suffixes.contains(word),
                               "\(entry.id): 한국어 이름에 영문이 섞였다 — \(korean)")
             }
+        }
+    }
+
+    /// **번역기가 뱉은 웹 문구가 섞여 들어오면 안 된다.**
+    ///
+    /// 한국 발매판이 없는 카드는 번역해서 넣는데, 한때 번역 메모리 API 를 쓰면서 짧은
+    /// 카드 이름에 엉뚱한 웹페이지 문구가 붙어 들어왔다 — Blaine 이 「뚱 베어」, Archie 가
+    /// 「인기 카테고리」, Absol G LV.X 가 「소프트웨어」였다. 그럴듯해서 눈으로는 안 걸린다.
+    func testNoScrapedWebBoilerplate() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let junk = ["카테고리", "사이트맵", "회사소개", "회사 소개", "채용정보", "윤리경영",
+                    "공급 업체", "홍보센터", "연락처", "기업소개", "회사연혁", "협력업체",
+                    "메뉴 닫기", "관련 항목", "이용 약관", "공지사항", "개인정보", "사업영역",
+                    "관심상품", "소프트웨어", "하드 디스크", "체류 시간"]
+        for entry in index.cards {
+            guard let korean = entry.nameKo else { continue }
+            for word in junk {
+                XCTAssertFalse(korean.contains(word),
+                               "\(entry.id) (\(entry.name)): 카드 이름에 웹 문구가 섞였다 — \(korean)")
+            }
+        }
+    }
+
+    /// **서로 다른 카드가 같은 한국어 이름을 쓰면 안 된다.**
+    ///
+    /// 일러스트레이터로 한국 카드와 짝지을 때 같은 작가가 그린 **다른** 카드를 집는 일이
+    /// 있었다. Hau·Lana·Mallow 가 모두 「마오」가 되고 Crystal Cave 와 Stormy Mountains 가
+    /// 서로의 이름을 바꿔 달았다. 겹치면 어느 쪽이 맞는지 알 수 없으므로 대조를 버린다.
+    ///
+    /// 정말로 같은 이름인 것들은 예외로 적는다 — 영문 철자만 다른 같은 카드, 그리고
+    /// 한국판에서 실제로 이름이 같은 것들이다.
+    func testDifferentCardsDoNotShareAKoreanName() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let allowed: Set<String> = [
+            "가짜 오박사",          // Imposter / Impostor — 영문 철자만 다르다
+            "오박사의 연구",         // Prof. / Professor — 같은 카드
+            "학습장치",            // EXP.ALL 과 Exp. Share 는 한국판에서 같은 도구다
+            "마리",              // Marnie 도 Mary 도 한국 이름이 마리다
+            "박사의 연구(매그놀리아박사)",  // 카드 한 장을 콕 집어 고친 것
+            "캐스퐁 빗방울의 모습", "캐스퐁 설운의 모습",  // 같은 폼을 세트마다 다르게 적었다
+            "캐스퐁 태양의 모습",
+        ]
+        // 같은 카드인지 견주는 꼴. 세트마다 영문 표기가 흔들리는 것까지 다른 카드로 세면
+        // 진짜 어긋난 것이 그 안에 묻힌다 — "Ho-Oh"/"Ho-oh", "Rocket's"/"Team Rocket's",
+        // "ナッシー[Exeggutor]" 는 모두 같은 카드다. ◇·★ 는 등급 표시라 이름이 같다.
+        func same(_ name: String) -> String {
+            let ascii = name.lowercased().filter { $0.isASCII && ($0.isLetter || $0.isNumber) }
+            return ascii.hasPrefix("team") ? String(ascii.dropFirst(4)) : ascii
+        }
+        var english: [String: Set<String>] = [:]
+        for entry in index.cards {
+            guard let korean = entry.nameKo, !korean.hasPrefix("기본 ") else { continue }
+            english[korean, default: []].insert(entry.name)
+        }
+        for (korean, names) in english where names.count > 1 && !allowed.contains(korean) {
+            XCTAssertEqual(Set(names.map(same)).count, 1,
+                           "\(korean): 서로 다른 카드가 같은 이름을 쓴다 — "
+                           + names.sorted().joined(separator: ", "))
         }
     }
 

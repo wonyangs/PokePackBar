@@ -23,20 +23,46 @@ struct CardCollectionView: View {
     /// 두 줄짜리 표가 늘 떠 있으면 그만큼 카드 볼 자리가 줄어든다.
     @AppStorage("collectionShowTiers") private var showTiers = false
 
-    /// 세트·등급 필터만 건 목록. 「몇 장 중 몇 장」의 분모가 여기서 나온다 —
-    /// 보유 필터까지 건 목록으로 세면 늘 "90 / 90" 이 되어 아무것도 말해 주지 않는다.
-    /// 세트·등급 필터만 건 목록. 「몇 장 중 몇 장」의 분모가 여기서 나온다 —
-    /// 보유 필터까지 건 목록으로 세면 늘 "90 / 90" 이 되어 아무것도 말해 주지 않는다.
+    /// 화면 한 번에 필요한 것을 **한 번의 훑기로** 모두 낸 결과.
     ///
-    /// **미리 세워 둔 값 순 목록에서 거른다.** 거르기는 순서를 지키므로 여기서 다시 정렬할
-    /// 이유가 없고, 정렬을 매번 돌리면 카드 그림이 도착할 때마다 화면이 덜컹거린다.
-    private var pool: [CardEntry] {
-        guard let index else { return [] }
-        return Self.filtered(index.cardsByValue, set: selectedSet, tier: selectedTier)
+    /// 예전에는 목록·보유 수·중복 여부를 각자 계산했다. 계산 하나하나가 전체를 훑으므로
+    /// 한 번 그릴 때마다 18,327장을 네 번 지나갔고 갱신 한 번에 27ms 가 걸렸다. 필요한 것을
+    /// 한 자리에서 같이 세면 한 번이면 된다.
+    struct Shelf {
+        /// 세트·등급 필터만 건 목록. 「몇 장 중 몇 장」의 분모가 여기서 나온다 —
+        /// 보유 필터까지 건 목록으로 세면 늘 "90 / 90" 이 되어 아무것도 말해 주지 않는다.
+        var pool: [CardEntry] = []
+        /// 실제로 격자에 그릴 것.
+        var visible: [CardEntry] = []
+        /// 필터 안에서 가진 종수.
+        var owned = 0
+        /// 팔 중복이 하나라도 있는가.
+        var hasSpares = false
     }
 
-    private var visible: [CardEntry] {
-        ownedOnly ? pool.filter { wallet.cardCount($0.id) > 0 } : pool
+    /// **미리 세워 둔 값 순 목록에서 거른다.** 거르기는 순서를 지키므로 여기서 다시 정렬할
+    /// 이유가 없고, 정렬을 매번 돌리면 카드 그림이 도착할 때마다 화면이 덜컹거린다.
+    private func makeShelf() -> Shelf {
+        guard let index else { return Shelf() }
+        var shelf = Shelf()
+        shelf.pool.reserveCapacity(index.cardsByValue.count)
+        for entry in index.cardsByValue {
+            guard selectedSet == nil || entry.setID == selectedSet,
+                  selectedTier == nil || entry.tier == selectedTier else { continue }
+            shelf.pool.append(entry)
+            let count = wallet.cardCount(entry.id)
+            if count > 0 {
+                shelf.owned += 1
+                if count > 1 { shelf.hasSpares = true }
+                shelf.visible.append(entry)
+            } else if !ownedOnly {
+                shelf.visible.append(entry)
+            }
+        }
+        // 보유 필터가 꺼져 있으면 값 순서를 지켜야 하므로 pool 을 그대로 쓴다 —
+        // 위 루프는 가진 것을 먼저 넣지 않는다(순서대로 담는다).
+        if !ownedOnly { shelf.visible = shelf.pool }
+        return shelf
     }
 
     /// 세트와 등급을 함께 건다. 둘 다 nil 이면 전체다.
@@ -58,14 +84,16 @@ struct CardCollectionView: View {
 
     var body: some View {
         let l = wallet.l
-        VStack(spacing: 4) {
+        // 한 번만 훑는다. 아래 조각들이 저마다 세면 그리기 한 번에 전체를 네 번 지나간다.
+        let shelf = makeShelf()
+        return VStack(spacing: 4) {
             if index == nil {
                 Text(l.cardIndexMissing)
                     .font(Typography.body).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if bulkSelling {
                 // 지금 목록에 걸린 카드만 넘긴다 — 화면에 안 보이는 카드가 팔리면 안 된다.
-                BulkSaleView(wallet: wallet, pool: pool) { bulkSelling = false }
+                BulkSaleView(wallet: wallet, pool: shelf.pool) { bulkSelling = false }
             } else if let selectedCard, let entry = index?.card(selectedCard) {
                 // 하단에 작게 붙이면 카드를 제대로 볼 수 없다. 화면을 통째로 내준다.
                 CardSpotlightView(wallet: wallet, cardID: entry.id,
@@ -78,11 +106,11 @@ struct CardCollectionView: View {
             } else {
                 // 카드가 없어도 격자를 보여준다. 무엇을 모을 수 있는지 알아야
                 // 어느 팩을 살지 정할 수 있다 — 빈 화면은 그 판단을 막는다.
-                filterBar
-                viewOptions
+                filterBar(shelf)
+                viewOptions(shelf)
                 if showTiers { tierSummary }
-                if visible.isEmpty { emptyHint }
-                grid
+                if shelf.visible.isEmpty { emptyHint }
+                grid(shelf)
             }
         }
         .frame(height: PopoverMetrics.tabHeight)
@@ -106,9 +134,8 @@ struct CardCollectionView: View {
     /// 긴 세트 하나가 팝오버 전체를 밀어낸다 — 상단 머리글이 이 탭에서만 덜컹거린 원인이다.
     private static let setMenuWidth: CGFloat = 190
 
-    private var filterBar: some View {
+    private func filterBar(_ shelf: Shelf) -> some View {
         let l = wallet.l
-        let owned = pool.filter { wallet.cardCount($0.id) > 0 }.count
         return HStack(spacing: 6) {
             Menu {
                 filterOption(l.allSets, isSelected: selectedSet == nil) { selectedSet = nil }
@@ -142,7 +169,7 @@ struct CardCollectionView: View {
             Spacer(minLength: 4)
             // 제목 줄을 따로 두지 않는다. 여기 필터가 무엇을 걸고 있는지와 그 결과가
             // 몇 장인지는 같은 줄에서 읽는 편이 자연스럽고, 카드 볼 자리도 그만큼 넓어진다.
-            Text(l.collectedOf(owned, pool.count))
+            Text(l.collectedOf(shelf.owned, shelf.pool.count))
                 .font(Typography.labelSemibold).foregroundStyle(.secondary)
                 .monospacedDigit().lineLimit(1)
         }
@@ -152,7 +179,7 @@ struct CardCollectionView: View {
     ///
     /// 위 줄이 「무엇을 거를까」라면 이 줄은 「어떻게 볼까」다. 한 줄에 다 넣으면 397pt 를
     /// 넘어 팝오버가 밀린다.
-    private var viewOptions: some View {
+    private func viewOptions(_ shelf: Shelf) -> some View {
         let l = wallet.l
         return HStack(spacing: 6) {
             Toggle(l.ownedOnly, isOn: $ownedOnly)
@@ -160,7 +187,7 @@ struct CardCollectionView: View {
                 .font(Typography.label)
             Spacer(minLength: 4)
             // 잡카드 정리로 들어가는 문. 중복이 없으면 누를 것이 없으므로 감춘다.
-            if hasSpares {
+            if shelf.hasSpares {
                 Button { bulkSelling = true } label: {
                     HStack(spacing: 3) {
                         Image(systemName: "wonsign.circle")
@@ -185,12 +212,6 @@ struct CardCollectionView: View {
             }
             .buttonStyle(.plain)
         }
-    }
-
-    /// 팔 중복이 하나라도 있는가. 없으면 정리 버튼을 띄우지 않는다 —
-    /// 누를 수 없는 버튼을 두면 그 줄만 복잡해진다.
-    private var hasSpares: Bool {
-        pool.contains { wallet.cardCount($0.id) > 1 }
     }
 
     /// 등급별 보유 현황. 두 줄로 전부 보여준다 — 가로로 흘리면 뒤쪽 등급이 가려진다.
@@ -266,13 +287,13 @@ struct CardCollectionView: View {
         selectedCard = nil
     }
 
-    private var grid: some View {
+    private func grid(_ shelf: Shelf) -> some View {
         ScrollView {
             // 칸을 고정한다. 유연 칸에 고정 폭 카드를 넣으면 칸은 넓어지고 카드만 작게
             // 남아 사이가 벌어진다 — 창을 넓힌 뒤 실제로 그렇게 보였다.
             LazyVGrid(columns: CardGrid.collection.items,
                       spacing: CardGrid.collection.spacing) {
-                ForEach(visible) { entry in
+                ForEach(shelf.visible) { entry in
                     let count = wallet.cardCount(entry.id)
                     Button {
                         selectedCard = entry.id

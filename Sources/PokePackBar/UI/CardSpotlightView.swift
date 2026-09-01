@@ -19,6 +19,9 @@ struct CardSpotlightView: View {
     /// 갖고 싶은 카드를 보고 어느 팩을 사야 하는지 알 수 있어야 한다.
     let setID: String
     let setName: String
+    /// 팩 이름을 눌러 상점으로 갈 수 있는가. **이미 그 팩 안에서 연 카드면 끈다** —
+    /// 눌러도 제자리라 아무 일도 일어나지 않는 버튼이 된다.
+    var canVisitPack = true
     /// 보유 장수. 0 이면 아직 얻지 못한 카드로 표시한다.
     let ownedCount: Int
     /// 미리 받아 둔 큰 그림이 있으면 기다리지 않는다.
@@ -35,16 +38,11 @@ struct CardSpotlightView: View {
     var body: some View {
         let l = wallet.l
         VStack(spacing: 0) {
+            // 뒤로가기는 왼쪽, 손대는 것은 오른쪽. 다른 화면과 같은 자리다.
             HStack {
-                favoriteButton(l)
+                BackButton(action: onClose, hint: l.close)
                 Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help(l.close)
+                favoriteButton(l)
             }
 
             Spacer(minLength: 0)
@@ -69,11 +67,21 @@ struct CardSpotlightView: View {
                     Text(l.tierBadge(tier))
                         .font(Typography.badgeLarge)
                         .foregroundStyle(tierColor(tier))
-                    // 출처 팩 — 그림까지 함께 둔다. 이름만으로는 상점에서 어느 것인지 못 찾는다.
-                    PackImageView(setID: setID, width: 15)
-                    Text(setName)
-                        .font(Typography.body)
-                        .lineLimit(1).truncationMode(.tail)
+                    // 출처 팩 — **눌러서 그 팩을 사러 간다.** 갖고 싶은 카드를 보고 있을 때
+                    // 필요한 다음 동작이 그것인데, 예전에는 이름만 적혀 있어서 상점에서
+                    // 시대를 짚어 가며 같은 팩을 다시 찾아야 했다.
+                    if canVisitPack {
+                        Button {
+                            nav.shopSet = setID
+                            nav.tab = .shop
+                        } label: {
+                            packLabel(linked: true)
+                        }
+                        .buttonStyle(.plain)
+                        .help(l.packGoBuy)
+                    } else {
+                        packLabel(linked: false)
+                    }
                     Text("·").font(Typography.label).foregroundStyle(.tertiary)
                     Text(ownedCount > 0 ? l.copiesOwned(ownedCount) : l.notOwnedYet)
                         .font(ownedCount > 0 ? Typography.labelSemibold : Typography.label)
@@ -100,6 +108,22 @@ struct CardSpotlightView: View {
             confirmingSale = false
             lastRefund = nil
         }
+    }
+
+    /// 팩 그림과 이름. **여기를 누르면 상점의 그 팩으로 간다.**
+    ///
+    /// 갈매기를 달아 봤더니 눈에 띄지도 않으면서 자리만 먹었다. 대신 이름에 강조색을 준다 —
+    /// 누를 수 있는 글자라는 표시로 화면 어디서나 쓰는 방식이고, 그림까지가 한 덩어리로
+    /// 눌린다. 갈 곳이 없을 때(그 팩 안에서 연 카드)는 강조색을 빼 평범한 글자로 둔다.
+    private func packLabel(linked: Bool) -> some View {
+        HStack(spacing: 5) {
+            PackImageView(setID: setID, width: 15)
+            Text(setName)
+                .font(linked ? Typography.bodySemibold : Typography.body)
+                .foregroundStyle(linked ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+                .lineLimit(1).truncationMode(.tail)
+        }
+        .contentShape(Rectangle())
     }
 
     /// 이 카드가 실제 시장에서 얼마인가. 갖고 있으면 장수만큼의 값도 함께 보여 준다.

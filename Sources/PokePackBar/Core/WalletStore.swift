@@ -331,7 +331,7 @@ final class WalletStore {
     ///
     /// v0.4.0 이 값을 반올림해 보여 준 탓에 적힌 값과 실제로 빠지는 값이 달랐다.
     /// 살 수 있다고 나오는 팩을 못 사고, 사고 나면 남은 돈이 계산과 맞지 않았다.
-    static let apologyGift = Gift(id: "v0.4.1-apology", tokens: 212_120_000, packsPerSet: 1)
+    static let apologyGift = Gift(id: "v0.4.1-apology", tokens: 213_370_000, packsPerSet: 1)
 
     /// 준 적이 없고 대상이면 준다. 이미 줬으면 아무것도 하지 않는다.
     ///

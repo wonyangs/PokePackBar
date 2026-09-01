@@ -1,51 +1,207 @@
 import Foundation
 
-/// 팩 구성과 확률. 값을 바꾸면 게임 밸런스가 바뀐다.
-enum PackConfig {
-    static let cardsPerPack = 10
+/// 팩 시대. **실물 팩은 시대마다 장수도, 칸 구성도, 봉입률도 다르다.**
+///
+/// 1999년 팩은 11장이고 역홀로 칸이 없다. e-Card 부터 역홀로가 생기면서 9장으로 줄었고,
+/// Diamond & Pearl 부터 10장으로 굳었다. 표 하나로 122세트를 덮으면 어느 시대에도 맞지
+/// 않는 팩이 된다.
+///
+/// **시리즈 이름이 아니라 발매일로 가른다.** 시리즈는 옛 인덱스에 없을 수 있고, 새 세트는
+/// 날짜만 있으면 저절로 제자리를 찾는다.
+enum PackEra: String, Sendable, CaseIterable {
+    /// Base·Gym·Neo·레전드 컬렉션 (1999/01~2002/05). 11장, 역홀로 없음.
+    case wotc
+    /// e-Card·EX (2002/09~2007/02). 9장, 역홀로 도입.
+    case ex
+    /// Diamond & Pearl·Platinum·HGSS (2007/05~2011/02). 10장.
+    case diamondPearl
+    /// Black & White·XY (2011/04~2016/11). 10장.
+    case blackWhite
+    /// Sun & Moon (2017/02~2019/11). 10장.
+    case sunMoon
+    /// Sword & Shield (2020/02~2023/01). 10장.
+    case swordShield
+    /// Scarlet & Violet·Mega Evolution (2023/03~). 10장.
+    case scarletViolet
 
-    /// 칸 구성 — 실제 부스터 팩의 배치를 따른다.
+    /// 이 시대가 시작하는 발매일. 인덱스의 `released`("2003/07/01") 와 문자열 그대로 견준다 —
+    /// 자릿수가 고정이라 사전순이 곧 날짜순이다.
+    var from: String {
+        switch self {
+        case .wotc:          return "0000/00/00"
+        case .ex:            return "2002/09/01"
+        case .diamondPearl:  return "2007/05/01"
+        case .blackWhite:    return "2011/04/01"
+        case .sunMoon:       return "2017/02/01"
+        case .swordShield:   return "2020/02/01"
+        case .scarletViolet: return "2023/03/01"
+        }
+    }
+
+    /// 발매일이 속한 시대. 날짜를 모르는 세트는 최신 구성으로 본다.
+    static func of(released: String) -> PackEra {
+        allCases.last { released >= $0.from } ?? .scarletViolet
+    }
+}
+
+/// 팩 구성과 확률. **값은 실물 팩에서 온다.**
+///
+/// 예전에는 열 칸을 우리가 정한 표로 굴렸다. 어느 칸에서도 UR 까지 나올 수 있었고, 실물보다
+/// 후하다는 이유로 그렇게 두었다. 실물은 그렇지 않다 — 커먼 칸에서는 커먼만 나오고 레어는
+/// 한 칸에서만 나온다. 지금은 실물 구조를 그대로 쓰고, Sword & Shield 와 Scarlet & Violet
+/// 은 표본 개봉으로 잰 값을 그대로 옮겼다.
+///
+/// **가중치는 만분율이다**(10000 = 100%). 실측 봉입률을 반올림 없이 적으려는 것이다.
+enum PackConfig {
+
+    // MARK: 칸 표 — 커먼·언커먼
+
+    /// 커먼 칸. **기본 에너지가 여기 섞인다.**
     ///
-    /// 실물 팩은 커먼 4장 + 언커먼 3장 + **포일 3칸**(그중 최소 한 장이 레어 이상) + 에너지다.
-    /// 즉 레어가 나올 수 있는 자리가 원래 세 칸이다. 예전 구조는 한 칸만 추첨하고 아홉 칸을
-    /// 커먼·언커먼으로 못박아서, 실물보다 인색한데다 "아홉 장은 절대 레어가 아니다" 가 됐다.
+    /// 옛 팩은 에너지를 따로 보장하지 않았고 커먼 자리에 한 장쯤 들어 있었다(11장 팩의
+    /// 커먼 7칸에 한 장이면 14%). 최신 세트는 기본 에너지가 재판이라 세트 목록에 없으므로,
+    /// 그런 세트에서는 이 몫이 커먼으로 돌아간다.
+    static let commonWeights: [(tier: CardTier, weight: Int)] = [
+        (.common, 8600), (.energy, 1400),
+    ]
+
+    /// 언커먼 칸.
+    static let uncommonWeights: [(tier: CardTier, weight: Int)] = [(.uncommon, 10000)]
+
+    // MARK: 칸 표 — 역홀로
+
+    /// 역홀로 칸은 e-Card(2002) 부터 생겼다. 대부분은 커먼·언커먼의 반짝이 판이다.
+    static let exReverse: [(tier: CardTier, weight: Int)] = [
+        (.common, 5500), (.uncommon, 3500), (.rare, 1000),
+    ]
+
+    static let diamondPearlReverse: [(tier: CardTier, weight: Int)] = [
+        (.common, 5500), (.uncommon, 3400), (.rare, 1100),
+    ]
+
+    static let blackWhiteReverse: [(tier: CardTier, weight: Int)] = [
+        (.common, 5400), (.uncommon, 3400), (.rare, 1200),
+    ]
+
+    static let sunMoonReverse: [(tier: CardTier, weight: Int)] = [
+        (.common, 5300), (.uncommon, 3400), (.rare, 1300),
+    ]
+
+    /// Sword & Shield — 어메이징레어·레디언트가 이 칸에서 1% 로 섞인다.
+    static let swordShieldReverse: [(tier: CardTier, weight: Int)] = [
+        (.common, 5200), (.uncommon, 3300), (.rare, 1400), (.tripleRare, 100),
+    ]
+
+    /// Scarlet & Violet — **실측값**이다.
     ///
-    /// 지금은 **모든 칸이 추첨이고 어떤 칸에서도 UR 까지 나올 수 있다.** 대신 마지막 한 칸은
-    /// 레어 이상만 뽑아 팩마다 최소 한 장을 보장한다. 실물보다 관대한 쪽이다.
-    static let generalSlots = 4
-    static let upperSlots = 3
-    static let foilSlots = 2
+    /// 일러스트레어 7.69%, 스페셜아트레어 3.11%, 하이퍼레어 1.92% 가 이 칸에서 나온다.
+    /// SV 의 상위 등급이 레어 칸이 아니라 역홀로 칸에서 나온다는 것이 이 시대의 핵심이고,
+    /// 그래서 "레어 칸 확률" 만 적으면 실제와 어긋난다. 남는 87.28% 는 커먼·언커먼·레어의
+    /// 역홀로이며 세트의 장수 비율(대략 56:32:12)로 나눴다.
+    static let scarletVioletReverse: [(tier: CardTier, weight: Int)] = [
+        (.common, 4890), (.uncommon, 2790), (.rare, 1048),
+        (.artRare, 769), (.specialArtRare, 311), (.ultraRare, 192),
+    ]
+
+    // MARK: 칸 표 — 레어 칸
+
+    /// 1999~2002. 레어 한 칸이고 홀로는 그중 3분의 1이다.
+    /// 빛나는 포켓몬·다크 라이츄 같은 시크릿은 팩 서른 개에 한 장꼴이다.
+    static let wotcRare: [(tier: CardTier, weight: Int)] = [
+        (.rare, 6550), (.doubleRare, 3200), (.specialArtRare, 200), (.ultraRare, 50),
+    ]
+
+    /// e-Card·EX (2002~2007). 홀로 자리에 ex 가 섞이고 골드스타가 1/72 로 들어온다.
+    static let exRare: [(tier: CardTier, weight: Int)] = [
+        (.rare, 6400), (.doubleRare, 3400), (.specialArtRare, 140), (.ultraRare, 60),
+    ]
+
+    /// Diamond & Pearl·Platinum·HGSS (2007~2011). LV.X·Prime 이 트리플레어 자리다.
+    static let diamondPearlRare: [(tier: CardTier, weight: Int)] = [
+        (.rare, 6000), (.doubleRare, 3200), (.tripleRare, 400),
+        (.superRare, 300), (.ultraRare, 100),
+    ]
+
+    /// Black & White·XY (2011~2016). EX 와 풀아트, 레인보우가 자리 잡은 시대다.
+    static let blackWhiteRare: [(tier: CardTier, weight: Int)] = [
+        (.rare, 5900), (.doubleRare, 3200), (.tripleRare, 200),
+        (.superRare, 550), (.ultraRare, 150),
+    ]
+
+    /// Sun & Moon (2017~2019). GX 와 시크릿이 가장 두꺼웠던 시대다.
+    static let sunMoonRare: [(tier: CardTier, weight: Int)] = [
+        (.rare, 5600), (.doubleRare, 3300), (.tripleRare, 200),
+        (.superRare, 600), (.ultraRare, 300),
+    ]
+
+    /// Sword & Shield — **실측값**이다.
+    ///
+    /// 표본 개봉에서 V 10.56%, VMAX 5.60%, 풀아트 2.78%, 레인보우 0.84% 가 나왔다.
+    /// V 는 홀로레어와 같은 RR 칸이므로 홀로레어 몫(22%)과 합쳐 적는다.
+    static let swordShieldRare: [(tier: CardTier, weight: Int)] = [
+        (.rare, 5822), (.doubleRare, 3256), (.tripleRare, 560),
+        (.superRare, 278), (.ultraRare, 84),
+    ]
+
+    /// Scarlet & Violet — **실측값**이다(676팩 표본).
+    ///
+    /// 레어 78.85%, 더블레어 14.05%, 울트라레어 6.51%. 남는 0.59% 가 ACE SPEC 이다.
+    /// 이 칸에는 일러스트레어·스페셜아트레어·하이퍼레어가 없다 — 그쪽은 역홀로 칸이다.
+    static let scarletVioletRare: [(tier: CardTier, weight: Int)] = [
+        (.rare, 7885), (.doubleRare, 1405), (.tripleRare, 59), (.superRare, 651),
+    ]
+
+    // MARK: 시대별 구성
+
+    /// 시대별 칸 구성. 위에서 아래 순서로 뽑고 **레어 칸이 언제나 마지막**이다 —
+    /// 개봉 연출이 마지막 장을 가장 좋은 장으로 놓고 움직인다.
+    ///
+    /// Sun & Moon 부터 실물 팩에는 기본 에너지가 한 장 고정으로 들어가지만, 그 시대 세트는
+    /// 기본 에너지가 세트 목록에 없어 칸을 만들 수가 없다. 장수를 맞추려고 커먼 칸으로 센다.
+    static func slotTables(_ era: PackEra)
+        -> [(weights: [(tier: CardTier, weight: Int)], count: Int)] {
+        switch era {
+        case .wotc:
+            return [(commonWeights, 7), (uncommonWeights, 3), (wotcRare, 1)]
+        case .ex:
+            return [(commonWeights, 4), (uncommonWeights, 3), (exReverse, 1), (exRare, 1)]
+        case .diamondPearl:
+            return [(commonWeights, 5), (uncommonWeights, 3),
+                    (diamondPearlReverse, 1), (diamondPearlRare, 1)]
+        case .blackWhite:
+            return [(commonWeights, 5), (uncommonWeights, 3),
+                    (blackWhiteReverse, 1), (blackWhiteRare, 1)]
+        case .sunMoon:
+            return [(commonWeights, 5), (uncommonWeights, 3),
+                    (sunMoonReverse, 1), (sunMoonRare, 1)]
+        case .swordShield:
+            return [(commonWeights, 5), (uncommonWeights, 3),
+                    (swordShieldReverse, 1), (swordShieldRare, 1)]
+        case .scarletViolet:
+            return [(commonWeights, 5), (uncommonWeights, 3),
+                    (scarletVioletReverse, 1), (scarletVioletRare, 1)]
+        }
+    }
+
+    /// 그 시대 레어 칸의 표. 마지막 칸이 곧 레어 칸이다.
+    static func rareWeights(_ era: PackEra) -> [(tier: CardTier, weight: Int)] {
+        slotTables(era).last?.weights ?? scarletVioletRare
+    }
+
+    /// 팩 장수. 칸 구성에서 나온다 — 따로 적으면 둘이 갈라진다.
+    static func cardsPerPack(_ era: PackEra) -> Int {
+        slotTables(era).reduce(0) { $0 + $1.count }
+    }
+
+    /// 가장 긴 팩(11장, 1999년). 개봉 결과 격자가 몇 줄까지 감당해야 하는지가 여기서 나온다.
+    static let maxCardsPerPack = PackEra.allCases.map { cardsPerPack($0) }.max() ?? 10
+
+    /// 레어 이상 칸 수. 어느 시대든 한 칸이고, 도감 혜택으로 늘어나지 않는다.
     static let hitSlots = 1
 
     /// 사용 한도를 다 채웠을 때 주는 팩 수. 한도를 채우는 건 하루를 꼬박 쓴 것이라
     /// 한 개로는 보상이 되지 않는다.
     static let bonusPackCount = 10
-
-    /// 일반 칸(4장). 대개 커먼이지만 1% 는 레어 이상으로 올라간다.
-    ///
-    /// 에너지 비중이 큰 것은 실물 팩이 에너지 한 장을 늘 끼워 주기 때문이다 —
-    /// 가장 값싼 카드가 희귀해지면 순서가 뒤집힌다.
-    static let generalWeights: [(tier: CardTier, weight: Int)] = [
-        (.common, 800), (.energy, 150), (.uncommon, 40), (.rare, 8), (.doubleRare, 2),
-    ]
-
-    /// 상위 칸(3장). 언커먼이 중심이고 5% 가 레어 이상이다.
-    static let upperWeights: [(tier: CardTier, weight: Int)] = [
-        (.uncommon, 700), (.common, 250), (.rare, 40), (.doubleRare, 9), (.artRare, 1),
-    ]
-
-    /// 포일 칸(2장). 실물의 역홀로 자리에 해당한다 — 7% 가 레어 이상이다.
-    static let foilWeights: [(tier: CardTier, weight: Int)] = [
-        (.common, 480), (.uncommon, 450), (.rare, 55), (.doubleRare, 13), (.artRare, 2),
-    ]
-
-    /// 레어 이상 칸(1장)의 가중치. 카드 실제 보유 수와 무관하게 게임 확률로 정한다 —
-    /// 어떤 세트는 시크릿이 37장이고 어떤 세트는 0장이라, 보유 수를 그대로 쓰면
-    /// 세트마다 체감 확률이 뒤집힌다.
-    static let hitWeights: [(tier: CardTier, weight: Int)] = [
-        (.rare, 55), (.doubleRare, 25), (.artRare, 7), (.tripleRare, 6),
-        (.superRare, 4), (.specialArtRare, 2), (.ultraRare, 1),
-    ]
 
     /// 특별 세트의 팩 장수. common 계층이 없는 세트를 말한다.
     ///
@@ -55,43 +211,44 @@ enum PackConfig {
 
     /// 특별 세트의 계층 가중치. 전 슬롯을 이 가중치로 뽑아 팩 안에 등급 차이를 만든다.
     static let specialWeights: [(tier: CardTier, weight: Int)] = [
-        (.rare, 46), (.doubleRare, 30), (.artRare, 8), (.tripleRare, 7),
-        (.superRare, 5), (.specialArtRare, 3), (.ultraRare, 1),
+        (.rare, 4600), (.doubleRare, 3000), (.artRare, 800), (.tripleRare, 700),
+        (.superRare, 500), (.specialArtRare, 300), (.ultraRare, 100),
     ]
 
-    /// 레어 이상 칸 수. 도감 혜택(`extraHitSlot`)이 하나 더 줄 수 있다.
-    static func hitSlotCount(_ perks: DexPerks) -> Int { hitSlots + perks.extraHitSlot }
+    /// 레어 이상 칸 수. 도감 혜택으로 늘어나지 않는다 — 팩 장수를 바꾸는 혜택은 없앴다.
+    static func hitSlotCount(_ perks: DexPerks) -> Int { hitSlots }
 
     /// 특별 팩의 장수. 전 슬롯이 가중 추첨이라 혜택은 장수를 늘리는 것으로 나타난다.
-    static func specialPackSize(_ perks: DexPerks) -> Int { specialPackSize + perks.extraHitSlot }
+    static func specialPackSize(_ perks: DexPerks) -> Int { specialPackSize }
 
     /// 갓팩 — 이 확률로 팩 전체가 레어 이상이 된다. `1/godPackOneIn`.
     ///
-    /// 실물 일본판은 1/600~1/2000 으로 추정되고 포켓몬 TCG 포켓은 0.05%(1/2000)다.
-    /// 그보다 후하게 잡은 이유는 규모 때문이다 — 이 앱은 하루 스무 팩 남짓이라
-    /// 1/2000 이면 백 일에 한 번이고, 그건 있는 줄도 모르는 기능이 된다.
+    /// **실물에는 없는 것이다.** 실물 팩 구조를 그대로 쓰되 이것만 얹어 둔다 — 포켓몬 TCG
+    /// 포켓이 0.05%(1/2000)로 넣고 있고, 이 앱은 하루 스무 팩 남짓이라 1/2000 이면 백 일에
+    /// 한 번이라 있는 줄도 모르는 기능이 된다. 상점에 확률을 함께 적는다.
     static let godPackOneIn = 300
 
     /// 갓팩의 등급 가중치. 하한만 올리는 것이 아니라 **상한 쪽도 함께 올린다** —
     /// 포켓몬 TCG 포켓도 갓팩에서 최상위 등급 확률을 0.05% 에서 5% 로 끌어올린다.
     /// 전 칸이 레어 이상이면서 위쪽이 두꺼워야 "터졌다" 는 느낌이 난다.
     static let godWeights: [(tier: CardTier, weight: Int)] = [
-        (.rare, 25), (.doubleRare, 30), (.artRare, 15), (.tripleRare, 12),
-        (.superRare, 10), (.specialArtRare, 5), (.ultraRare, 3),
+        (.rare, 2500), (.doubleRare, 3000), (.artRare, 1500), (.tripleRare, 1200),
+        (.superRare, 1000), (.specialArtRare, 500), (.ultraRare, 300),
     ]
 
     /// 천장 — 레어 이상 칸에서 이 횟수만큼 연속으로 레어만 나오면 다음은 RR 이상을 보장한다.
     ///
-    /// 기본 확률로는 RR 이상이 45% 라 다섯 번 연속 레어만 나올 확률이 5% 다. 드물지만
-    /// 실제로 일어나고, 그때 사용자는 확률이 조작됐다고 느낀다. 상한을 두고 그 숫자를
-    /// 상점에 함께 적는다 — 보장을 두고 숨기면 그것대로 공시 의무를 어긴다.
+    /// SV 실측 기준으로 레어 칸의 79% 가 그냥 레어라, 다섯 번 연속 레어만 나올 확률이 31% 다.
+    /// 흔하게 일어나는 만큼 상한을 두고 그 숫자를 상점에 함께 적는다 — 보장을 두고 숨기면
+    /// 그것대로 공시 의무를 어긴다.
     static let pityThreshold = 5
 
     /// 가중치에 혜택을 반영한다.
     ///
     /// `hitOdds` 는 레어의 몫을 덜어 **레어보다 위 등급에만** 나눠 준다. 커먼·언커먼까지
-    /// 같이 오르면 일반 칸에서는 오히려 나빠진다. 정수 가중치의 반올림 손실을 막으려고
-    /// 100 배로 올려 계산한다.
+    /// 같이 오르면 일반 칸에서는 오히려 나빠진다. 커먼 칸과 언커먼 칸에는 레어가 없으므로
+    /// 이 계산이 그대로 지나가고, 실제로 걸리는 곳은 역홀로 칸과 레어 칸이다.
+    /// 정수 가중치의 반올림 손실을 막으려고 100 배로 올려 계산한다.
     static func weights(_ base: [(tier: CardTier, weight: Int)],
                         perks: DexPerks) -> [(tier: CardTier, weight: Int)] {
         let scaled = base.map { (tier: $0.tier, weight: $0.weight * 100) }
@@ -167,7 +324,7 @@ enum PackPricing {
         let pool = index.pools[setID] ?? [:]
         return (pool[.common] ?? []).isEmpty
             ? PackConfig.specialPackSize(perks)
-            : PackConfig.cardsPerPack + perks.extraHitSlot
+            : PackConfig.cardsPerPack(index.era(setID))
     }
 }
 
@@ -266,6 +423,7 @@ enum PackOpening {
         }
 
         // 갓팩 판정을 먼저 한다. 걸리면 전 칸이 갓팩 표에서 나온다.
+        let era = index.era(setID)
         let isGod = generator.next(upperBound: UInt64(PackConfig.godPackOneIn)) == 0
         var requests: [CardTier] = []
 
@@ -277,19 +435,17 @@ enum PackOpening {
             // 갓팩은 레어 이상만 나오므로 천장을 다시 채울 이유가 없다.
             pity = 0
         } else {
-            // 모든 칸을 추첨한다. 칸 종류마다 확률표가 다를 뿐, 어떤 칸에서도 상위 등급이 나온다.
-            for (weights, count) in [(PackConfig.generalWeights, PackConfig.generalSlots),
-                                     (PackConfig.upperWeights, PackConfig.upperSlots),
-                                     (PackConfig.foilWeights, PackConfig.foilSlots)] {
+            // 그 시대의 칸 구성을 그대로 따라간다. 레어 칸만 따로 다루므로 마지막을 뺀다.
+            for (weights, count) in Self.standardSlotTables(era: era, perks: perks).dropLast() {
                 for _ in 0..<count {
-                    requests.append(weightedTier(PackConfig.weights(weights, perks: perks),
-                                                 available: pool, using: &generator))
+                    requests.append(weightedTier(weights, available: pool, using: &generator))
                 }
             }
 
             // 마지막 칸은 레어 이상만 뽑는다. 천장이 걸려 있으면 RR 이상으로 올린다.
             for _ in 0..<PackConfig.hitSlotCount(perks) {
-                requests.append(hitTier(available: pool, perks: perks, pity: pity, using: &generator))
+                requests.append(hitTier(available: pool, era: era, perks: perks,
+                                        pity: pity, using: &generator))
             }
             pity = Self.nextPity(after: requests.suffix(PackConfig.hitSlotCount(perks)), from: pity)
         }
@@ -347,7 +503,7 @@ enum PackOpening {
             // 도감 난이도도 이 값에서 나오므로 빼먹으면 난이도가 조용히 어긋난다.
             let godChance = 1.0 / Double(PackConfig.godPackOneIn)
             let cards = PackPricing.cardCount(setID: setID, index: index, perks: perks)
-            for (weights, count) in Self.standardSlotTables(perks: perks) {
+            for (weights, count) in Self.standardSlotTables(era: index.era(setID), perks: perks) {
                 addWeighted(weights, slots: Double(count) * (1 - godChance))
             }
             addWeighted(PackConfig.weights(PackConfig.godWeights, perks: perks),
@@ -361,14 +517,13 @@ enum PackOpening {
             .sorted { $0.tier.rank > $1.tier.rank }
     }
 
-    /// 일반 팩의 칸 표. 뽑기·기대 구성·공시가 모두 이 하나를 본다 —
+    /// 그 시대 팩의 칸 표. 뽑기·기대 구성·공시가 모두 이 하나를 본다 —
     /// 세 곳에 따로 적으면 표시된 확률과 실제 결과가 갈라진다.
-    static func standardSlotTables(perks: DexPerks)
+    static func standardSlotTables(era: PackEra, perks: DexPerks)
         -> [(weights: [(tier: CardTier, weight: Int)], count: Int)] {
-        [(PackConfig.weights(PackConfig.generalWeights, perks: perks), PackConfig.generalSlots),
-         (PackConfig.weights(PackConfig.upperWeights, perks: perks), PackConfig.upperSlots),
-         (PackConfig.weights(PackConfig.foilWeights, perks: perks), PackConfig.foilSlots),
-         (PackConfig.weights(PackConfig.hitWeights, perks: perks), PackConfig.hitSlotCount(perks))]
+        PackConfig.slotTables(era).map {
+            (weights: PackConfig.weights($0.weights, perks: perks), count: $0.count)
+        }
     }
 
     /// 칸별 공시. 상점이 이 값을 그대로 표로 그린다.
@@ -390,7 +545,8 @@ enum PackOpening {
             return [PackSlot(id: 0, count: PackConfig.specialPackSize(perks),
                              guaranteed: nil, odds: odds(weights))]
         }
-        return Self.standardSlotTables(perks: perks).enumerated().map { offset, table in
+        return Self.standardSlotTables(era: index.era(setID), perks: perks)
+            .enumerated().map { offset, table in
             PackSlot(id: offset, count: table.count, guaranteed: nil, odds: odds(table.weights))
         }
     }
@@ -398,7 +554,9 @@ enum PackOpening {
     /// 히트 슬롯만의 등급 분포. 뽑기 내부와 상세 표시가 같은 값을 쓰도록 남겨 둔다.
     static func hitOdds(setID: String, index: CardIndex) -> [(tier: CardTier, probability: Double)] {
         let pool = index.pools[setID] ?? [:]
-        let weights = (pool[.common] ?? []).isEmpty ? PackConfig.specialWeights : PackConfig.hitWeights
+        let weights = (pool[.common] ?? []).isEmpty
+            ? PackConfig.specialWeights
+            : PackConfig.rareWeights(index.era(setID))
         let available = weights.filter { !(pool[$0.tier] ?? []).isEmpty }
         let total = available.reduce(0) { $0 + $1.weight }
         guard total > 0 else { return [] }
@@ -419,11 +577,12 @@ enum PackOpening {
     /// 빼지 않으면 1999년 세트에서 시크릿을 뽑았다고 판정하고 폴백으로 흘러가 확률이 왜곡된다.
     static func hitTier(
         available pool: [CardTier: [String]],
+        era: PackEra = .scarletViolet,
         perks: DexPerks = .none,
         pity: Int = 0,
         using generator: inout some RandomNumberGenerator
     ) -> CardTier {
-        var weights = PackConfig.weights(PackConfig.hitWeights, perks: perks)
+        var weights = PackConfig.weights(PackConfig.rareWeights(era), perks: perks)
         // 천장 — 레어를 후보에서 빼 RR 이상만 남긴다. 세트에 RR 이상이 없으면
         // (1999년 세트 중 일부) 빼지 않는다. 뺐다가 후보가 비면 슬롯이 사라진다.
         if pity >= PackConfig.pityThreshold {

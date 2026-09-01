@@ -45,7 +45,7 @@ struct PacksView: View {
                     opened = loaded
                     self.preparing = nil
                 }
-            } else if wallet.ownedPacks.isEmpty {
+            } else if owned.isEmpty {
                 emptyState
             } else {
                 packList
@@ -69,13 +69,29 @@ struct PacksView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// 가진 팩. **최신 세트가 앞이다** — 상점과 같은 순서다.
+    ///
+    /// 예전에는 세트 ID 순이었다. 사람 눈에는 아무 뜻이 없는 순서라, 방금 산 팩이 목록
+    /// 한가운데에 끼어 찾을 수가 없었다("me1" 은 "base1" 과 "neo1" 사이에 낀다).
+    /// 상점에서 최신 팩을 사고 넘어오면 그것이 맨 위에 있어야 한다.
+    ///
+    /// 인덱스에 없는 세트는 뺀다. 옛 세이브에 남은 세트가 그럴 수 있는데, 카드도 그림도
+    /// 없어 열어 봐야 빈 팩이 된다.
+    private var owned: [(set: CardSet, count: Int)] {
+        guard let index else { return [] }
+        return wallet.ownedPacks
+            .compactMap { entry in index.set(entry.setID).map { (set: $0, count: entry.count) } }
+            .sorted { $0.set.released > $1.set.released }
+    }
+
     private var packList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                ForEach(wallet.ownedPacks, id: \.setID) { entry in
-                    if let index, let set = index.set(entry.setID) {
-                        OwnedPackRow(wallet: wallet, index: index, set: set, count: entry.count) {
-                            open(set: set, index: index)
+                ForEach(owned, id: \.set.id) { entry in
+                    if let index {
+                        OwnedPackRow(wallet: wallet, index: index, set: entry.set,
+                                     count: entry.count) {
+                            open(set: entry.set, index: index)
                         }
                     }
                 }
@@ -362,6 +378,9 @@ private struct RevealView: View {
 
     // MARK: 요약
 
+    /// 이 팩에 맞춘 요약 격자. 1999년 팩은 11장이라 열이 하나 더 필요하다.
+    private var summaryGrid: CardGrid { CardGrid.packSummary(opened.cards.count) }
+
     private var summary: some View {
         let l = wallet.l
         return VStack(spacing: 8) {
@@ -397,14 +416,15 @@ private struct RevealView: View {
                 }
             }
 
-            // 스크롤로 감싸지 않는다. 열 장이 두 줄로 들어가므로 감쌀 이유가 없고,
-            // 감싸면 결과를 다 보려고 굴려야 한다.
-            LazyVGrid(columns: CardGrid.packSummary.items,
-                      spacing: CardGrid.packSummary.spacing) {
+            // 스크롤로 감싸지 않는다. 격자가 팩 장수에 맞춰 두 줄로 접히므로 감쌀 이유가
+            // 없고, 감싸면 결과를 다 보려고 굴려야 한다.
+            LazyVGrid(columns: summaryGrid.items, spacing: summaryGrid.spacing) {
                 // 요약은 희귀한 것부터 — 무엇을 건졌는지 먼저 보인다.
                 ForEach(Array(opened.cards.reversed().enumerated()), id: \.offset) { _, card in
                     Button { spotlight = card } label: {
-                        PulledCardCell(wallet: wallet, card: card, preloaded: opened.thumbs[card.id])
+                        PulledCardCell(wallet: wallet, card: card,
+                                       width: summaryGrid.width,
+                                       preloaded: opened.thumbs[card.id])
                     }
                     .buttonStyle(.plain)
                 }
@@ -695,12 +715,14 @@ struct TierGlow: View {
 private struct PulledCardCell: View {
     let wallet: WalletStore
     let card: PulledCard
+    /// 요약 격자의 칸 폭. 팩 장수에 따라 달라지므로 밖에서 받는다.
+    let width: CGFloat
     var preloaded: NSImage?
 
     var body: some View {
         VStack(spacing: 3) {
             ZStack(alignment: .topTrailing) {
-                CardImageView(cardID: card.id, width: CardGrid.packSummary.width, preloaded: preloaded)
+                CardImageView(cardID: card.id, width: width, preloaded: preloaded)
                 if card.isNew {
                     // 카드 안쪽에 붙인다. 바깥으로 내밀면 격자 경계에서 위가 잘린다.
                     NewBadge(text: wallet.l.newCardBadge).padding(3)

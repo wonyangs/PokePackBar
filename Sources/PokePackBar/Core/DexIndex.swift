@@ -8,16 +8,6 @@ enum DexPerkKind: String, Codable, Sendable, CaseIterable {
     case packDiscount       // 팩 가격 -x
     case dustBonus          // 판매 추가금 +x
     case hitOdds            // 히트 슬롯에서 레어 비중을 x 만큼 상위 등급으로 넘긴다
-    case extraHitSlot       // 레어 이상 칸 +x 개 (팩 장수도 그만큼 는다)
-}
-
-extension DexPerkKind {
-    /// 판 자체를 바꾸는 혜택인가.
-    ///
-    /// 퍼센트 손잡이는 조금씩 쌓이지만, 히트 칸을 하나 더 주는 것은 팩 기대값을 33% 에서
-    /// 50% 로 올리고 그 뒤 여는 모든 팩에 걸린다. **가장 비싼 도감에서만 준다** —
-    /// 중간 난이도에 붙으면 그 위를 모을 이유가 사라진다.
-    var isStructural: Bool { self == .extraHitSlot }
 }
 
 struct DexPerk: Codable, Sendable, Equatable {
@@ -74,18 +64,24 @@ struct DexPerks: Sendable, Equatable {
     var packDiscount: Double = 0
     var dustBonus: Double = 0
     var hitOdds: Double = 0
-    var extraHitSlot: Int = 0
 
     static let none = DexPerks()
 
     /// 상한값은 되팔기 회수율이 정한다.
     ///
     /// 팩을 사서 전부 팔았을 때의 기대 수입이 팩 값에 가까워지면 팩을 돌리는 것 자체가
-    /// 재화 순환이 되어 게임이 성립하지 않는다. 히트 칸 하나가 이 비율을 혼자 32% → 53% 로
-    /// 밀어 올린다(sv10 기준, 실측). **두 칸이면 73% 라 다른 혜택을 얹을 자리가 없다** —
-    /// 그래서 카드를 늘리는 혜택은 하나뿐이다. 75% 를 넘으면 `DexPerkEffectTests` 가 막는다.
-    static let caps = DexPerks(tokenGain: 0.15, packDiscount: 0.10, dustBonus: 0.06,
-                               hitOdds: 0.15, extraHitSlot: 1)
+    /// 재화 순환이 되어 게임이 성립하지 않는다.
+    ///
+    /// 「히트 칸 +1」을 없애면서 전부 올렸다. 그 혜택 하나가 이 비율을 32% 에서 53% 로 밀어
+    /// 올려 다른 혜택을 얹을 자리를 먹고 있었다. 빼고 나니 상한을 올려도 최악이 52% 다.
+    /// 세트가 126개가 되면서 팩값이 4,000배로 벌어져, 가장 비싼 도감의 보상을 채우려면
+    /// 예전 상한으로는 모자라기도 했다. `DexPerkEffectTests` 가 이 선을 지킨다.
+    ///
+    /// 판매 추가금만 다른 것보다 상한이 높다. **한 점의 값이 6분의 1이기 때문이다** —
+    /// 팩값 전체에 걸리는 할인·획득량과 달리 이것은 판 카드에만, 그것도 절반만 걸린다.
+    /// 같은 크기의 보상을 주려면 숫자가 그만큼 커야 한다.
+    static let caps = DexPerks(tokenGain: 0.25, packDiscount: 0.15, dustBonus: 0.15,
+                               hitOdds: 0.20)
 
     /// 완성한 도감에서 혜택을 모은다. 상한을 넘으면 상한에서 멈춘다.
     ///
@@ -99,7 +95,6 @@ struct DexPerks: Sendable, Equatable {
                 case .packDiscount: perks.packDiscount += perk.value
                 case .dustBonus:    perks.dustBonus += perk.value
                 case .hitOdds:      perks.hitOdds += perk.value
-                case .extraHitSlot: perks.extraHitSlot += Int(perk.value.rounded())
                 }
             }
         }
@@ -110,8 +105,7 @@ struct DexPerks: Sendable, Equatable {
         DexPerks(tokenGain: min(tokenGain, Self.caps.tokenGain),
                  packDiscount: min(packDiscount, Self.caps.packDiscount),
                  dustBonus: min(dustBonus, Self.caps.dustBonus),
-                 hitOdds: min(hitOdds, Self.caps.hitOdds),
-                 extraHitSlot: min(extraHitSlot, Self.caps.extraHitSlot))
+                 hitOdds: min(hitOdds, Self.caps.hitOdds))
     }
 
     var isEmpty: Bool { self == .none }

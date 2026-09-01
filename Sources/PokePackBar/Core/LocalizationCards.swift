@@ -128,11 +128,15 @@ extension L {
         lang == .ko ? ko : en
     }
 
-    var packTotalCards: String { t("전체 카드", "Cards in set", "収録カード",
-                                     "Cartas del set", "Cartes du set", "Cartas do set") }
-    var packCollected: String { t("수집률", "Collected", "収集率", "Recolectadas", "Collectées", "Coletadas") }
     var packOdds: String { t("등급별 확률", "Odds by rarity", "レアリティ別確率",
                               "Probabilidad por rareza", "Probabilité par rareté", "Chance por raridade") }
+    /// 이 팩에서 나올 수 있는 카드를 다 보여 주는 화면으로 들어가는 말.
+    var packSeeCards: String { t("나올 수 있는 카드", "Cards in this pack", "出るカード一覧",
+                                  "Cartas de este sobre", "Cartes de ce booster",
+                                  "Cartas deste pacote") }
+    /// 카드 상세에서 그 팩을 사러 가는 말.
+    var packGoBuy: String { t("이 팩 사러 가기", "Buy this pack", "このパックを買う",
+                               "Comprar este sobre", "Acheter ce booster", "Comprar este pacote") }
     /// 확정 한 장과 천장을 한 줄로. 표를 칸별로 쪼개는 대신 이 줄로 보장을 알린다.
     func packGuaranteeNote(_ guaranteed: Int, pity: Int) -> String {
         t("팩마다 레어 이상 \(guaranteed)장 확정 · 레어만 \(pity)팩 연속이면 다음은 RR 이상 보장",
@@ -337,6 +341,10 @@ extension L {
                                       "カードリストを読み込めません。", "No se pudo cargar la lista de cartas.",
                                       "Impossible de charger la liste des cartes.", "Não foi possível carregar a lista de cartas.") }
 
+    /// 시대에 든 세트 수. 「18개」처럼 읽힌다.
+    func shopPackCount(_ count: Int) -> String {
+        t("\(count)개", "\(count)", "\(count)個", "\(count)", "\(count)", "\(count)")
+    }
     var shopPacksSection: String { t("일반 팩", "Packs", "通常パック",
                                       "Sobres", "Boosters", "Pacotes") }
 
@@ -467,7 +475,6 @@ extension L {
         case .packDiscount: return "\(dexPerkPackDiscount) −\(Self.percent(perk.value))"
         case .dustBonus:    return "\(dexPerkDustBonus) +\(Self.percent(perk.value))"
         case .hitOdds:      return "\(dexPerkHitOdds) +\(Self.percent(perk.value))"
-        case .extraHitSlot: return "\(dexPerkExtraHit) +\(Int(perk.value.rounded()))"
         }
     }
 
@@ -482,8 +489,6 @@ extension L {
             return perks.dustBonus > 0 ? "\(dexPerkDustBonus) +\(Self.percent(perks.dustBonus))" : nil
         case .hitOdds:
             return perks.hitOdds > 0 ? "\(dexPerkHitOdds) +\(Self.percent(perks.hitOdds))" : nil
-        case .extraHitSlot:
-            return perks.extraHitSlot > 0 ? "\(dexPerkExtraHit) +\(perks.extraHitSlot)" : nil
         }
     }
 
@@ -495,8 +500,6 @@ extension L {
     var dexPerkHitOdds: String { t("상위 등급 확률", "Higher rarity odds", "上位レア確率",
                                     "Prob. de rareza alta", "Chance de haute rareté",
                                     "Chance de raridade alta") }
-    var dexPerkExtraHit: String { t("레어 이상 확정", "Guaranteed rare+", "レア以上確定",
-                                     "Rara garantizada", "Rare garantie", "Rara garantida") }
 
     /// 혜택이 실제로 무엇을 바꾸는지 한 줄로. 이름 위에 마우스를 올리면 뜬다.
     func dexPerkHelp(_ kind: DexPerkKind) -> String {
@@ -529,13 +532,6 @@ extension L {
                       "La carta rara garantizada sale con más rareza.",
                       "La carte rare garantie monte plus souvent en rareté.",
                       "A carta rara garantida sobe de raridade com mais frequência.")
-        case .extraHitSlot:
-            return t("팩마다 레어 이상 확정 칸이 하나 늘어요. 10장 팩이 11장이 됩니다.",
-                      "Every pack holds one more rare-or-better card.",
-                      "パックごとにレア以上のカードが1枚増えます。",
-                      "Cada sobre trae una carta rara adicional.",
-                      "Chaque booster contient une carte rare de plus.",
-                      "Cada pacote traz mais uma carta rara.")
         }
     }
 

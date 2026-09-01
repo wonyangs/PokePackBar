@@ -34,12 +34,18 @@ final class CardGridTests: XCTestCase {
     /// 팩 한 개가 개봉 결과에 두 줄로 들어가는가.
     ///
     /// 세 줄이 되면 머리글과 「확인」 버튼까지 더해 탭 높이를 넘고, 결과를 다 보려면
-    /// 굴려야 한다 — 열 장이 한눈에 안 보이면 무엇을 건졌는지 읽히지 않는다.
-    func testAPackFitsTheSummaryInTwoRows() {
-        let columns = Double(CardGrid.packSummary.columns)
-        let rows = Int((Double(PackConfig.cardsPerPack) / columns).rounded(.up))
-        XCTAssertLessThanOrEqual(rows, 2,
-                                 "열 \(CardGrid.packSummary.columns)개로는 \(rows)줄이 된다")
+    /// 굴려야 한다 — 한 팩이 한눈에 안 보이면 무엇을 건졌는지 읽히지 않는다.
+    ///
+    /// **시대마다 팩 장수가 다르다.** 1999년 팩은 11장이라 다섯 열로는 세 줄이 되고,
+    /// e-Card·EX 는 9장이다. 어느 시대든 두 줄이어야 한다.
+    func testEveryEraFitsTheSummaryInTwoRows() {
+        for era in PackEra.allCases {
+            let cards = PackConfig.cardsPerPack(era)
+            let grid = CardGrid.packSummary(cards)
+            let rows = Int((Double(cards) / Double(grid.columns)).rounded(.up))
+            XCTAssertLessThanOrEqual(rows, 2,
+                                     "\(era) \(cards)장을 열 \(grid.columns)개로 놓으면 \(rows)줄이다")
+        }
     }
 
     /// 도감 띠는 줄 카드 **안에** 들어간다. 띠에 줄 여백을 더한 값이 탭 폭을 넘으면
@@ -89,6 +95,49 @@ final class SegmentedTabsTests: XCTestCase {
                            "\(name): 기본 세그먼트 컨트롤로 돌아갔다")
             XCTAssertTrue(text.contains("SegmentedTabs("), "\(name): 탭 줄이 사라졌다")
         }
+    }
+}
+
+/// 뒤로 가기가 화면마다 다른 자리에 있지 않은가.
+///
+/// 예전에는 목록에서 왼쪽 갈매기, 상세에서 오른쪽 X 였다. 상점에서 시대 → 팩 목록 → 팩
+/// 상세로 들어가면 버튼이 왼쪽에 있다 오른쪽으로 건너뛰어 매번 눈으로 찾아야 했다.
+@MainActor
+final class BackButtonTests: XCTestCase {
+
+    private var uiSources: [URL] {
+        let dir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/PokePackBar/UI")
+        return ((try? FileManager.default.contentsOfDirectory(at: dir,
+                                                              includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == "swift" && $0.lastPathComponent != "BackButton.swift" }
+    }
+
+    /// 화면을 닫는 버튼을 손으로 그리지 않는다. `BackButton` 하나만 쓴다.
+    func testNoHandRolledBackControls() throws {
+        var offenders: [String] = []
+        for url in uiSources {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            for glyph in ["xmark.circle", "chevron.left", "chevron.backward"]
+            where text.contains(glyph) {
+                offenders.append("\(url.lastPathComponent): \(glyph)")
+            }
+        }
+        XCTAssertTrue(offenders.isEmpty,
+                      "뒤로 가기를 손으로 그렸다. BackButton 을 쓴다: "
+                      + offenders.joined(separator: ", "))
+    }
+
+    /// 누를 수 있는 넓이가 충분한가.
+    ///
+    /// 그림만 두면 실제로 눌리는 곳이 글리프 넓이(대략 10×14pt)뿐이라 조금만 빗나가도
+    /// 반응하지 않는다. 「눌러도 안 눌린다」는 말이 여기서 나왔다.
+    func testBackButtonIsBigEnoughToHit() {
+        let controller = NSHostingController(rootView: AnyView(BackButton(action: {})))
+        let size = controller.sizeThatFits(in: CGSize(width: 200, height: 100))
+        XCTAssertGreaterThanOrEqual(size.width, 28, "가로가 좁아 누르기 어렵다")
+        XCTAssertGreaterThanOrEqual(size.height, 24, "세로가 좁아 누르기 어렵다")
     }
 }
 

@@ -14,20 +14,29 @@ enum OripaConfig {
     /// 박스에 들어갈 수 있는 최저 등급. 오리파는 "상위 등급만 담은 뽑기" 다.
     static let minimumTier: CardTier = .doubleRare
 
-    /// 박스 구성. **등급이 아니라 값으로 칸을 나눈다.**
+    /// 박스 구성. **칸을 값의 배수 구간으로 적는다.**
     ///
-    /// 예전에는 UR 1장·SAR 4장처럼 등급으로 짰다. 등급이 값을 뜻하지 않으므로 그렇게 짜면
-    /// 값싼 UR 만 들어찬 박스와 비싼 것만 들어찬 박스의 가치가 몇 배씩 갈리는데, 값은 같다.
+    /// 등급으로 짜지 않는 이유는 그대로다 — 등급이 값을 뜻하지 않아서 값싼 UR 만 들어찬
+    /// 박스가 나온다. 그래서 값으로 나누되, 나누는 방식을 바꿨다.
     ///
-    /// 후보를 시세 순으로 세운 뒤 순위 구간에서 뽑으면 어느 박스든 값의 윤곽이 같아진다.
-    /// 맨 위 칸은 늘 "이 게임에서 제일 비싼 다섯 장 중 하나" 다.
+    /// 예전에는 **순위** 구간이었다(상위 1.2% 에서 한 장). 후보가 423장이던 시절에는 그
+    /// 구간 안의 값이 고만고만해서 통했는데, 122세트 5,438장이 되면서 같은 구간에
+    /// 109만원과 2,737만원이 함께 들어왔다. 25배다. 그 한 칸이 박스 값의 3분의 1이라
+    /// 어떤 박스가 다른 박스의 세 배가 되는데 칸 값은 같았고, **박스 안이 다 보이는
+    /// 뽑기에서 그건 「좋은 박스에서만 사면 된다」가 된다.**
+    ///
+    /// 이제 구간을 값의 배수로 적는다. 기준은 후보 시세의 중앙값이고, 한 구간 안의 값
+    /// 차이를 좁혀 어느 박스든 총값이 ±5% 안에 들게 한다.
+    ///
+    /// 위쪽을 잘라 둔 것도 일부러다. 2,737만원짜리 카드는 80만원짜리 칸 100개에 넣을
+    /// 물건이 아니다 — 그 한 장이 박스 전체보다 비싸다.
     static let composition: [(band: Range<Double>, count: Int)] = [
-        (0.00..<0.012, 1),    // 최상위 — 후보 423장 기준 상위 5장
-        (0.012..<0.06, 4),
-        (0.06..<0.18, 10),
-        (0.18..<0.36, 15),
-        (0.36..<0.60, 20),
-        (0.60..<1.00, 50),
+        (180.0..<200.0, 1),     // 최상위 — 슬롯 평균의 스무 배 남짓
+        (55.0..<62.0, 4),
+        (17.0..<20.0, 10),
+        (5.2..<6.2, 15),
+        (1.9..<2.2, 20),
+        (0.55..<0.65, 50),
     ]
 
     static var slotsPerBox: Int { composition.reduce(0) { $0 + $1.count } }
@@ -39,42 +48,84 @@ enum OripaConfig {
     /// 이 값이면 갈아서 돌려받는 비율이 8분의 1이라 수익원이 될 수 없다.
     static let margin: Double = 8
 
+    /// 박스를 만들 재료. **한 번 세워 두고 돌려 쓴다.**
+    ///
+    /// 예전에는 부를 때마다 후보 전체를 값순으로 다시 정렬했다. 비교 안에서 시세를 조회하는
+    /// 정렬이라 5,438장이면 한 번에 13만 번 사전 조회가 일어나는데, 그것이 화면을 그릴
+    /// 때마다 돌았다. 이제 장당 한 번만 조회하고 칸별 후보까지 한 번에 갈라 둔다.
+    struct Shelf: Sendable {
+        /// 칸마다의 후보. `composition` 과 같은 순서다.
+        let bands: [[String]]
+        /// 배수의 기준 — 후보 시세의 중앙값(달러).
+        let baseUSD: Double
+        /// 슬롯 하나의 기대 시세(달러).
+        let slotUSD: Double
+
+        var isEmpty: Bool { bands.allSatisfy(\.isEmpty) }
+    }
+
+    /// 후보를 값순으로 세우고 칸별로 갈라 둔다.
+    static func shelf(index: CardIndex, prices: CardPrices? = CardPrices.shared) -> Shelf {
+        shelf(cards: index.cards, prices: prices)
+    }
+
+    /// 인덱스를 조립하는 시점에 쓸 진입점. 이 결과를 `CardIndex`가 보관해 상점 화면을
+    /// 다시 그릴 때마다 5천 장을 재정렬하지 않게 한다.
+    static func shelf(cards: [CardEntry], prices: CardPrices? = CardPrices.shared) -> Shelf {
+        // 값을 먼저 뽑아 두고 정렬한다. 비교 안에서 조회하면 같은 카드를 수십 번 찾는다.
+        let keyed = cards
+            .filter { $0.tier.rank >= minimumTier.rank }
+            .map { (id: $0.id, usd: MarketEconomy.usd(cardID: $0.id, prices: prices)) }
+            .sorted { $0.usd != $1.usd ? $0.usd > $1.usd : $0.id < $1.id }
+        guard !keyed.isEmpty else { return Shelf(bands: [], baseUSD: 0, slotUSD: 0) }
+
+        let base = keyed[keyed.count / 2].usd
+        var bands: [[String]] = []
+        var total = 0.0
+        for entry in composition {
+            let picked = window(entry.band, in: keyed, base: base, need: entry.count)
+            bands.append(picked.map(\.id))
+            guard !picked.isEmpty else { continue }
+            let mean = picked.reduce(0.0) { $0 + $1.usd } / Double(picked.count)
+            total += mean * Double(entry.count)
+        }
+        return Shelf(bands: bands, baseUSD: base, slotUSD: total / Double(slotsPerBox))
+    }
+
+    /// 값 구간에 드는 카드. 목록은 값이 큰 것부터라 구간은 이어진 한 토막이다.
+    ///
+    /// 후보가 칸 수보다 적으면 값이 가까운 쪽으로 넓힌다 — 칸을 비우느니 값이 조금
+    /// 어긋나는 편이 낫다. 시세 스냅샷이 크게 바뀌어 한 구간이 비는 날에도 박스는 채워진다.
+    private static func window(_ band: Range<Double>,
+                               in keyed: [(id: String, usd: Double)],
+                               base: Double, need: Int) -> ArraySlice<(id: String, usd: Double)> {
+        let high = band.upperBound * base, low = band.lowerBound * base
+        var lower = keyed.firstIndex { $0.usd < high } ?? keyed.count
+        var upper = keyed.firstIndex { $0.usd < low } ?? keyed.count
+        while upper - lower < need, lower > 0 || upper < keyed.count {
+            if lower > 0 { lower -= 1 }
+            if upper < keyed.count { upper += 1 }
+        }
+        return keyed[lower..<upper]
+    }
+
     /// 슬롯 하나의 값. 박스 기대 시세에서 나온다.
     static func slotPrice(index: CardIndex, prices: CardPrices? = CardPrices.shared) -> Int {
-        let pool = eligible(index: index, prices: prices)
-        guard !pool.isEmpty else { return 30_000_000 }
-        let mean = expectedSlotUSD(pool: pool, prices: prices)
-        return MarketEconomy.tokens(usd: mean * margin)
+        slotPrice(shelf: index.oripaShelf, prices: prices)
+    }
+
+    static func slotPrice(shelf: Shelf, prices: CardPrices? = CardPrices.shared) -> Int {
+        guard shelf.slotUSD > 0 else { return 30_000_000 }
+        return MarketEconomy.tokens(usd: shelf.slotUSD * margin, prices: prices)
     }
 
     /// 박스에 들어갈 수 있는 카드를 시세 높은 순으로.
     static func eligible(index: CardIndex, prices: CardPrices?) -> [String] {
         index.cards
             .filter { $0.tier.rank >= minimumTier.rank }
+            .map { (id: $0.id, usd: MarketEconomy.usd(cardID: $0.id, prices: prices)) }
+            .sorted { $0.usd != $1.usd ? $0.usd > $1.usd : $0.id < $1.id }
             .map(\.id)
-            .sorted { MarketEconomy.usd(cardID: $0, prices: prices)
-                    > MarketEconomy.usd(cardID: $1, prices: prices) }
-    }
-
-    /// 슬롯 하나의 기대 시세 — 구간마다 그 구간 평균을 쓰고 칸 수로 가중한다.
-    static func expectedSlotUSD(pool: [String], prices: CardPrices?) -> Double {
-        var total = 0.0
-        for entry in composition {
-            let range = bounds(entry.band, count: pool.count)
-            guard !range.isEmpty else { continue }
-            let mean = range.reduce(0.0) {
-                $0 + MarketEconomy.usd(cardID: pool[$1], prices: prices)
-            } / Double(range.count)
-            total += mean * Double(entry.count)
-        }
-        return total / Double(slotsPerBox)
-    }
-
-    /// 비율 구간을 실제 순위 구간으로 옮긴다. 후보가 적어도 최소 한 장은 잡는다.
-    static func bounds(_ band: Range<Double>, count: Int) -> Range<Int> {
-        let lower = min(count - 1, Int(band.lowerBound * Double(count)))
-        let upper = min(count, max(lower + 1, Int(band.upperBound * Double(count))))
-        return lower..<upper
     }
 }
 
@@ -92,20 +143,25 @@ struct OripaBox: Codable, Sendable, Equatable {
 
 enum Oripa {
 
-    /// 새 박스를 만든다. 등급별로 정해진 수만큼 서로 다른 카드를 고른다.
+    /// 새 박스를 만든다. 칸마다 정해진 수만큼 서로 다른 카드를 고른다.
     ///
     /// 같은 카드를 두 번 넣지 않는다 — 100슬롯을 다 사면 박스 안의 것을 전부 갖게 되는 것이
     /// 이 뽑기의 확정 경로이고, 중복이 섞이면 그 약속이 깨진다.
     static func makeBox(index: CardIndex, serial: Int,
                         prices: CardPrices? = CardPrices.shared,
                         using generator: inout some RandomNumberGenerator) -> OripaBox {
-        let ranked = OripaConfig.eligible(index: index, prices: prices)
+        // `prices`는 기존 호출부 호환용이다. 선반은 이 인덱스가 만들어질 때의 시세와 한 묶음이고,
+        // 화면을 그릴 때 다른 스냅샷으로 다시 세우면 캐시 계약과 박스 가격이 갈라진다.
+        _ = prices
+        return makeBox(shelf: index.oripaShelf, serial: serial, using: &generator)
+    }
+
+    static func makeBox(shelf: OripaConfig.Shelf, serial: Int,
+                        using generator: inout some RandomNumberGenerator) -> OripaBox {
         var slots: [String] = []
         var taken: Set<String> = []
-        for entry in OripaConfig.composition {
-            var pool = OripaConfig.bounds(entry.band, count: ranked.count)
-                .map { ranked[$0] }
-                .filter { !taken.contains($0) }
+        for (entry, candidates) in zip(OripaConfig.composition, shelf.bands) {
+            var pool = candidates.filter { !taken.contains($0) }
             for _ in 0..<entry.count {
                 guard !pool.isEmpty else { break }
                 let pick = Int(generator.next(upperBound: UInt64(pool.count)))
