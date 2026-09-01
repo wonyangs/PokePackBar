@@ -10,19 +10,52 @@ final class PopoverNavigationTests: XCTestCase {
         XCTAssertEqual(PopoverNavigation().tab, .shop)
     }
 
-    /// 호스팅 컨트롤러는 팝오버를 닫아도 재사용되므로 화면 상태가 남는다.
-    /// 열 때마다 reset() 해서 항상 같은 자리에서 시작하게 한다.
-    func testResetReturnsToShopAndClosesSettings() {
+    /// **팝오버를 닫아도 보던 화면이 남는다.**
+    ///
+    /// 예전에는 닫을 때 화면 트리를 버리고 열 때 상점으로 되돌렸다. 팩을 뜯다 닫으면 뜯던
+    /// 장 번호도 무엇이 나왔는지도 사라졌다. 트리를 버리지 않고 되돌리지도 않으므로,
+    /// 되돌리는 코드가 다시 생기면 그 증상이 그대로 돌아온다.
+    func testNothingResetsTheScreenOnReopen() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let app = try String(contentsOf: root.appendingPathComponent(
+            "Sources/PokePackBar/PokePackBarApp.swift"), encoding: .utf8)
+
+        XCTAssertFalse(app.contains("navigation.reset()"),
+                       "열 때 화면을 되돌리고 있다 — 뜯던 팩이 사라진다")
+        XCTAssertFalse(app.contains("contentViewController = nil"),
+                       "닫을 때 화면 트리를 버리고 있다 — @State 가 함께 죽는다")
+        // 트리는 한 번만 만든다. 열 때마다 만들면 버리지 않아도 상태가 사라진다.
+        XCTAssertTrue(app.contains("if popover.contentViewController == nil { buildPopoverContent() }"),
+                      "트리를 열 때마다 새로 만들고 있다")
+    }
+
+    /// 끝없이 도는 애니메이션은 팝오버가 보일 때만 돌아야 한다.
+    ///
+    /// 트리를 닫아도 버리지 않으므로, 걸어 둔 `repeatForever` 는 닫힌 채로도 계속 다시
+    /// 그린다. 오리파 가림막의 숨쉬기가 그것이다 — 창 표시 상태를 봐야 한다.
+    func testEndlessAnimationsWatchWindowVisibility() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let ui = root.appendingPathComponent("Sources/PokePackBar/UI")
+        for case let url as URL in try XCTUnwrap(FileManager.default.enumerator(
+            at: ui, includingPropertiesForKeys: nil)) where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            guard text.contains("repeatForever") else { continue }
+            // 잠깐 떴다 사라지는 화면(개봉 대기)은 스스로 없어지므로 뺀다.
+            guard url.lastPathComponent != "PacksView.swift" else { continue }
+            XCTAssertTrue(text.contains("nav.isShown"),
+                          "\(url.lastPathComponent): 끝없는 애니메이션이 창 표시 상태를 안 본다")
+        }
+    }
+
+    /// 화면 상태를 담는 자리는 남아 있어야 한다 — 여기가 비면 닫았다 열 때 돌아갈 곳이 없다.
+    func testNavigationKeepsWhereYouWere() {
         let nav = PopoverNavigation()
-        nav.tab = .collection
+        nav.tab = .packs
         nav.showSettings = true
-        nav.showReleaseNotes = true
-
-        nav.reset()
-
-        XCTAssertEqual(nav.tab, .shop)
-        XCTAssertFalse(nav.showSettings)
-        XCTAssertFalse(nav.showReleaseNotes)
+        XCTAssertEqual(nav.tab, .packs)
+        XCTAssertTrue(nav.showSettings)
     }
 
     /// 기획에 필요한 탭만 둔다 — 팩을 사고, 팩을 열고, 카드를 보고, 조합을 모은다.

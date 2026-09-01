@@ -20,14 +20,22 @@ enum PopoverMetrics {
 }
 
 /// 팝오버 내부 내비게이션 상태.
-/// NSHostingController 는 팝오버를 닫아도 재사용되어 @State 가 유지되므로, 화면 상태를 이
-/// Observable 로 분리해 팝오버를 열 때마다 reset() 한다.
+///
+/// 화면 트리는 처음 열 때 한 번 만들고 닫아도 버리지 않으므로, 여기 담긴 것도 화면에 담긴
+/// `@State` 도 닫았다 열면 그대로 남는다. **일부러 그렇게 둔다** — 팩을 뜯다 닫았을 때
+/// 뜯던 자리로 돌아오는 것이 이 앱에서 기대되는 동작이다.
 @MainActor
 @Observable
 final class PopoverNavigation {
     var showSettings = false
     var showReleaseNotes = false
     var tab: PopoverTab = .shop
+
+    /// 팝오버가 지금 보이는가.
+    ///
+    /// 화면 트리를 닫아도 버리지 않으므로, 끝없이 도는 애니메이션은 **보일 때만** 돌려야 한다.
+    /// 안 그러면 닫힌 채로도 계속 다시 그린다. 앱이 팝오버 델리게이트에서 채운다.
+    var isShown = false
 
     /// 상점에서 바로 열어야 할 팩. 도감의 「이 팩 사러 가기」가 채운다.
     /// 상점이 한 번 읽고 지운다 — 남겨 두면 다음에 상점을 열 때 또 그 팩이 뜬다.
@@ -36,13 +44,6 @@ final class PopoverNavigation {
     /// 도감 탭에서 바로 열어야 할 도감. 카드 상세의 도감 배지가 채운다.
     var dexID: String?
 
-    func reset() {
-        showSettings = false
-        showReleaseNotes = false
-        tab = .shop
-        shopSet = nil
-        dexID = nil
-    }
 }
 
 @MainActor

@@ -56,6 +56,21 @@ extension L {
 
     var releaseNotes: [ReleaseNote] {
         [
+            ReleaseNote(version: "0.4.2", items: [
+                ReleaseNoteItem(text: t("버그 수정",
+                                         "Fixes",
+                                         "不具合修正",
+                                         "Correcciones",
+                                         "Corrections",
+                                         "Correções"), details: [
+                    t("위젯이 닫히면 기존 뽑기 화면이 날아가는 현상 수정",
+                      "Closing the window no longer throws away the pack you were opening",
+                      "ウィンドウを閉じても開封中の画面が消えなくなりました",
+                      "Cerrar la ventana ya no descarta el sobre que estabas abriendo",
+                      "Fermer la fenêtre n'abandonne plus le booster en cours d'ouverture",
+                      "Fechar a janela não descarta mais o pacote que você estava abrindo"),
+                ]),
+            ]),
             ReleaseNote(version: "0.4.1", items: [
                 ReleaseNoteItem(text: t("버그 수정",
                                          "Fixes",

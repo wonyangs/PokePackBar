@@ -310,10 +310,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     @objc private func togglePopover() {
         guard let button = statusItem.button else { return }
         if popover.isShown {
-            popover.performClose(nil)   // 해제·메뉴 애니메이션 재개는 popoverDidClose 에서
+            popover.performClose(nil)   // 메뉴 애니메이션 재개는 popoverDidClose 에서
         } else {
-            navigation.reset()   // 닫혔다 열리면 항상 Home 으로 (설정 화면 잔류 방지)
-            buildPopoverContent()   // 열 때 호스팅 트리 생성(닫힐 때 해제)
+            // 트리는 처음 열 때 한 번만 만들고 그대로 둔다. 닫을 때 버리면 화면에 붙어 있던
+            // 상태가 함께 죽어, 팩을 뜯다 닫으면 뜯던 자리가 사라진다.
+            if popover.contentViewController == nil { buildPopoverContent() }
             // LSUIElement 앱이 비활성이면 팝오버 내부 버튼 클릭이 무시됨 — show 전에 활성화 보장
             NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
@@ -329,12 +330,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     /// overwrite a live token (#168). `start` is also idempotent if `didShow` fires twice.
     func popoverDidShow(_ notification: Notification) {
         startOutsideClickMonitor()
+        navigation.isShown = true
     }
 
-    /// 팝오버가 닫히면 호스팅 컨트롤러를 해제한다 — 숨은 트리의 재레이아웃 비용을 없앤다.
+    /// 팝오버가 닫혀도 **호스팅 컨트롤러를 그대로 둔다.**
+    ///
+    /// 예전에는 여기서 해제해 「숨은 트리의 재레이아웃 비용」을 아꼈다. 그런데 그 비용을 재
+    /// 보니 사용량 갱신 한 번에 컬렉션 탭 기준 5ms 였고, 갱신은 기본 120초에 한 번이라
+    /// CPU 0.004% 다. 아끼려던 것이 없었던 셈이다.
+    ///
+    /// 대신 잃는 것이 컸다. `@State` 는 화면 트리에 붙어 있어 트리를 버리면 함께 죽는다 —
+    /// 팩을 뜯다 닫으면 뜯던 장 번호도 무엇이 나왔는지도 사라졌다. 이제 탭·개봉·오리파·
+    /// 카드 상세·필터가 닫았다 열어도 그대로 남는다.
     func popoverDidClose(_ notification: Notification) {
         stopOutsideClickMonitor()
-        popover.contentViewController = nil
+        navigation.isShown = false
     }
 
     /// 다른 메뉴바 팝업은 앱을 비활성화 안 시켜 .transient 가 못 닫는다 → 열림 동안만 앱 밖 클릭을 직접 감지해 닫는다(관찰 전용, 권한 불필요).

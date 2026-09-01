@@ -487,17 +487,6 @@ extension L {
         }
     }
 
-    /// 지금까지 모은 혜택 요약. 0 인 항목은 적지 않는다.
-    func dexPerksSummary(_ perks: DexPerks) -> String {
-        var parts: [String] = []
-        if perks.tokenGain > 0 { parts.append("\(dexPerkTokenGain) +\(Self.percent(perks.tokenGain))") }
-        if perks.packDiscount > 0 { parts.append("\(dexPerkPackDiscount) −\(Self.percent(perks.packDiscount))") }
-        if perks.dustBonus > 0 { parts.append("\(dexPerkDustBonus) +\(Self.percent(perks.dustBonus))") }
-        if perks.hitOdds > 0 { parts.append("\(dexPerkHitOdds) +\(Self.percent(perks.hitOdds))") }
-        if perks.extraHitSlot > 0 { parts.append("\(dexPerkExtraHit) +\(perks.extraHitSlot)") }
-        return parts.joined(separator: "  ·  ")
-    }
-
     var dexPerkTokenGain: String { t("적립 토큰", "Token earning", "獲得トークン",
                                       "Tokens ganados", "Tokens gagnés", "Tokens ganhos") }
     var dexPerkPackDiscount: String { t("팩 가격", "Pack price", "パック価格", "Precio", "Prix", "Preço") }

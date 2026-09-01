@@ -293,6 +293,10 @@ private struct OripaDrawView: View {
     /// 손으로 미는 것과 저 혼자 움직이는 것이 겹치면 어디까지 밀었는지 가늠이 안 된다.
     @State private var holding = false
 
+    /// 팝오버가 보이는가. 닫혀도 화면 트리가 남으므로 이 값을 봐야 한다 —
+    /// 끝없이 도는 숨쉬기가 닫힌 채로도 계속 다시 그리면 그만큼 그냥 태우는 것이다.
+    @Environment(PopoverNavigation.self) private var nav
+
     /// 뽑기 화면에서 카드를 그리는 폭(pt).
     ///
     /// 개봉 화면(`RevealPeek.cardWidth`)보다 조금 작다. 상점 탭에는 「일반 팩 / 오리파」
@@ -356,10 +360,20 @@ private struct OripaDrawView: View {
             )
     }
 
+    /// 숨쉬기를 건다. **팝오버가 보일 때만** 건다.
     private func startBreathing() {
+        guard nav.isShown, !opened, !holding else { return }
         withAnimation(.easeInOut(duration: 0.32).repeatForever(autoreverses: true)) {
             pulse = true
         }
+    }
+
+    /// 숨쉬기를 멈춘다.
+    ///
+    /// `repeatForever` 는 값이 그대로면 계속 돈다. 표시만 가리면 반복이 남으므로 짧은
+    /// 애니메이션으로 값을 되돌려 그 반복을 갈아 치운다.
+    private func stopBreathing() {
+        withAnimation(.easeOut(duration: 0.12)) { pulse = false }
     }
 
     private func reveal() {
@@ -430,11 +444,11 @@ private struct OripaDrawView: View {
         // 값을 되돌려 그 반복을 갈아 치운다 — 표시만 가리면 반복이 남아 언제 다시 튀어나올지
         // 알 수 없다.
         .onChange(of: holding) {
-            if holding {
-                withAnimation(.easeOut(duration: 0.12)) { pulse = false }
-            } else if !opened {
-                startBreathing()
-            }
+            holding ? stopBreathing() : startBreathing()
+        }
+        // 팝오버를 닫으면 숨쉬기를 멈추고, 다시 열면 이어서 쉰다.
+        .onChange(of: nav.isShown) {
+            nav.isShown ? startBreathing() : stopBreathing()
         }
         .task(id: card.id) {
             drag = .zero

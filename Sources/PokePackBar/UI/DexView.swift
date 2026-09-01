@@ -54,7 +54,6 @@ struct DexView: View {
 
     private func header(_ all: [DexStatus]) -> some View {
         let l = wallet.l
-        let summary = l.dexPerksSummary(wallet.perks)
         return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Text(l.dexPerksHeader).font(Typography.bodySemibold)
