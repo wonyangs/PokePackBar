@@ -276,10 +276,11 @@ struct PopoverView: View {
                 Image(systemName: "takeoutbag.and.cup.and.straw.fill")
                     .foregroundStyle(.orange)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(l.giftTitle).font(Typography.bodySemibold)
-                    Text(l.giftBody(gift.packsPerSet * (Self.index?.setIDs.count ?? 0),
-                                    MarketEconomy.money(tokens: gift.tokens,
-                                                        language: wallet.language)))
+                    Text(l.giftTitle(gift.kind)).font(Typography.bodySemibold)
+                    Text(l.giftBody(gift.kind,
+                                    packs: gift.packsPerSet * (Self.index?.setIDs.count ?? 0),
+                                    money: MarketEconomy.money(tokens: gift.tokens,
+                                                               language: wallet.language)))
                         .font(Typography.label).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }

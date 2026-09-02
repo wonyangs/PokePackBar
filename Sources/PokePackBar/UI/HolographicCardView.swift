@@ -53,12 +53,26 @@ struct HoloProfile: Equatable {
         case .common:         return 0.06
         case .uncommon:       return 0.16
         case .rare:           return 0.34
+        case .promo:          return 0.38
         case .doubleRare:     return 0.52
         case .tripleRare:     return 0.64
-        case .artRare:        return 0.74
-        case .superRare:      return 0.84
-        case .specialArtRare: return 0.92
-        case .ultraRare:      return 1.00
+        case .prismStar:      return 0.68
+        case .amazing:        return 0.70
+        case .radiant:        return 0.72
+        case .characterRare:  return 0.75
+        case .artRare:        return 0.76
+        case .aceSpec:        return 0.79
+        case .superRare:      return 0.83
+        case .shiny:          return 0.86
+        case .shinyUltra:     return 0.88
+        case .specialArtRare: return 0.89
+        case .shining:        return 0.92
+        case .hyperRare:      return 0.96
+        case .ultraRare:      return 0.98
+        case .blackWhiteRare: return 0.99
+        case .megaAttack:     return 0.995
+        case .megaUltraRare:  return 0.998
+        case .futureUltra:    return 1.00
         }
     }
 

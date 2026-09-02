@@ -49,6 +49,7 @@ struct OripaView: View {
                                   name: entry.displayName(wallet.language),
                                   tier: entry.tier, setID: entry.setID,
                                   setName: index.set(entry.setID)?.name ?? entry.setID,
+                                  rarity: entry.rarity,
                                   ownedCount: wallet.cardCount(entry.id)) {
                     self.focused = nil
                 }
@@ -131,23 +132,34 @@ struct OripaView: View {
     }
 
     /// 남은 등급별 개수. 이 줄이 오리파의 전부다 — 무엇이 얼마나 남았는지가 사는 이유다.
+    ///
+    /// **넘치면 줄을 바꾼다.** 등급이 열 칸이던 시절에는 한 줄에 다 들어갔는데, 등급을
+    /// 나무위키 기준으로 가르면서 박스 하나에 열댓 종이 들어가게 됐다. `HStack` 은 폭이
+    /// 모자라면 자식을 눌러 줄이므로 배지와 숫자가 붙어 뭉개졌다.
     private func remainingRow(_ box: OripaBox) -> some View {
         let counts = Oripa.remainingByTier(box, index: index)
-        return HStack(spacing: 6) {
-            ForEach(counts, id: \.tier) { entry in
-                HStack(spacing: 2) {
-                    Text(wallet.l.tierBadge(entry.tier))
-                        .font(.system(size: 14, weight: .heavy))
-                        .foregroundStyle(tierColor(entry.tier))
-                    Text("\(entry.count)")
-                        .font(.system(size: 14, weight: .semibold)).monospacedDigit()
-                        .foregroundStyle(.secondary)
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(wallet.l.oripaRemaining(box.remaining, OripaConfig.slotsPerBox))
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary).monospacedDigit()
+                Spacer(minLength: 0)
+            }
+            WrapLayout(spacing: 8, lineSpacing: 3) {
+                ForEach(counts, id: \.tier) { entry in
+                    HStack(spacing: 2) {
+                        Text(wallet.l.tierBadge(entry.tier))
+                            .font(.system(size: 14, weight: .heavy))
+                            .foregroundStyle(tierColor(entry.tier))
+                        Text("\(entry.count)")
+                            .font(.system(size: 14, weight: .semibold)).monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    .fixedSize()
                 }
             }
-            Spacer(minLength: 0)
-            Text(wallet.l.oripaRemaining(box.remaining, OripaConfig.slotsPerBox))
-                .font(.system(size: 14)).foregroundStyle(.tertiary).monospacedDigit()
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 8).padding(.vertical, 5)
         .background(Color.secondary.opacity(0.07), in: RoundedRectangle(cornerRadius: 6))
     }

@@ -19,9 +19,15 @@ struct SegmentedTabs<Value: Hashable>: View {
     let items: [Item]
     @Binding var selection: Value
 
-    /// 칸 하나의 세로 여백. 기본 세그먼트 컨트롤과 비슷한 높이가 되도록 잡았다.
-    private let verticalPadding: CGFloat = 5
+    /// 칸 하나의 세로 여백. 줄 전체가 28pt 가 되도록 잡았다 —
+    /// 바깥 여백 2×2 + 이 값 2×4 + 13pt 글자 높이 16 = 28.
+    private let verticalPadding: CGFloat = 4
     private let radius: CGFloat = 7
+
+    /// 탭 글자. 본문(14pt)보다 한 단계 작다 — 탭은 읽는 글이 아니라 자리를 가리키는 표라
+    /// 줄 높이를 낮게 잡는 편이 화면을 넓게 쓴다.
+    private var font: Font { .system(size: 13) }
+    private var pickedFont: Font { .system(size: 13, weight: .semibold) }
 
     var body: some View {
         HStack(spacing: 2) {
@@ -31,7 +37,7 @@ struct SegmentedTabs<Value: Hashable>: View {
                     selection = item.value
                 } label: {
                     Text(item.label)
-                        .font(picked ? Typography.labelSemibold : Typography.label)
+                        .font(picked ? pickedFont : font)
                         .foregroundStyle(picked ? Color.white : Color.primary)
                         .lineLimit(1).minimumScaleFactor(0.8)
                         .frame(maxWidth: .infinity)
@@ -48,5 +54,12 @@ struct SegmentedTabs<Value: Hashable>: View {
         .padding(2)
         .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: radius))
         .frame(maxWidth: .infinity)
+        // **세로로 눌리지 않게 못 박는다.**
+        //
+        // 팝오버 안에서 세로 자리가 모자라면 SwiftUI 가 줄일 수 있는 자식부터 줄인다.
+        // 상단 탭 줄은 탭 내용(높이가 고정된 540pt)과 같은 VStack 에 있어 눌리는 쪽이 되고,
+        // 탭 안의 갈래 선택은 그 540pt 안에 여유가 있어 안 눌린다. 그래서 같은 부품인데
+        // 위는 28pt, 아래는 31pt 로 그려졌다. 글자까지 함께 줄어 크기가 달라 보인 원인이다.
+        .fixedSize(horizontal: false, vertical: true)
     }
 }

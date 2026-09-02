@@ -250,6 +250,7 @@ private struct RevealView: View {
                                   tier: focused.tier,
                                   setID: index?.card(focused.id)?.setID ?? "",
                                   setName: opened.setName,
+                                  rarity: index?.card(focused.id)?.rarity,
                                   ownedCount: wallet.cardCount(focused.id),
                                   preloaded: opened.hires[focused.id]) {
                     spotlight = nil
@@ -701,12 +702,26 @@ struct TierGlow: View {
         case .energy, .common: return 0.0
         case .uncommon:        return 0.18
         case .rare:            return 0.34
+        case .promo:           return 0.38
         case .doubleRare:      return 0.52
-        case .tripleRare:      return 0.66
-        case .artRare:         return 0.74
-        case .superRare:       return 0.84
-        case .specialArtRare:  return 0.92
-        case .ultraRare:       return 1.0
+        case .tripleRare:      return 0.65
+        case .prismStar:       return 0.68
+        case .amazing:         return 0.70
+        case .radiant:         return 0.72
+        case .characterRare:   return 0.75
+        case .artRare:         return 0.76
+        case .aceSpec:         return 0.79
+        case .superRare:       return 0.83
+        case .shiny:           return 0.86
+        case .shinyUltra:      return 0.88
+        case .specialArtRare:  return 0.89
+        case .shining:         return 0.92
+        case .hyperRare:       return 0.96
+        case .ultraRare:       return 0.98
+        case .blackWhiteRare:  return 0.99
+        case .megaAttack:      return 0.995
+        case .megaUltraRare:   return 0.998
+        case .futureUltra:     return 1.0
         }
     }
 }
@@ -742,11 +757,25 @@ func tierColor(_ tier: CardTier) -> Color {
     case .common:         return .secondary
     case .uncommon:       return .green
     case .rare:           return .blue
+    case .promo:          return Color(red: 0.55, green: 0.60, blue: 0.70)   // 프로모
     case .doubleRare:     return .indigo
     case .tripleRare:     return .purple
+    case .prismStar:      return Color(red: 0.60, green: 0.55, blue: 0.90)   // 프리즘스타
+    case .amazing:        return Color(red: 0.35, green: 0.80, blue: 0.75)   // 어메이징
+    case .radiant:        return Color(red: 0.98, green: 0.78, blue: 0.30)   // 찬란한 — 금빛
+    case .characterRare:  return Color(red: 0.30, green: 0.65, blue: 0.85)   // 캐릭터레어
     case .artRare:        return .teal
+    case .aceSpec:        return Color(red: 0.90, green: 0.25, blue: 0.35)   // ACE — 붉은 테두리
     case .superRare:      return .orange
+    case .shiny:          return Color(red: 0.55, green: 0.80, blue: 0.95)   // 샤이니 — 은빛
+    case .shinyUltra:     return Color(red: 0.40, green: 0.70, blue: 0.92)   // 샤이니 풀아트
     case .specialArtRare: return .pink
+    case .shining:        return Color(red: 0.95, green: 0.85, blue: 0.55)   // 빛나는 포켓몬
+    case .hyperRare:      return Color(red: 0.75, green: 0.45, blue: 0.95)   // 레인보우
     case .ultraRare:      return .yellow
+    case .blackWhiteRare: return Color(red: 0.40, green: 0.40, blue: 0.45)   // 블랙볼트·화이트플레어
+    case .megaAttack:     return Color(red: 0.95, green: 0.40, blue: 0.55)   // 메가어택레어
+    case .megaUltraRare:  return Color(red: 1.00, green: 0.55, blue: 0.10)   // 메가 울트라레어
+    case .futureUltra:    return Color(red: 0.20, green: 0.85, blue: 0.80)   // 퓨처울트라레어
     }
 }

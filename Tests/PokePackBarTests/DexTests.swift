@@ -825,6 +825,61 @@ final class OripaTests: XCTestCase {
     }
 }
 
+/// 원본 등급 — 10칸으로 접기 전의 이름이 실려 있고, 전부 이름을 붙일 수 있어야 한다.
+final class CardRarityTests: XCTestCase {
+
+    /// **모든 카드에 원본 등급이 실려 있다** (기본 에너지만 예외 — 출처에 등급이 없다).
+    func testEveryCardCarriesItsSourceRarity() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let missing = index.cards.filter { $0.rarity == nil && $0.tier != .energy }
+        XCTAssertTrue(missing.isEmpty,
+                      "원본 등급이 없는 카드 \(missing.count)장: "
+                      + missing.prefix(5).map(\.id).joined(separator: ", "))
+        XCTAssertTrue(index.cards.filter { $0.tier == .energy }.allSatisfy { $0.rarity == nil },
+                      "기본 에너지에 등급이 붙었다")
+    }
+
+    /// **이름을 못 붙이는 등급이 있으면 안 된다.**
+    ///
+    /// 새 세트가 새 등급을 들고 오는 일이 잦다 — 2025년에만 Mega Hyper Rare 와
+    /// Black White Rare 가 생겼다. 표에 없으면 카드 상세에서 그 줄이 조용히 사라지므로
+    /// 여기서 잡는다.
+    func testEverySourceRarityHasACommunityLabel() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let l = L(.ko)
+        let sources = Set(index.cards.compactMap(\.rarity))
+        XCTAssertGreaterThan(sources.count, 25, "원본 등급이 너무 적다 — 인덱스가 옛 판인가")
+        for source in sources.sorted() {
+            XCTAssertNotNil(l.rarityLabel(source),
+                            "\(source): 커뮤니티 약칭 표에 없다 — LocalizationCards 에 추가한다")
+        }
+    }
+
+    /// **아직 접혀 있는 것은 카드 종류 차이뿐이어야 한다.**
+    ///
+    /// 규칙이 「원본 등급 이름이 다르면 칸도 다르다, 단 같은 등급 안의 카드 종류 차이는
+    /// 접는다」이다. RR 이 홀로레어·ex·GX·V·BREAK 를 접는 것은 그 규칙대로이고, 그 밖의
+    /// 칸이 서로 다른 *등급*을 접고 있으면 규칙이 깨진 것이다.
+    func testOnlyCardTypesStayCollapsed() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let l = L(.ko)
+        var perTier: [CardTier: Set<String>] = [:]
+        for card in index.cards {
+            guard let rarity = card.rarity, let label = l.rarityLabel(rarity) else { continue }
+            perTier[card.tier, default: []].insert(label)
+        }
+        // 카드 종류를 접는 칸. RR 은 홀로레어·ex·GX·V, RRR 은 VMAX·VSTAR,
+        // SR 은 풀아트 두 표기, UR 은 시크릿과 하이퍼레어(둘 다 금색)다.
+        let collapsesTypes: Set<CardTier> = [.doubleRare, .tripleRare, .superRare, .ultraRare]
+        for (tier, labels) in perTier where !collapsesTypes.contains(tier) {
+            XCTAssertEqual(labels.count, 1,
+                           "\(tier.rawValue) 가 서로 다른 등급을 접고 있다 — "
+                           + labels.sorted().joined(separator: ", "))
+        }
+        XCTAssertGreaterThanOrEqual(perTier[.doubleRare]?.count ?? 0, 4, "RR 이 카드 종류를 접어야 한다")
+    }
+}
+
 /// 한국어 카드명 — 번들에 실제로 들어갔고, 절반만 한국어인 이름이 없어야 한다.
 final class KoreanCardNameTests: XCTestCase {
 

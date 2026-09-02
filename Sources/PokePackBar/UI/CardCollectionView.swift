@@ -22,6 +22,27 @@ struct CardCollectionView: View {
     /// 등급별 수집 현황을 펼쳐 둘 것인가. 접어 두는 것이 기본이다 —
     /// 두 줄짜리 표가 늘 떠 있으면 그만큼 카드 볼 자리가 줄어든다.
     @AppStorage("collectionShowTiers") private var showTiers = false
+    /// 무엇을 앞에 둘 것인가. 고른 것은 기억한다.
+    @AppStorage("collectionSort") private var sort: CardSort = .value
+
+    /// 컬렉션을 세우는 기준.
+    ///
+    /// 값이 기본이다. 등급은 시장과 어긋나서 — 1999년 커먼이 최신 SR 보다 비싸다 —
+    /// 값으로 세워야 무엇이 귀한지가 읽힌다. 나머지는 다른 질문에 답한다:
+    /// 등급순은 「무슨 등급을 모았나」, 최근 획득순은 「방금 뭘 얻었나」,
+    /// 중복 많은순은 「무엇을 팔까」다.
+    enum CardSort: String, CaseIterable {
+        case value, tier, acquired, duplicates
+
+        func label(_ l: L) -> String {
+            switch self {
+            case .value:      return l.sortByValue
+            case .tier:       return l.sortByTier
+            case .acquired:   return l.sortByAcquired
+            case .duplicates: return l.sortByDuplicates
+            }
+        }
+    }
 
     /// 화면 한 번에 필요한 것을 **한 번의 훑기로** 모두 낸 결과.
     ///
@@ -62,7 +83,37 @@ struct CardCollectionView: View {
         // 보유 필터가 꺼져 있으면 값 순서를 지켜야 하므로 pool 을 그대로 쓴다 —
         // 위 루프는 가진 것을 먼저 넣지 않는다(순서대로 담는다).
         if !ownedOnly { shelf.visible = shelf.pool }
+        shelf.visible = ordered(shelf.visible)
         return shelf
+    }
+
+    /// 고른 기준으로 다시 세운다.
+    ///
+    /// **들어온 목록이 이미 값 순이라는 것을 이용한다.** 같은 순위끼리는 들어온 자리를
+    /// 지키게 해서 값 순서가 그대로 남고, 그 덕에 정렬 안에서 시세를 한 번도 조회하지
+    /// 않는다 — 비교 안에서 조회하면 1만 8천 장 한 번 정렬에 사전 조회가 수십만 번 일어난다.
+    private func ordered(_ entries: [CardEntry]) -> [CardEntry] {
+        Self.ordered(entries, by: sort,
+                     count: { wallet.cardCount($0) },
+                     acquired: { wallet.firstAcquiredStamp($0) })
+    }
+
+    /// 순수 함수로 떼어 둔다 — 정렬은 눈으로 확인하기 어렵고, 기준을 하나 더할 때마다
+    /// 조용히 어긋난다.
+    static func ordered(_ entries: [CardEntry], by sort: CardSort,
+                        count: (String) -> Int, acquired: (String) -> Int) -> [CardEntry] {
+        guard sort != .value, entries.count > 1 else { return entries }
+        let keyed = entries.enumerated().map { at, entry -> (rank: Int, at: Int, entry: CardEntry) in
+            switch sort {
+            case .value:      return (0, at, entry)
+            case .tier:       return (entry.tier.rank, at, entry)
+            case .acquired:   return (acquired(entry.id), at, entry)
+            case .duplicates: return (count(entry.id), at, entry)
+            }
+        }
+        return keyed
+            .sorted { $0.rank != $1.rank ? $0.rank > $1.rank : $0.at < $1.at }
+            .map(\.entry)
     }
 
     /// 세트와 등급을 함께 건다. 둘 다 nil 이면 전체다.
@@ -100,6 +151,7 @@ struct CardCollectionView: View {
                                   name: entry.displayName(wallet.language),
                                   tier: entry.tier, setID: entry.setID,
                                   setName: index?.set(entry.setID)?.name ?? entry.setID,
+                                  rarity: entry.rarity,
                                   ownedCount: wallet.cardCount(entry.id)) {
                     self.selectedCard = nil
                 }
@@ -115,6 +167,7 @@ struct CardCollectionView: View {
         }
         .frame(height: PopoverMetrics.tabHeight)
         .onChange(of: ownedOnly) { selectedCard = nil }
+        .onChange(of: sort) { selectedCard = nil }
     }
 
     /// 보이는 카드가 없을 때의 안내. 격자 자리는 그대로 두고 위에 한 줄만 얹는다.
@@ -132,7 +185,10 @@ struct CardCollectionView: View {
     /// 등급까지 더하면 줄이 둘로 늘어난다. 목록으로 열면 전체가 한눈에 들어온다.
     /// 세트 이름은 얼마든지 길어질 수 있다. 메뉴는 라벨을 줄이지 않으므로 폭을 막지 않으면
     /// 긴 세트 하나가 팝오버 전체를 밀어낸다 — 상단 머리글이 이 탭에서만 덜컹거린 원인이다.
-    private static let setMenuWidth: CGFloat = 190
+    ///
+    /// 190 이던 것을 줄였다. 같은 줄에 정렬 메뉴가 하나 더 붙어서, 가장 긴 세트 이름이
+    /// 걸렸을 때 셋과 「수집 n/N」이 함께 들어갈 자리가 이만큼이다.
+    private static let setMenuWidth: CGFloat = 150
 
     private func filterBar(_ shelf: Shelf) -> some View {
         let l = wallet.l
@@ -154,7 +210,7 @@ struct CardCollectionView: View {
                 filterOption(l.allSets, isSelected: selectedTier == nil) { selectedTier = nil }
                 Divider()
                 // 희귀한 것부터 — 찾고 싶은 등급이 대개 위쪽이다.
-                ForEach(CardTier.allCases.reversed(), id: \.self) { tier in
+                ForEach(index?.presentTiers ?? [], id: \.self) { tier in
                     filterOption("\(tier.rawValue) · \(l.tierName(tier))",
                                  isSelected: selectedTier == tier) { selectedTier = tier }
                 }
@@ -165,6 +221,20 @@ struct CardCollectionView: View {
             }
             .menuStyle(.borderlessButton)
             .lineLimit(1)
+            .fixedSize()
+
+            // 정렬도 「무엇을 걸까」와 같은 줄에 둔다. 아래 줄로 내렸더니 「보유한 카드만」이
+            // 밀려 줄이 바뀌었다 — 그 줄은 토글과 버튼이라 폭이 안 줄어든다.
+            Menu {
+                ForEach(CardSort.allCases, id: \.self) { option in
+                    filterOption(option.label(l), isSelected: sort == option) { sort = option }
+                }
+            } label: {
+                filterLabel(l.sortBy, sort.label(l))
+            }
+            .menuStyle(.borderlessButton)
+            .lineLimit(1)
+            .fixedSize()
 
             Spacer(minLength: 4)
             // 제목 줄을 따로 두지 않는다. 여기 필터가 무엇을 걸고 있는지와 그 결과가
@@ -185,6 +255,7 @@ struct CardCollectionView: View {
             Toggle(l.ownedOnly, isOn: $ownedOnly)
                 .toggleStyle(.checkbox)
                 .font(Typography.label)
+                .fixedSize()
             Spacer(minLength: 4)
             // 잡카드 정리로 들어가는 문. 중복이 없으면 누를 것이 없으므로 감춘다.
             if shelf.hasSpares {
@@ -218,7 +289,7 @@ struct CardCollectionView: View {
     /// 누르면 그 등급만 걸린다(다시 누르면 해제).
     private var tierSummary: some View {
         let counts = tierCounts
-        let tiers = CardTier.allCases.reversed().map { $0 }
+        let tiers = index?.presentTiers ?? []
         return LazyVGrid(columns: Array(repeating: GridItem(spacing: 3), count: 5), spacing: 3) {
             ForEach(tiers, id: \.self) { tier in
                 let stat = counts[tier] ?? (owned: 0, total: 0)

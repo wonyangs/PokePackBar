@@ -219,7 +219,9 @@ final class PackOpeningTests: XCTestCase {
         }
         XCTAssertEqual(share(.tripleRare), 5.60, accuracy: 0.01)
         XCTAssertEqual(share(.superRare), 2.78, accuracy: 0.01)
-        XCTAssertEqual(share(.ultraRare), 0.84, accuracy: 0.01)
+        // 실측한 0.84% 는 **레인보우**다. 금색 시크릿(UR)은 따로 센 값이 아니다 —
+        // 그 숫자를 둘로 쪼개면 실측이라 적어 둔 값이 실측이 아니게 된다.
+        XCTAssertEqual(share(.hyperRare), 0.84, accuracy: 0.01)
         XCTAssertGreaterThan(share(.doubleRare), 10.56, "V 몫보다 작으면 홀로레어가 빠진 것이다")
     }
 
@@ -461,7 +463,10 @@ final class CardTierOrderingTests: XCTestCase {
     /// 선언 순서가 곧 등급 순서다. 생성 스크립트의 TIER_ORDER 와 어긋나면
     /// 인덱스의 등급 문자열이 엉뚱한 순위를 받는다.
     func testRankAscendsInDeclaredOrder() {
-        let expected = ["E", "C", "U", "R", "RR", "RRR", "AR", "SR", "SAR", "UR"]
+        // 나무위키 「포켓몬 카드 게임/레어도」 문서에 실린 등급이 전부이고, 그것만이다.
+        let expected = ["E", "C", "U", "R", "P", "RR", "RRR", "PR", "A", "K", "CHR",
+                        "AR", "ACE", "SR", "S", "SSR", "SAR", "SH", "HR", "UR",
+                        "BWR", "MA", "MUR", "FUR"]
         XCTAssertEqual(CardTier.allCases.map(\.rawValue), expected)
         XCTAssertEqual(CardTier.allCases.map(\.rank), Array(0..<expected.count))
     }
@@ -471,8 +476,8 @@ final class CardTierOrderingTests: XCTestCase {
     func testFallbackPrefersNearestThenLowerTier() {
         let chain = CardTier.artRare.fallbackChain
         XCTAssertEqual(chain.first, .artRare)
-        // AR(6) 기준 거리 1 은 RRR(5) 과 SR(7) — 낮은 쪽이 먼저다.
-        XCTAssertEqual(Array(chain.dropFirst().prefix(2)), [.tripleRare, .superRare])
+        // AR 기준 거리 1 은 CHR 과 ACE — 낮은 쪽이 먼저다.
+        XCTAssertEqual(Array(chain.dropFirst().prefix(2)), [.characterRare, .aceSpec])
         XCTAssertFalse(chain.contains(.energy), "에너지는 등급 대체가 아니다")
     }
 
@@ -813,15 +818,64 @@ final class CollectionFilterTests: XCTestCase {
         XCTAssertTrue(CardCollectionView.filtered(sample, set: "a", tier: .artRare).isEmpty)
     }
 
-    /// 배포하는 모든 등급으로 필터를 걸 수 있어야 한다.
-    /// 실제 카드가 없는 등급이 목록에 있으면 고르고도 빈 화면만 본다.
+    /// 정렬 기준마다 앞에 오는 것이 달라야 한다.
+    ///
+    /// **같은 순위끼리는 들어온 순서를 지킨다.** 들어오는 목록이 값 순이므로 그 덕에
+    /// 값이 자연스러운 2차 기준이 되고, 정렬 안에서 시세를 조회할 이유가 사라진다.
+    func testEachSortPutsADifferentCardFirst() {
+        // 값 순으로 들어온다고 본다 — 인덱스가 그렇게 세워 준다.
+        let pool = [entry("a-1", "a", .ultraRare),   // 제일 비싸고, 제일 높은 등급
+                    entry("a-2", "a", .common),      // 중복이 제일 많다
+                    entry("a-3", "a", .rare)]        // 제일 최근에 얻었다
+        let count: (String) -> Int = ["a-1": 1, "a-2": 9, "a-3": 2].mapValues { $0 }.withDefault
+        let acquired: (String) -> Int = ["a-1": 100, "a-2": 200, "a-3": 300].mapValues { $0 }.withDefault
+
+        func first(_ sort: CardCollectionView.CardSort) -> String {
+            CardCollectionView.ordered(pool, by: sort, count: count, acquired: acquired).first!.id
+        }
+        XCTAssertEqual(first(.value), "a-1", "가격순은 들어온 순서를 그대로 둔다")
+        XCTAssertEqual(first(.tier), "a-1")
+        XCTAssertEqual(first(.duplicates), "a-2")
+        XCTAssertEqual(first(.acquired), "a-3")
+        // 어느 기준으로 세워도 카드가 사라지거나 늘지 않는다.
+        for sort in CardCollectionView.CardSort.allCases {
+            XCTAssertEqual(Set(CardCollectionView.ordered(pool, by: sort, count: count,
+                                                          acquired: acquired).map(\.id)),
+                           Set(pool.map(\.id)), "\(sort) 에서 목록이 달라졌다")
+        }
+    }
+
+    /// 획득 기록이 없는 카드는 맨 뒤로 간다. 기록이 생기기 전에 모은 카드가 그렇다 —
+    /// 앞에 두면 「최근 획득순」이 옛날 카드로 시작한다.
+    func testCardsWithoutAnAcquiredDateSortLast() {
+        let pool = [entry("a-1", "a", .rare), entry("a-2", "a", .rare), entry("a-3", "a", .rare)]
+        let sorted = CardCollectionView.ordered(pool, by: .acquired,
+                                                count: { _ in 1 },
+                                                acquired: { $0 == "a-2" ? 500 : 0 })
+        XCTAssertEqual(sorted.map(\.id), ["a-2", "a-1", "a-3"])
+    }
+
+    /// **메뉴에 오르는 등급은 전부 카드가 있어야 한다.**
+    ///
+    /// 등급 칸에는 아직 파는 세트에 카드가 없는 것이 있다 — 메가어택레어처럼 곧 나올
+    /// 세트를 위해 미리 만들어 둔 자리다. 그런 것까지 메뉴에 올리면 고르고도 빈 화면만 본다.
+    /// 그래서 화면은 `allCases` 가 아니라 `presentTiers` 를 늘어놓는다.
     func testEveryTierInTheMenuHasCardsSomewhere() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
-        for tier in CardTier.allCases {
+        for tier in index.presentTiers {
             let hits = CardCollectionView.filtered(index.cards, set: nil, tier: tier)
             XCTAssertFalse(hits.isEmpty, "\(tier.rawValue) 등급 카드가 하나도 없다")
         }
+        // 카드가 있는 등급이 빠지면 그 카드는 필터로 찾을 길이 없어진다.
+        XCTAssertEqual(Set(index.presentTiers), Set(index.cards.map(\.tier)))
+        // 순서는 사다리 순(희귀한 것부터)이어야 한다.
+        XCTAssertEqual(index.presentTiers, index.presentTiers.sorted { $0.rank > $1.rank })
     }
+}
+
+private extension Dictionary where Key == String, Value == Int {
+    /// 표에 없는 카드는 0 으로 본다.
+    var withDefault: (String) -> Int { { self[$0] ?? 0 } }
 }
 
 final class PackOddsTests: XCTestCase {

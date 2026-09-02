@@ -66,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 한 번만 주는 보상은 기동할 때 넣는다. 팝오버를 열 때 넣으면 안 여는 동안
         // 팩이 안 들어와 있고, 안내도 그만큼 늦는다.
         wallet.claim(WalletStore.apologyGift)
+        wallet.claim(WalletStore.patchGift)
         updater = UpdateChecker()
         store.localizationLanguage = wallet.language   // 알림 현지화용 미러 시드
         store.onRefresh = { [weak self] in self?.onStoreRefreshed() }   // 한도 로드 후 companion·사탕 지급

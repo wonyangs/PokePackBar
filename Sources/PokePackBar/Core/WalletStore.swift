@@ -317,11 +317,15 @@ final class WalletStore {
 
     /// 사과나 안내로 한 번만 주는 것. 값은 코드에 적고 지급 여부만 세이브에 남는다.
     struct Gift: Sendable, Equatable {
+        /// 왜 주는가. 알림 문구가 이걸 보고 갈린다 — 사과와 기념은 다른 말이다.
+        enum Kind: Sendable { case apology, celebration }
+
         /// 지급 기록에 남는 이름. 버전이 아니라 **보상마다** 다르게 붙인다.
         let id: String
         let tokens: Int
         /// 세트마다 몇 팩을 줄지.
         let packsPerSet: Int
+        var kind: Kind = .apology
     }
 
     /// 받은 보상. 팝오버가 한 번 알리고 지운다.
@@ -333,9 +337,16 @@ final class WalletStore {
     /// 살 수 있다고 나오는 팩을 못 사고, 사고 나면 남은 돈이 계산과 맞지 않았다.
     static let apologyGift = Gift(id: "v0.4.1-apology", tokens: 213_370_000, packsPerSet: 1)
 
+    /// v0.6.0 판올림 기념 사료. 100만원.
+    ///
+    /// 토큰 수는 **정확히 100만원이 되는 값**이다 — 100원 한 칸이 21,337토큰이므로
+    /// 만 칸이면 딱 떨어진다. 어정쩡한 액수가 뜨면 기념이 아니라 실수처럼 보인다.
+    static let patchGift = Gift(id: "v0.6.0-patch", tokens: 213_370_000, packsPerSet: 0,
+                                kind: .celebration)
+
     /// 준 적이 없고 대상이면 준다. 이미 줬으면 아무것도 하지 않는다.
     ///
-    /// **이미 팩을 사 본 세이브만** 받는다. 겪지도 않은 일로 229만원을 들고 시작하면
+    /// **이미 팩을 사 본 세이브만** 받는다. 갓 설치한 사람이 백만원을 들고 시작하면
     /// 초반에 무엇을 살지 고르는 재미가 통째로 사라진다.
     ///
     /// 대상이 아니어도 기록은 남긴다 — 안 남기면 나중에 팩을 하나 사는 순간 대상이 되어
@@ -387,6 +398,14 @@ final class WalletStore {
     // MARK: 카드 보유량
 
     func cardCount(_ cardID: String) -> Int { state.cards[cardID] ?? 0 }
+
+    /// 이 카드를 처음 얻은 때. 기록이 생기기 전에 모은 카드는 nil 이다.
+    func firstAcquired(_ cardID: String) -> Date? {
+        state.cardFirstAt[cardID].map { Date(timeIntervalSince1970: TimeInterval($0)) }
+    }
+
+    /// 정렬에 쓸 값. 기록이 없으면 0 — 획득 순에서 맨 뒤로 간다.
+    func firstAcquiredStamp(_ cardID: String) -> Int { state.cardFirstAt[cardID] ?? 0 }
 
     var distinctCardCount: Int { state.cards.count }
 
@@ -445,7 +464,12 @@ final class WalletStore {
     func collect(_ cardIDs: [String]) -> [DexCompletion] {
         guard !cardIDs.isEmpty else { return [] }
         let before = Set(state.cards.keys)
-        for id in cardIDs { state.cards[id, default: 0] += 1 }
+        let now = Int(Date().timeIntervalSince1970)
+        for id in cardIDs {
+            state.cards[id, default: 0] += 1
+            // 처음 얻은 때만 적는다. 두 번째부터 덮어쓰면 「최초」가 아니게 된다.
+            if state.cardFirstAt[id] == nil { state.cardFirstAt[id] = now }
+        }
         save()
 
         return DexProgress.newlyFilled(dexes: dexes, owned: { (state.cards[$0] ?? 0) > 0 },
@@ -635,6 +659,25 @@ final class WalletStore {
             return
         }
         state = decoded
+        backfillFirstAcquired()
+    }
+
+    /// 획득 날짜 기록이 생기기 전에 모은 카드에 **오늘 날짜를 채운다.**
+    ///
+    /// 기록이 없으면 카드 상세에 날짜가 안 뜨고 「최근 획득순」에서 맨 뒤로 밀린다. 이미
+    /// 수백 장을 모은 세이브에서는 그게 대부분의 카드라, 두 기능이 사실상 빈 채로 남는다.
+    /// 실제로 언제 얻었는지는 어디에도 없으므로 지어낼 수 없고, 대신 **처음 본 날**을
+    /// 적는다 — 「적어도 이날에는 갖고 있었다」는 사실이다.
+    ///
+    /// 한 번만 채워진다. 채운 뒤에는 빈 카드가 없고, 새로 얻는 카드는 그때 시각이 박힌다.
+    /// 그래서 채워 넣은 카드가 앞으로 얻을 카드보다 항상 앞선다.
+    private func backfillFirstAcquired() {
+        let missing = state.cards.filter { $0.value > 0 && state.cardFirstAt[$0.key] == nil }
+        guard !missing.isEmpty else { return }
+        let now = Int(Date().timeIntervalSince1970)
+        for id in missing.keys { state.cardFirstAt[id] = now }
+        save()
+        AppLog.write("card first-seen backfilled for \(missing.count) cards")
     }
 
     private func save() {

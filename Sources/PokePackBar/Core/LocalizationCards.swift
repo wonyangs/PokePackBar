@@ -128,6 +128,72 @@ extension L {
         lang == .ko ? ko : en
     }
 
+    /// 원본 등급 이름을 **커뮤니티 약칭**으로 옮긴다.
+    ///
+    /// 우리 10칸(`CardTier`)은 게임 규칙용으로 접은 것이다. 팩 확률표와 도감이 그 칸으로
+    /// 돌아가야 하고, 33종을 그대로 쓰면 세트마다 표 모양이 달라져 못 쓴다. 그래서 접었다.
+    ///
+    /// 그런데 접은 탓에 「이 카드가 무슨 등급인가」에 답하지 못한다 — 찬란한·ACE SPEC·
+    /// BREAK·LV.X 가 모두 RRR 로 뭉쳐 있다. 국내 커뮤니티는 그것들을 각각 K·ACE·BREAK·LV.X
+    /// 라 부르므로, 카드 상세에서는 그 이름으로 적어 준다.
+    ///
+    /// 영문/일문 판은 원문 등급명을 그대로 쓴다 — 약칭은 일본판 표기에서 온 국내 관용이다.
+    func rarityLabel(_ source: String) -> String? {
+        switch source {
+        case "Common":                      return t("C", "Common", "C", "C", "C", "C")
+        case "Uncommon":                    return t("U", "Uncommon", "U", "U", "U", "U")
+        case "Rare":                        return t("R", "Rare", "R", "R", "R", "R")
+        case "Rare Holo":                   return t("홀로 R", "Holo Rare", "R", "R holo", "R holo", "R holo")
+        case "Double Rare":                 return t("RR", "Double Rare", "RR", "RR", "RR", "RR")
+        case "Rare Holo EX":                return t("ex (구)", "Holo ex", "ex", "ex", "ex", "ex")
+        case "Rare Holo GX":                return t("GX", "Holo GX", "GX", "GX", "GX", "GX")
+        case "Rare Holo V":                 return t("V", "Holo V", "V", "V", "V", "V")
+        case "Rare Holo VMAX":              return t("VMAX", "Holo VMAX", "VMAX", "VMAX", "VMAX", "VMAX")
+        case "Rare Holo VSTAR":             return t("VSTAR", "Holo VSTAR", "VSTAR", "VSTAR", "VSTAR", "VSTAR")
+        case "Rare Holo LV.X":              return t("LV.X", "Holo LV.X", "LV.X", "LV.X", "LV.X", "LV.X")
+        case "Rare Prime":                  return t("Prime", "Prime", "Prime", "Prime", "Prime", "Prime")
+        case "Rare Prism Star":             return t("PR (프리즘스타)", "Prism Star", "PR", "Prism Star", "Prism Star", "Prism Star")
+        case "Rare ACE", "ACE SPEC Rare":   return t("ACE", "ACE SPEC", "ACE", "ACE", "ACE", "ACE")
+        case "Rare BREAK":                  return t("BREAK", "BREAK", "BREAK", "BREAK", "BREAK", "BREAK")
+        case "Radiant Rare":                return t("K (찬란한)", "Radiant Rare", "K", "Radiante", "Radiant", "Radiante")
+        case "Amazing Rare":                return t("A (어메이징)", "Amazing Rare", "A", "Amazing", "Amazing", "Amazing")
+        case "Illustration Rare":           return t("AR", "Illustration Rare", "AR", "AR", "AR", "AR")
+        case "Special Illustration Rare":   return t("SAR", "Special Illustration Rare", "SAR", "SAR", "SAR", "SAR")
+        case "Rare Ultra":                  return t("SR (풀아트)", "Full Art SR", "SR", "SR", "SR", "SR")
+        case "Ultra Rare":                  return t("SR", "Ultra Rare", "SR", "SR", "SR", "SR")
+        case "Shiny Rare":                  return t("S (샤이니)", "Shiny Rare", "S", "Shiny", "Shiny", "Shiny")
+        case "Shiny Ultra Rare":            return t("SSR (샤이니)", "Shiny Ultra Rare", "SSR", "SSR", "SSR", "SSR")
+        case "Rare Secret":                 return t("UR (시크릿)", "Secret Rare", "UR", "UR", "UR", "UR")
+        case "Rare Rainbow":                return t("UR (레인보우)", "Rainbow Rare", "UR", "UR", "UR", "UR")
+        case "Hyper Rare":                  return t("HR", "Hyper Rare", "HR", "HR", "HR", "HR")
+        case "Mega Hyper Rare":             return t("MUR", "Mega Hyper Rare", "MUR", "MUR", "MUR", "MUR")
+        case "Black White Rare":            return t("BWR", "Black White Rare", "BWR", "BWR", "BWR", "BWR")
+        case "Rare Holo Star":              return t("★ (골드스타)", "Gold Star", "★", "Gold Star", "Gold Star", "Gold Star")
+        case "Rare Shining":                return t("빛나는", "Shining", "光り", "Shining", "Shining", "Shining")
+        case "LEGEND":                      return t("LEGEND", "LEGEND", "LEGEND", "LEGEND", "LEGEND", "LEGEND")
+        case "Promo":                       return t("P (프로모)", "Promo", "P", "Promo", "Promo", "Promo")
+        default:                            return nil
+        }
+    }
+
+    // MARK: 컬렉션 정렬
+    var sortBy: String { t("정렬", "Sort", "並び替え", "Orden", "Tri", "Ordem") }
+    var sortByValue: String { t("가격순", "By price", "価格順", "Por precio", "Par prix", "Por preço") }
+    var sortByTier: String { t("등급순", "By rarity", "レアリティ順",
+                                "Por rareza", "Par rareté", "Por raridade") }
+    /// 「획득 순」은 방향이 두 가지로 읽힌다. 최근 것부터라고 못 박는다 —
+    /// 컬렉션에서 찾는 것은 대개 방금 얻은 카드다.
+    var sortByAcquired: String { t("최근 획득순", "Recently added", "入手が新しい順",
+                                    "Añadidas hace poco", "Ajoutées récemment",
+                                    "Adicionadas recentemente") }
+    var sortByDuplicates: String { t("중복 많은순", "Most duplicates", "重複が多い順",
+                                      "Más repetidas", "Plus de doublons", "Mais repetidas") }
+    /// 카드를 처음 얻은 날. 기록이 있는 카드에만 붙는다.
+    func cardFirstAcquired(_ date: String) -> String {
+        t("처음 얻은 날 \(date)", "First obtained \(date)", "初入手 \(date)",
+           "Primera vez \(date)", "Obtenue le \(date)", "Primeira vez \(date)")
+    }
+
     var packOdds: String { t("등급별 확률", "Odds by rarity", "レアリティ別確率",
                               "Probabilidad por rareza", "Probabilité par rareté", "Chance por raridade") }
     /// 이 팩에서 나올 수 있는 카드를 다 보여 주는 화면으로 들어가는 말.
@@ -246,17 +312,37 @@ extension L {
 
     // MARK: 사죄의 사료
 
-    var giftTitle: String { t("사죄의 사료", "An apology treat", "おわびのごはん",
-                               "Un obsequio de disculpa", "Un cadeau d'excuse",
-                               "Um agrado de desculpas") }
+    func giftTitle(_ kind: WalletStore.Gift.Kind) -> String {
+        switch kind {
+        case .apology:
+            return t("사죄의 사료", "An apology treat", "おわびのごはん",
+                      "Un obsequio de disculpa", "Un cadeau d'excuse", "Um agrado de desculpas")
+        case .celebration:
+            return t("판올림 기념 사료", "A treat for the update", "アップデート記念のごはん",
+                      "Un obsequio por la actualización", "Un cadeau pour la mise à jour",
+                      "Um agrado pela atualização")
+        }
+    }
+
     /// 무엇이 들어왔는지 숫자로 적는다. 「보상을 드렸습니다」만 있으면 확인하러 탭을 뒤져야 한다.
-    func giftBody(_ packs: Int, _ money: String) -> String {
-        t("값이 잘못 보이던 문제로 불편을 드렸어요. 팩 \(packs)개와 \(money)을 넣어 뒀습니다.",
-           "Sorry about the prices showing wrong. \(packs) packs and \(money) are in your wallet.",
-           "価格の表示が誤っていた件、失礼しました。パック \(packs)個と \(money) を入れておきました。",
-           "Perdón por los precios mal mostrados. Te dejamos \(packs) sobres y \(money).",
-           "Désolé pour les prix mal affichés. \(packs) boosters et \(money) t'attendent.",
-           "Desculpe pelos preços exibidos errado. \(packs) pacotes e \(money) estão na carteira.")
+    /// 팩이 없으면 팩 이야기를 하지 않는다 — 「팩 0개」는 받은 것을 세는 말이 아니다.
+    func giftBody(_ kind: WalletStore.Gift.Kind, packs: Int, money: String) -> String {
+        switch kind {
+        case .apology:
+            return t("값이 잘못 보이던 문제로 불편을 드렸어요. 팩 \(packs)개와 \(money)을 넣어 뒀습니다.",
+                      "Sorry about the prices showing wrong. \(packs) packs and \(money) are in your wallet.",
+                      "価格の表示が誤っていた件、失礼しました。パック \(packs)個と \(money) を入れておきました。",
+                      "Perdón por los precios mal mostrados. Te dejamos \(packs) sobres y \(money).",
+                      "Désolé pour les prix mal affichés. \(packs) boosters et \(money) t'attendent.",
+                      "Desculpe pelos preços exibidos errado. \(packs) pacotes e \(money) estão na carteira.")
+        case .celebration:
+            return t("새 판올림을 기념해 \(money)을 넣어 뒀어요.",
+                      "\(money) is in your wallet to mark the new update.",
+                      "アップデートを記念して \(money) を入れておきました。",
+                      "Te dejamos \(money) para celebrar la actualización.",
+                      "\(money) t'attendent pour fêter la mise à jour.",
+                      "Deixamos \(money) para comemorar a atualização.")
+        }
     }
 
     // MARK: 한번에 판매
@@ -315,12 +401,32 @@ extension L {
         case .uncommon:       return t("언커먼", "Uncommon", "アンコモン", "Poco común", "Peu commune", "Incomum")
         case .rare:           return t("레어", "Rare", "レア", "Rara", "Rare", "Rara")
         case .doubleRare:     return t("더블레어", "Double Rare", "ダブルレア", "Doble rara", "Double rare", "Dupla rara")
+        case .promo:          return t("프로모", "Promo", "プロモ", "Promo", "Promo", "Promo")
         case .tripleRare:     return t("트리플레어", "Triple Rare", "トリプルレア", "Triple rara", "Triple rare", "Tripla rara")
+        case .prismStar:      return t("프리즘스타", "Prism Star", "プリズムスター", "Prisma", "Prisme", "Prisma")
+        case .amazing:        return t("어메이징레어", "Amazing Rare", "オーロラレア", "Asombrosa", "Incroyable", "Incrível")
+        case .radiant:        return t("찬란한", "Radiant", "かがやく", "Radiante", "Radieux", "Radiante")
+        case .characterRare:  return t("캐릭터레어", "Character Rare", "キャラクターレア",
+                                        "Personaje rara", "Personnage rare", "Personagem rara")
         case .artRare:        return t("아트레어", "Art Rare", "アートレア", "Arte rara", "Art rare", "Arte rara")
+        case .aceSpec:        return t("에이스 스펙", "ACE SPEC", "ACE SPEC", "ACE SPEC", "ACE SPEC", "ACE SPEC")
         case .superRare:      return t("슈퍼레어", "Super Rare", "スーパーレア", "Súper rara", "Super rare", "Super rara")
+        case .shiny:          return t("샤이니", "Shiny", "色違い", "Variocolor", "Chromatique", "Brilhante")
+        case .shinyUltra:     return t("샤이니 울트라레어", "Shiny Ultra Rare", "色違いウルトラレア",
+                                        "Variocolor ultra", "Chromatique ultra", "Brilhante ultra")
         case .specialArtRare: return t("스페셜아트레어", "Special Art Rare", "スペシャルアートレア",
                                         "Arte especial rara", "Art spécial rare", "Arte especial rara")
+        case .shining:        return t("빛나는", "Shining", "ひかる", "Brillante", "Brillant", "Brilhante")
+        case .hyperRare:      return t("하이퍼레어", "Hyper Rare", "ハイパーレア", "Híper rara", "Hyper rare", "Hiper rara")
         case .ultraRare:      return t("울트라레어", "Ultra Rare", "ウルトラレア", "Ultra rara", "Ultra rare", "Ultra rara")
+        case .blackWhiteRare: return t("블랙화이트레어", "Black White Rare", "ブラックホワイトレア",
+                                        "Black White Rare", "Black White Rare", "Black White Rare")
+        case .megaAttack:     return t("메가어택레어", "Mega Attack Rare", "メガアタックレア",
+                                        "Mega Attack Rare", "Mega Attack Rare", "Mega Attack Rare")
+        case .megaUltraRare:  return t("메가울트라레어", "Mega Ultra Rare", "メガウルトラレア",
+                                        "Mega Ultra Rare", "Mega Ultra Rare", "Mega Ultra Rare")
+        case .futureUltra:    return t("퓨처울트라레어", "Future Ultra Rare", "フューチャーウルトラレア",
+                                        "Future Ultra Rare", "Future Ultra Rare", "Future Ultra Rare")
         }
     }
 

@@ -71,6 +71,35 @@ final class SegmentedTabsTests: XCTestCase {
         return controller.sizeThatFits(in: CGSize(width: width, height: 100)).width
     }
 
+    /// **세로로 눌리지 않는다.**
+    ///
+    /// 자리가 모자라면 SwiftUI 가 줄일 수 있는 자식부터 줄인다. 상단 탭 줄은 높이가 고정된
+    /// 탭 내용과 같은 VStack 에 있어 눌리는 쪽이 되고, 탭 안의 갈래 선택은 그 안쪽이라
+    /// 안 눌린다 — 같은 부품인데 위는 28pt, 아래는 31pt 로 그려졌다.
+    /// 탭 줄 높이는 28pt 다. 두 세그먼트가 같은 값을 써야 한 화면에서 어긋나 보이지 않는다.
+    func testTabRowIsTwentyEightPointsTall() {
+        var picked = 0
+        let tabs = SegmentedTabs(items: (0..<4).map { .init(value: $0, label: "탭 \($0)") },
+                                 selection: Binding(get: { picked }, set: { picked = $0 }))
+        let host = NSHostingController(rootView: AnyView(tabs))
+        XCTAssertEqual(host.sizeThatFits(in: CGSize(width: PopoverMetrics.contentWidth,
+                                                    height: 200)).height,
+                       28, accuracy: 0.5)
+    }
+
+    func testTabsKeepTheirHeightWhenSqueezed() {
+        var picked = 0
+        let tabs = SegmentedTabs(items: (0..<4).map { .init(value: $0, label: "탭 \($0)") },
+                                 selection: Binding(get: { picked }, set: { picked = $0 }))
+        let host = NSHostingController(rootView: AnyView(tabs))
+        let natural = host.sizeThatFits(in: CGSize(width: PopoverMetrics.contentWidth,
+                                                   height: .greatestFiniteMagnitude)).height
+        let squeezed = host.sizeThatFits(in: CGSize(width: PopoverMetrics.contentWidth,
+                                                    height: 10)).height
+        XCTAssertEqual(squeezed, natural, accuracy: 0.5,
+                       "자리가 모자라면 탭 줄이 눌린다 — 다른 세그먼트와 높이가 달라진다")
+    }
+
     func testTabsFillTheWidthTheyAreGiven() {
         for count in 2...5 {
             let items = (0..<count).map {

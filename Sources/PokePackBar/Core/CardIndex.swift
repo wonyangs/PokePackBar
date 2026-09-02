@@ -5,17 +5,47 @@ import Foundation
 ///
 /// 선언 순서가 곧 등급 순서다(낮은 것부터). 생성 스크립트(`build_card_index.py`)의
 /// `TIER_ORDER` 와 일치해야 한다.
+///
+/// **칸은 나무위키 「포켓몬 카드 게임/레어도」 문서에 실린 등급만 둔다.** 우리가 등급이라고
+/// 여길 만한 것을 골라 넣지 않는다 — 그렇게 했더니 LV.X·Prime·LEGEND·골드스타처럼 문서에
+/// 없는 것이 칸으로 서고, 문서에 있는 BREAK 를 RR 에서 떼어 내는 잘못을 저질렀다.
+/// (문서는 BREAK 를 RR 로 못박는다 — 「BREAK, EX, GX, V, ex 등 … 더블레어」.)
+///
+/// 그래서 영문판 등급명 39종이 이 칸들로 접힌다. 영문판에만 있는 이름(Rare Holo LV.X·
+/// Rare Prime·LEGEND·Rare Holo Star)은 그 카드가 맡던 자리로 넣는다 — 앞의 셋은 그 시대의
+/// 간판 홀로라 RR, 골드스타는 「박스당 0~1장」이라 SR 이다. 원본 이름은 카드 상세에
+/// 그대로 적어 주므로(`L.rarityLabel`) 무엇인지는 잃지 않는다.
+///
+/// 아직 파는 세트에 카드가 없는 칸(CHR·MA·FUR·P)도 미리 둔다. 그 세트가 들어올 때 엉뚱한
+/// 칸으로 새지 않게 하려는 것이고, 화면은 `presentTiers` 로 걸러 빈 칸을 보여 주지 않는다.
+///
+/// **이 사다리는 값 순서도 봉입률 순서도 아니다.** 커뮤니티가 등급을 늘어놓는 관례일 뿐이다 —
+/// AR 은 팩의 7.7% 인데 ACE 는 0.6% 다. 목록 정렬은 시세를 쓴다.
 enum CardTier: String, Codable, Sendable, CaseIterable {
     case energy = "E"           // 기본 에너지 — 등급 축이 아니라 별도 슬롯
     case common = "C"           // 커먼
     case uncommon = "U"         // 언커먼
     case rare = "R"             // 레어
-    case doubleRare = "RR"      // 더블레어 — 홀로레어·ex·V 계열
-    case tripleRare = "RRR"     // 트리플레어 — VMAX·VSTAR·K·ACE
+    case promo = "P"            // 프로모
+    case doubleRare = "RR"      // 더블레어 — 홀로레어·ex·GX·V·BREAK·LV.X·Prime·LEGEND
+    case tripleRare = "RRR"     // 트리플레어 — VMAX·VSTAR·V-UNION
+    case prismStar = "PR"       // 프리즘스타 — 썬&문 시대
+    case amazing = "A"          // 어메이징레어 — 소드&실드 시대
+    case radiant = "K"          // 찬란한 — 소드&실드 시대
+    case characterRare = "CHR"  // 캐릭터레어 — 영문판 트레이너 갤러리
     case artRare = "AR"         // 아트레어
+    case aceSpec = "ACE"        // ACE SPEC — 블랙&화이트, 스칼렛&바이올렛
     case superRare = "SR"       // 슈퍼레어 — 풀아트
+    case shiny = "S"            // 샤이니 — 이로치. 팔데아의 운명 계열
+    case shinyUltra = "SSR"     // 샤이니 울트라레어 — 이로치 풀아트
     case specialArtRare = "SAR" // 스페셜아트레어
-    case ultraRare = "UR"       // 울트라레어 — 골드·레인보우·시크릿
+    case shining = "SH"         // 빛나는 포켓몬 — 네오·썬&문. 위의 S(이로치)와 다른 등급이다
+    case hyperRare = "HR"       // 하이퍼레어 — 레인보우
+    case ultraRare = "UR"       // 울트라레어 — 금색 시크릿
+    case blackWhiteRare = "BWR" // 블랙볼트·화이트플레어 전용
+    case megaAttack = "MA"      // 메가어택레어 — 카툰풍 메가진화
+    case megaUltraRare = "MUR"  // 메가 울트라레어 — 메가 에볼루션 이후
+    case futureUltra = "FUR"    // 퓨처울트라레어 — 30th CELEBRATION 한정
 
     /// 등급 순위. 정렬과 개봉 순서가 이 값을 쓴다. 클수록 희귀하다.
     var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }
@@ -45,6 +75,13 @@ struct CardEntry: Sendable, Identifiable {
     let name: String
     let tier: CardTier
     let setID: String     // 카드 ID 의 첫 '-' 앞부분
+    /// 원본 등급 이름("Rare Holo V", "Special Illustration Rare"…). 없는 카드는 nil 이다.
+    ///
+    /// `tier` 는 게임 규칙용으로 접은 10칸이라 「이 카드가 무슨 등급인가」에 답하지 못한다 —
+    /// Radiant·ACE SPEC·BREAK·LV.X 가 모두 RRR 이다. 그걸 알려면 원본이 필요하다.
+    /// 화면에 적을 때는 `L.rarityLabel` 이 커뮤니티 약칭으로 옮긴다.
+    var rarity: String?
+
     /// 한국어 카드명. 아직 확인된 표기가 없는 카드는 nil 이다.
     ///
     /// 없으면 영문을 그대로 쓴다. 절반만 한국어인 이름("Team Rocket's 뮤츠 ex")은
@@ -136,6 +173,13 @@ struct CardIndex: Sendable {
     /// 오리파 후보를 값 구간별로 미리 나눈 선반. 상점 화면은 이 값을 그대로 재사용한다.
     let oripaShelf: OripaConfig.Shelf
 
+    /// 실제로 카드가 있는 등급만, 희귀한 것부터.
+    ///
+    /// 등급 칸에는 아직 파는 세트에 카드가 없는 것이 있다 — 메가어택레어처럼 곧 나올
+    /// 세트를 위해 미리 자리를 만들어 둔 것들이다. 화면이 `allCases` 를 그대로 늘어놓으면
+    /// 고르면 늘 빈 화면인 필터와 0/0 만 적힌 칸이 생긴다.
+    let presentTiers: [CardTier]
+
     private let byID: [String: CardEntry]
     private let bySetID: [String: CardSet]
 
@@ -164,7 +208,25 @@ struct CardIndex: Sendable {
         }
         let version: Int
         let sets: [SetDTO]
-        let cards: [[String]]   // [카드ID, 이름, 계층]
+        /// [카드ID, 이름, 계층, 등급번호]. 등급번호는 `rarities` 의 색인이다.
+        /// 판번호마다 칸이 늘 수 있어 문자열 배열로 받고 마지막 칸은 있으면 쓴다.
+        let cards: [[JSONValue]]
+        let rarities: [String]?
+    }
+
+    /// 카드 행이 문자열과 숫자를 섞어 담는다. 한 칸만 숫자라 전용 타입을 두지 않는다.
+    enum JSONValue: Decodable {
+        case string(String)
+        case int(Int)
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if let n = try? c.decode(Int.self) { self = .int(n); return }
+            self = .string(try c.decode(String.self))
+        }
+
+        var text: String? { if case let .string(s) = self { return s }; return nil }
+        var number: Int? { if case let .int(n) = self { return n }; return nil }
     }
 
     /// 번들에서 읽는다. 인덱스가 없거나 깨졌으면 nil — 호출부가 실패를 드러내야 한다.
@@ -230,14 +292,21 @@ struct CardIndex: Sendable {
         var entries: [CardEntry] = []
         entries.reserveCapacity(payload.cards.count)
         var skipped = 0
+        let rarities = payload.rarities ?? []
         for row in payload.cards {
             // [ID, 이름, 계층] 세 칸이어야 한다. 계층 문자열이 알 수 없는 값이면 건너뛴다 —
             // 생성 스크립트와 앱의 계층 정의가 어긋난 것이므로 조용히 섞어 넣지 않는다.
-            guard row.count >= 3, let tier = CardTier(rawValue: row[2]) else { skipped += 1; continue }
-            let id = row[0]
+            guard row.count >= 3, let id = row[0].text, let name = row[1].text,
+                  let tier = row[2].text.flatMap(CardTier.init(rawValue:)) else {
+                skipped += 1; continue
+            }
             guard let dash = id.firstIndex(of: "-") else { skipped += 1; continue }
-            entries.append(CardEntry(id: id, name: row[1], tier: tier,
+            // 네 번째 칸은 등급 표의 번호다. 옛 인덱스에는 없다.
+            let rarity = row.count >= 4 ? row[3].number.flatMap { rarities.indices.contains($0)
+                                                                 ? rarities[$0] : nil } : nil
+            entries.append(CardEntry(id: id, name: name, tier: tier,
                                      setID: String(id[id.startIndex..<dash]),
+                                     rarity: rarity?.nonEmpty,
                                      nameKo: korean[id]))
         }
         if skipped > 0 { AppLog.write("card index: skipped \(skipped) malformed rows") }
@@ -249,10 +318,12 @@ struct CardIndex: Sendable {
             CardSet(id: $0.id, name: $0.name, series: $0.series ?? "",
                     released: $0.released, cardCount: $0.cardCount)
         }
+        let present = Set(entries.map(\.tier))
         return CardIndex(sets: sets, cards: entries, pools: pools,
                          eras: CardEra.group(sets),
                          cardsByValue: byValue(entries),
                          oripaShelf: OripaConfig.shelf(cards: entries),
+                         presentTiers: CardTier.allCases.reversed().filter(present.contains),
                          byID: Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }),
                          bySetID: Dictionary(sets.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }))
     }

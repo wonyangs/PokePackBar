@@ -87,9 +87,11 @@ enum PackConfig {
         (.common, 5300), (.uncommon, 3400), (.rare, 1300),
     ]
 
-    /// Sword & Shield — 어메이징레어·레디언트가 이 칸에서 1% 로 섞인다.
+    /// Sword & Shield — 어메이징레어와 찬란한(K)이 이 칸에서 1% 로 섞인다.
+    /// 실물도 찬란한 카드가 역홀로 자리를 대신 차지하는 방식이었다.
     static let swordShieldReverse: [(tier: CardTier, weight: Int)] = [
-        (.common, 5200), (.uncommon, 3300), (.rare, 1400), (.tripleRare, 100),
+        (.common, 5200), (.uncommon, 3300), (.rare, 1400),
+        (.tripleRare, 10), (.amazing, 30), (.radiant, 60),
     ]
 
     /// Scarlet & Violet — **실측값**이다.
@@ -98,9 +100,12 @@ enum PackConfig {
     /// SV 의 상위 등급이 레어 칸이 아니라 역홀로 칸에서 나온다는 것이 이 시대의 핵심이고,
     /// 그래서 "레어 칸 확률" 만 적으면 실제와 어긋난다. 남는 87.28% 는 커먼·언커먼·레어의
     /// 역홀로이며 세트의 장수 비율(대략 56:32:12)로 나눴다.
+    /// 샤이니(S)도 이 칸이다 — 「팔데아의 운명」처럼 이로치가 주력인 세트에서 역홀로
+    /// 자리를 대신 차지한다. 실측한 세 값(AR·SAR·UR)은 건드리지 않고 유도값인 커먼 몫에서 뗐다.
     static let scarletVioletReverse: [(tier: CardTier, weight: Int)] = [
-        (.common, 4890), (.uncommon, 2790), (.rare, 1048),
+        (.common, 4805), (.uncommon, 2790), (.rare, 1048), (.shiny, 46), (.shinyUltra, 5),
         (.artRare, 769), (.specialArtRare, 311), (.ultraRare, 192),
+        (.megaUltraRare, 20), (.blackWhiteRare, 14),
     ]
 
     // MARK: 칸 표 — 레어 칸
@@ -108,47 +113,62 @@ enum PackConfig {
     /// 1999~2002. 레어 한 칸이고 홀로는 그중 3분의 1이다.
     /// 빛나는 포켓몬·다크 라이츄 같은 시크릿은 팩 서른 개에 한 장꼴이다.
     static let wotcRare: [(tier: CardTier, weight: Int)] = [
-        (.rare, 6550), (.doubleRare, 3200), (.specialArtRare, 200), (.ultraRare, 50),
+        (.rare, 6550), (.doubleRare, 3200), (.shining, 200), (.ultraRare, 50),
     ]
 
     /// e-Card·EX (2002~2007). 홀로 자리에 ex 가 섞이고 골드스타가 1/72 로 들어온다.
+    ///
+    /// 골드스타는 나무위키 등급표에 없어 SR 로 넣는다 — 「박스당 0~1장」이라는 SR 설명과
+    /// 봉입률이 맞는다. 카드 상세에는 「★ (골드스타)」로 적힌다.
     static let exRare: [(tier: CardTier, weight: Int)] = [
-        (.rare, 6400), (.doubleRare, 3400), (.specialArtRare, 140), (.ultraRare, 60),
+        (.rare, 6400), (.doubleRare, 3400), (.superRare, 140), (.ultraRare, 60),
     ]
 
-    /// Diamond & Pearl·Platinum·HGSS (2007~2011). LV.X·Prime 이 트리플레어 자리다.
+    /// Diamond & Pearl·Platinum·HGSS (2007~2011).
+    ///
+    /// LV.X·Prime·LEGEND 는 나무위키 등급표에 없다. 셋 다 그 시대의 간판 홀로라 RR 에 든다 —
+    /// 문서의 RR 설명이 「한 세대를 대표하는 간판 2점몬」이다.
     static let diamondPearlRare: [(tier: CardTier, weight: Int)] = [
-        (.rare, 6000), (.doubleRare, 3200), (.tripleRare, 400),
-        (.superRare, 300), (.ultraRare, 100),
+        (.rare, 6000), (.doubleRare, 3720), (.superRare, 180), (.ultraRare, 100),
     ]
 
-    /// Black & White·XY (2011~2016). EX 와 풀아트, 레인보우가 자리 잡은 시대다.
+    /// Black & White·XY (2011~2016). EX 와 풀아트가 자리 잡은 시대다.
+    ///
+    /// **BREAK 와 ACE 를 뗀다.** BREAK 는 XY 후기의 홀로 자리를 나눠 쓰던 카드라 RR 에서
+    /// 떼고, ACE SPEC 은 규칙상 덱에 한 장뿐인 카드라 RRR 에서 뗀다.
     static let blackWhiteRare: [(tier: CardTier, weight: Int)] = [
-        (.rare, 5900), (.doubleRare, 3200), (.tripleRare, 200),
-        (.superRare, 550), (.ultraRare, 150),
+        (.rare, 5900), (.doubleRare, 3200), (.tripleRare, 140),
+        (.aceSpec, 60), (.superRare, 550), (.ultraRare, 150),
     ]
 
     /// Sun & Moon (2017~2019). GX 와 시크릿이 가장 두꺼웠던 시대다.
+    ///
+    /// **레인보우(HR)를 금색(UR)에서 뗀다.** 커뮤니티는 이 둘을 확실히 구분하고, 이 시대에는
+    /// 레인보우가 금색보다 흔했다.
     static let sunMoonRare: [(tier: CardTier, weight: Int)] = [
-        (.rare, 5600), (.doubleRare, 3300), (.tripleRare, 200),
-        (.superRare, 600), (.ultraRare, 300),
+        (.rare, 5540), (.doubleRare, 3300), (.tripleRare, 100), (.prismStar, 100),
+        (.superRare, 600), (.shining, 60), (.hyperRare, 200), (.ultraRare, 100),
     ]
 
     /// Sword & Shield — **실측값**이다.
     ///
     /// 표본 개봉에서 V 10.56%, VMAX 5.60%, 풀아트 2.78%, 레인보우 0.84% 가 나왔다.
     /// V 는 홀로레어와 같은 RR 칸이므로 홀로레어 몫(22%)과 합쳐 적는다.
+    /// 실측 0.84% 는 **레인보우**를 잰 값이므로 그대로 HR 에 둔다. 금색 시크릿(UR)은 따로
+    /// 세던 값이 아니라 레어 몫에서 뗐다 — 실측한 숫자를 나눠 쓰면 그 숫자가 거짓이 된다.
     static let swordShieldRare: [(tier: CardTier, weight: Int)] = [
-        (.rare, 5822), (.doubleRare, 3256), (.tripleRare, 560),
-        (.superRare, 278), (.ultraRare, 84),
+        (.rare, 5794), (.doubleRare, 3256), (.tripleRare, 560),
+        (.superRare, 278), (.hyperRare, 84), (.ultraRare, 28),
     ]
 
     /// Scarlet & Violet — **실측값**이다(676팩 표본).
     ///
     /// 레어 78.85%, 더블레어 14.05%, 울트라레어 6.51%. 남는 0.59% 가 ACE SPEC 이다.
     /// 이 칸에는 일러스트레어·스페셜아트레어·하이퍼레어가 없다 — 그쪽은 역홀로 칸이다.
+    /// 남는 0.59% 는 ACE SPEC 이다 — 이 시대 RRR 자리를 쓰는 것이 그것뿐이다.
+    /// **실측 세 값은 그대로 둔다.** 샤이니는 역홀로 칸에서 나온다.
     static let scarletVioletRare: [(tier: CardTier, weight: Int)] = [
-        (.rare, 7885), (.doubleRare, 1405), (.tripleRare, 59), (.superRare, 651),
+        (.rare, 7885), (.doubleRare, 1405), (.aceSpec, 59), (.superRare, 651),
     ]
 
     // MARK: 시대별 구성
@@ -211,8 +231,11 @@ enum PackConfig {
 
     /// 특별 세트의 계층 가중치. 전 슬롯을 이 가중치로 뽑아 팩 안에 등급 차이를 만든다.
     static let specialWeights: [(tier: CardTier, weight: Int)] = [
-        (.rare, 4600), (.doubleRare, 3000), (.artRare, 800), (.tripleRare, 700),
-        (.superRare, 500), (.specialArtRare, 300), (.ultraRare, 100),
+        (.rare, 4160), (.doubleRare, 3100), (.tripleRare, 500), (.prismStar, 80),
+        (.amazing, 60), (.radiant, 80), (.characterRare, 20), (.artRare, 650),
+        (.aceSpec, 90), (.superRare, 470), (.shiny, 70), (.shinyUltra, 20),
+        (.specialArtRare, 230), (.shining, 60), (.hyperRare, 190), (.ultraRare, 180),
+        (.blackWhiteRare, 10), (.megaAttack, 10), (.megaUltraRare, 10), (.futureUltra, 10),
     ]
 
     /// 레어 이상 칸 수. 도감 혜택으로 늘어나지 않는다 — 팩 장수를 바꾸는 혜택은 없앴다.
@@ -232,8 +255,11 @@ enum PackConfig {
     /// 포켓몬 TCG 포켓도 갓팩에서 최상위 등급 확률을 0.05% 에서 5% 로 끌어올린다.
     /// 전 칸이 레어 이상이면서 위쪽이 두꺼워야 "터졌다" 는 느낌이 난다.
     static let godWeights: [(tier: CardTier, weight: Int)] = [
-        (.rare, 2500), (.doubleRare, 3000), (.artRare, 1500), (.tripleRare, 1200),
-        (.superRare, 1000), (.specialArtRare, 500), (.ultraRare, 300),
+        (.rare, 1840), (.doubleRare, 2970), (.tripleRare, 700), (.prismStar, 150),
+        (.amazing, 120), (.radiant, 250), (.characterRare, 30), (.artRare, 1100),
+        (.aceSpec, 250), (.superRare, 950), (.shiny, 180), (.shinyUltra, 70),
+        (.specialArtRare, 400), (.shining, 150), (.hyperRare, 350), (.ultraRare, 300),
+        (.blackWhiteRare, 80), (.megaAttack, 15), (.megaUltraRare, 80), (.futureUltra, 15),
     ]
 
     /// 천장 — 레어 이상 칸에서 이 횟수만큼 연속으로 레어만 나오면 다음은 RR 이상을 보장한다.

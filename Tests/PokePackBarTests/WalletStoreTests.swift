@@ -649,3 +649,154 @@ final class GiftTests: XCTestCase {
                        "현금 보상이 100만원이 아니다")
     }
 }
+
+/// 카드를 처음 얻은 때를 기록하는가.
+@MainActor
+final class CardFirstAcquiredTests: XCTestCase {
+
+    private var dir: URL!
+
+    override func setUp() {
+        super.setUp()
+        dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("first-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        super.tearDown()
+    }
+
+    private func makeStore() -> WalletStore {
+        WalletStore(fileURL: dir.appendingPathComponent("game-state.json"), dexes: [])
+    }
+
+    /// 처음 얻은 때만 적는다. 두 번째부터 덮어쓰면 「최초」가 아니게 된다.
+    func testKeepsTheFirstTimeOnly() {
+        let s = makeStore()
+        s.collect(["a-1"])
+        let first = try! XCTUnwrap(s.firstAcquired("a-1"))
+        s.collect(["a-1", "a-1"])
+        XCTAssertEqual(s.firstAcquired("a-1"), first, "다시 얻었다고 날짜가 바뀌면 안 된다")
+        XCTAssertEqual(s.cardCount("a-1"), 3)
+    }
+
+    /// 아예 가진 적 없는 카드는 날짜가 없다.
+    func testUnknownWhenNeverOwned() {
+        let s = makeStore()
+        XCTAssertNil(s.firstAcquired("a-1"))
+        XCTAssertEqual(s.firstAcquiredStamp("a-1"), 0, "정렬에서 맨 뒤로 가야 한다")
+    }
+
+    /// **기록이 생기기 전에 모은 카드는 세이브를 읽을 때 그날 날짜로 채운다.**
+    ///
+    /// 안 채우면 이미 수백 장을 모은 세이브에서 날짜도 「최근 획득순」도 빈 채로 남는다.
+    func testBackfillsCardsSavedBeforeTheRecordExisted() throws {
+        // 날짜 칸이 없던 시절의 세이브를 흉내 낸다.
+        let legacy: [String: Any] = ["cards": ["a-1": 2, "a-2": 1], "packs": [:]]
+        let data = try JSONSerialization.data(withJSONObject: legacy)
+        let url = dir.appendingPathComponent("game-state.json")
+        try data.write(to: url)
+
+        let s = makeStore()
+        let stamp = s.firstAcquiredStamp("a-1")
+        XCTAssertGreaterThan(stamp, 0, "옛 카드에 날짜가 안 채워졌다")
+        XCTAssertEqual(s.firstAcquiredStamp("a-2"), stamp, "같은 때로 채워야 한다")
+
+        // 채운 값은 저장돼야 한다 — 다시 켤 때마다 오늘로 밀리면 「최초」가 아니다.
+        XCTAssertEqual(makeStore().firstAcquiredStamp("a-1"), stamp)
+
+        // 채워 넣은 카드보다 새로 얻는 카드가 뒤다.
+        s.collect(["a-3"])
+        XCTAssertGreaterThanOrEqual(s.firstAcquiredStamp("a-3"), stamp)
+    }
+
+    /// 다시 켜도 남아 있어야 한다 — 세이브에 들어가는 값이다.
+    func testSurvivesRestart() {
+        let s = makeStore()
+        s.collect(["a-1"])
+        let stamp = s.firstAcquiredStamp("a-1")
+        XCTAssertGreaterThan(stamp, 0)
+        XCTAssertEqual(makeStore().firstAcquiredStamp("a-1"), stamp)
+    }
+
+    /// 판 카드도 기록은 남긴다. 다시 얻어도 처음 얻은 날은 그날이다.
+    func testSellingKeepsTheDate() {
+        let s = makeStore()
+        s.collect(["a-1", "a-1"])
+        let stamp = s.firstAcquiredStamp("a-1")
+        s.sellSpares(cardID: "a-1", tier: .rare, count: 1)
+        XCTAssertEqual(s.firstAcquiredStamp("a-1"), stamp)
+    }
+}
+
+/// 판올림 기념 사료 — 딱 100만원이고, 한 번만 들어온다.
+@MainActor
+final class PatchGiftTests: XCTestCase {
+
+    private var dir: URL!
+
+    override func setUp() {
+        super.setUp()
+        dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("patch-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        super.tearDown()
+    }
+
+    private func played() -> WalletStore {
+        let s = WalletStore(fileURL: dir.appendingPathComponent("game-state.json"), dexes: [])
+        s.addPack(setID: "base1", count: 1)
+        s.consumePack(setID: "base1")          // 팩을 사 본 세이브로 만든다
+        return s
+    }
+
+    /// **정확히 100만원이어야 한다.** 어정쩡한 액수가 뜨면 기념이 아니라 실수처럼 보인다.
+    func testGrantsExactlyOneMillionWon() throws {
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        XCTAssertEqual(MarketEconomy.won(tokens: WalletStore.patchGift.tokens, prices: prices),
+                       1_000_000)
+    }
+
+    /// 팩은 주지 않는다 — 이번 보상은 현금뿐이다.
+    func testGivesNoPacks() {
+        let s = played()
+        let before = s.totalPackCount
+        s.claim(WalletStore.patchGift, index: nil)
+        XCTAssertEqual(s.totalPackCount, before)
+    }
+
+    /// 두 번 불러도 한 번만 들어온다.
+    func testGrantsOnlyOnce() {
+        let s = played()
+        let before = s.availableTokens
+        s.claim(WalletStore.patchGift, index: nil)
+        let after = s.availableTokens
+        XCTAssertEqual(after - before, WalletStore.patchGift.tokens)
+        s.claim(WalletStore.patchGift, index: nil)
+        XCTAssertEqual(s.availableTokens, after, "두 번째 호출에서 또 들어왔다")
+    }
+
+    /// 사죄 사료와 별개다 — id 가 다르면 각자 한 번씩 나간다.
+    func testIsSeparateFromTheApologyGift() {
+        let s = played()
+        s.claim(WalletStore.apologyGift, index: nil)
+        let after = s.availableTokens
+        XCTAssertTrue(s.claim(WalletStore.patchGift, index: nil))
+        XCTAssertEqual(s.availableTokens - after, WalletStore.patchGift.tokens)
+    }
+
+    /// 알림 문구가 기념 쪽으로 나와야 한다. 사과 문구가 뜨면 무슨 일인지 알 수 없다.
+    func testTellsTheUserItIsACelebration() {
+        XCTAssertEqual(WalletStore.patchGift.kind, .celebration)
+        let l = L(.ko)
+        XCTAssertNotEqual(l.giftTitle(.celebration), l.giftTitle(.apology))
+        XCTAssertFalse(l.giftBody(.celebration, packs: 0, money: "1,000,000원").contains("팩"),
+                       "팩을 안 주는데 팩 이야기를 한다")
+    }
+}

@@ -22,6 +22,8 @@ struct CardSpotlightView: View {
     /// 팩 이름을 눌러 상점으로 갈 수 있는가. **이미 그 팩 안에서 연 카드면 끈다** —
     /// 눌러도 제자리라 아무 일도 일어나지 않는 버튼이 된다.
     var canVisitPack = true
+    /// 원본 등급 이름. 커뮤니티 약칭으로 옮겨 등급 배지 옆에 적는다.
+    var rarity: String?
     /// 보유 장수. 0 이면 아직 얻지 못한 카드로 표시한다.
     let ownedCount: Int
     /// 미리 받아 둔 큰 그림이 있으면 기다리지 않는다.
@@ -67,6 +69,15 @@ struct CardSpotlightView: View {
                     Text(l.tierBadge(tier))
                         .font(Typography.badgeLarge)
                         .foregroundStyle(tierColor(tier))
+                    // 우리 10칸은 게임 규칙용으로 접은 것이라 「무슨 등급인가」에 답하지
+                    // 못한다 — 찬란한·ACE SPEC·BREAK·LV.X 가 모두 RRR 이다. 원본을 적는다.
+                    // 접기 전과 같은 이름이면(AR·SAR 등) 같은 말을 두 번 하지 않는다.
+                    if let detail = rarity.flatMap({ l.rarityLabel($0) }),
+                       detail != l.tierBadge(tier) {
+                        Text(detail)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                     // 출처 팩 — **눌러서 그 팩을 사러 간다.** 갖고 싶은 카드를 보고 있을 때
                     // 필요한 다음 동작이 그것인데, 예전에는 이름만 적혀 있어서 상점에서
                     // 시대를 짚어 가며 같은 팩을 다시 찾아야 했다.
@@ -110,6 +121,33 @@ struct CardSpotlightView: View {
         }
     }
 
+    /// 이 카드를 처음 얻은 날. **값 줄 끝에 붙인다.**
+    ///
+    /// 줄을 따로 두었더니 카드가 커서 판매 버튼이 화면 밖으로 밀려났다. 이 화면은 470pt
+    /// 안에 다 들어와야 하고(스크롤 없음), 값 줄은 짧아서 자리가 남는다.
+    ///
+    /// **기록이 없으면 아무것도 안 붙인다.** 이 기록은 나중에 생긴 것이라 그 전에 모은
+    /// 카드에는 없다. 「알 수 없음」이라 적으면 대부분의 카드에 쓸모없는 글자가 늘 뜬다.
+    @ViewBuilder
+    private func acquiredTag(_ l: L) -> some View {
+        if let date = wallet.firstAcquired(cardID) {
+            Text("·").font(Typography.label).foregroundStyle(.tertiary)
+            Text(Self.dayFormatter.string(from: date))
+                .font(.system(size: 14)).foregroundStyle(.tertiary)
+                .monospacedDigit()
+                .help(l.cardFirstAcquired(Self.dayFormatter.string(from: date)))
+        }
+    }
+
+    /// 숫자만 쓴다 — 값 줄에 곁들이는 것이라 「2026년 9월 1일」은 자리를 너무 먹는다.
+    /// 시각은 적지 않는다. 몇 시에 뽑았는지는 아무 뜻이 없다.
+    private static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = .current
+        f.setLocalizedDateFormatFromTemplate("yMd")
+        return f
+    }()
+
     /// 팩 그림과 이름. **여기를 누르면 상점의 그 팩으로 간다.**
     ///
     /// 갈매기를 달아 봤더니 눈에 띄지도 않으면서 자리만 먹었다. 대신 이름에 강조색을 준다 —
@@ -144,6 +182,7 @@ struct CardSpotlightView: View {
                         .font(Typography.bodySemibold).monospacedDigit()
                         .foregroundStyle(Color.accentColor)
                 }
+                acquiredTag(l)
             }
             .lineLimit(1).minimumScaleFactor(0.75)
             .help(l.marketPriceSource(prices.asOf))

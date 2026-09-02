@@ -322,6 +322,7 @@ private struct DexDetailView: View {
                               name: entry.displayName(wallet.language),
                               tier: entry.tier, setID: entry.setID,
                               setName: index?.set(entry.setID)?.name ?? entry.setID,
+                              rarity: entry.rarity,
                               ownedCount: wallet.cardCount(entry.id)) {
                 self.spotlight = nil
             }

@@ -46,6 +46,17 @@ struct GameState: Codable, Sendable {
     /// 수집한 카드 — 카드 ID → 보유 장수. 같은 카드를 여러 장 가질 수 있다.
     var cards: [String: Int] = [:]
 
+    /// 카드를 **처음 얻은 때** — 카드 ID → 1970년 기준 초.
+    ///
+    /// 날짜만 적으면 같은 날 얻은 카드끼리 순서가 없어 「획득 순」이 뒤죽박죽이 된다.
+    /// 초로 두고 화면에는 날짜만 적는다.
+    ///
+    /// 이 칸이 생기기 전에 모은 카드는 값이 없었다. 그런 카드는 세이브를 처음 읽을 때
+    /// **그날 날짜로 채운다**(`WalletStore.backfillFirstAcquired`) — 실제 획득일은 어디에도
+    /// 없지만, 「적어도 이날에는 갖고 있었다」는 사실이라 지어낸 값은 아니다.
+    /// 판 카드도 기록은 남긴다. 다시 얻어도 처음 얻은 날은 그날이다.
+    var cardFirstAt: [String: Int] = [:]
+
     /// 개봉한 팩 누적 개수. 통계용.
     var packsOpened = 0
 
@@ -127,6 +138,7 @@ struct GameState: Codable, Sendable {
         lastDate = value(.lastDate, "")
         packs = value(.packs, [:])
         cards = value(.cards, [:])
+        cardFirstAt = value(.cardFirstAt, [:])
         packsOpened = value(.packsOpened, 0)
         favoriteCardID = try? c.decodeIfPresent(String.self, forKey: .favoriteCardID)
         // 이전 이름(completedDex)으로 저장된 값도 읽는다.

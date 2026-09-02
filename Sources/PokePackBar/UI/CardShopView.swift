@@ -272,6 +272,7 @@ private struct PackDetailView: View {
                               tier: entry.tier, setID: entry.setID,
                               setName: set.name,
                               canVisitPack: false,
+                              rarity: entry.rarity,
                               ownedCount: wallet.cardCount(entry.id)) {
                 self.spotlight = nil
             }
@@ -390,11 +391,12 @@ private struct PackDetailView: View {
                 HStack(spacing: 5) {
                     // 칸이 30pt 였다. 14pt 헤비에서 "SAR"·"RRR" 이 그보다 넓어 두 줄로
                     // 꺾였다. 가장 긴 배지가 들어갈 만큼 넓히고 꺾이지 않게 못 박는다.
+                    // 등급을 늘리면서 "BREAK"·"LV.X" 가 들어왔고 38pt 를 다시 넘겼다.
                     Text(entry.tier.rawValue)
                         .font(.system(size: 14, weight: .heavy))
                         .foregroundStyle(tierColor(entry.tier))
                         .lineLimit(1).fixedSize()
-                        .frame(width: 38, alignment: .leading)
+                        .frame(width: 62, alignment: .leading)
                     Text("\(owned)/\(all)")
                         .font(.system(size: 14)).foregroundStyle(.tertiary).monospacedDigit()
                     Spacer()
