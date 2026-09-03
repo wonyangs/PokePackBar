@@ -52,8 +52,15 @@ struct CardGrid: Sendable {
 
     /// 컬렉션 탭의 카드 격자.
     static let collection = fitting(inScroll(inset: 2), columns: 5, spacing: 6)
-    /// 오리파 박스 안의 카드.
+    /// 오리파 박스 안의 카드. 「내용물」 화면에서 세로로 넘긴다.
     static let oripa = fitting(inScroll(inset: 2), columns: 5, spacing: 5)
+    /// 오리파 봉투 격자. **스크롤이 없다** — 못 보는 봉투는 고를 수 없다.
+    ///
+    /// 40봉투가 8열 다섯 줄로 딱 떨어지고 봉투는 46×64pt 다. 뽑기 창에는 등급 요약 줄이
+    /// 없어(그건 공지 보드가 한다) 격자에 340pt 를 줄 수 있다.
+    ///
+    /// 100봉투는 어떤 열 배치로도 들어가지 않았고, 그것이 박스를 40으로 줄인 이유다.
+    static let oripaEnvelope = fitting(onScreen(inset: 2), columns: 8, spacing: 5)
     /// 도감 한 줄에 늘어놓는 카드 띠. 줄 카드의 좌우 여백 안쪽이라 그만큼 좁다.
     static let dexStrip = fitting(inScroll(inset: dexRowPadding * 2), columns: 5, spacing: 5)
     /// 개봉 결과 요약. **팩 장수에 맞춰 열을 정한다.**
@@ -74,7 +81,8 @@ struct CardGrid: Sendable {
     static let packShelf = fitting(inScroll(inset: 2), columns: 3, spacing: 8)
 
     static let all: [(name: String, grid: CardGrid)] = [
-        ("collection", collection), ("oripa", oripa), ("dexStrip", dexStrip),
+        ("collection", collection), ("oripa", oripa),
+        ("oripaEnvelope", oripaEnvelope), ("dexStrip", dexStrip),
         ("packSummary", packSummary(10)), ("packSummary11", packSummary(PackConfig.maxCardsPerPack)),
         ("packShelf", packShelf),
     ]

@@ -325,7 +325,7 @@ struct PopoverView: View {
         }
     }
 
-    /// 판올림 안내. 새 버전으로 처음 열었을 때 한 줄만 띄우고, 보거나 닫으면 사라진다.
+    /// 업데이트 안내. 새 버전으로 처음 열었을 때 한 줄만 띄우고, 보거나 닫으면 사라진다.
     @ViewBuilder
     private var releaseNotesToast: some View {
         if let version = ReleaseNotes.runningVersion,

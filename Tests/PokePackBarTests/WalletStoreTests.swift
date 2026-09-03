@@ -791,6 +791,26 @@ final class PatchGiftTests: XCTestCase {
         XCTAssertEqual(s.availableTokens - after, WalletStore.patchGift.tokens)
     }
 
+    /// v0.7.0 사료도 정확히 100만원이고 **id 가 달라야 한다.**
+    ///
+    /// id 가 같으면 v0.6.0 에서 이미 받은 사람이 이번 것을 못 받는다 —
+    /// 지급 기록은 id 로만 판정한다.
+    func testOripaUpdateGiftIsAnotherMillion() throws {
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        XCTAssertEqual(MarketEconomy.won(tokens: WalletStore.oripaUpdateGift.tokens, prices: prices),
+                       1_000_000)
+        XCTAssertEqual(WalletStore.oripaUpdateGift.kind, .celebration)
+        XCTAssertEqual(WalletStore.oripaUpdateGift.packsPerSet, 0, "이번 보상도 현금뿐이다")
+        XCTAssertNotEqual(WalletStore.oripaUpdateGift.id, WalletStore.patchGift.id)
+
+        // v0.6.0 사료를 이미 받은 세이브에도 이번 것이 따로 들어온다.
+        let s = played()
+        s.claim(WalletStore.patchGift, index: nil)
+        let after = s.availableTokens
+        XCTAssertTrue(s.claim(WalletStore.oripaUpdateGift, index: nil))
+        XCTAssertEqual(s.availableTokens - after, WalletStore.oripaUpdateGift.tokens)
+    }
+
     /// 알림 문구가 기념 쪽으로 나와야 한다. 사과 문구가 뜨면 무슨 일인지 알 수 없다.
     func testTellsTheUserItIsACelebration() {
         XCTAssertEqual(WalletStore.patchGift.kind, .celebration)

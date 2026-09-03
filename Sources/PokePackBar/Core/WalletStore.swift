@@ -337,12 +337,20 @@ final class WalletStore {
     /// 살 수 있다고 나오는 팩을 못 사고, 사고 나면 남은 돈이 계산과 맞지 않았다.
     static let apologyGift = Gift(id: "v0.4.1-apology", tokens: 213_370_000, packsPerSet: 1)
 
-    /// v0.6.0 판올림 기념 사료. 100만원.
+    /// v0.6.0 업데이트 기념 사료. 100만원.
     ///
     /// 토큰 수는 **정확히 100만원이 되는 값**이다 — 100원 한 칸이 21,337토큰이므로
     /// 만 칸이면 딱 떨어진다. 어정쩡한 액수가 뜨면 기념이 아니라 실수처럼 보인다.
     static let patchGift = Gift(id: "v0.6.0-patch", tokens: 213_370_000, packsPerSet: 0,
                                 kind: .celebration)
+
+    /// v0.7.0 업데이트 기념 사료. 100만원.
+    ///
+    /// 토큰 수가 `patchGift` 와 같은 이유는 둘 다 **정확히 100만원**이기 때문이다 —
+    /// 100원 한 칸이 21,337토큰이므로 만 칸이면 딱 떨어진다. `id` 는 반드시 달라야 한다.
+    /// 같으면 v0.6.0 에서 이미 받은 사람이 이번 것을 못 받는다.
+    static let oripaUpdateGift = Gift(id: "v0.7.0-patch", tokens: 213_370_000, packsPerSet: 0,
+                                      kind: .celebration)
 
     /// 준 적이 없고 대상이면 준다. 이미 줬으면 아무것도 하지 않는다.
     ///
@@ -492,56 +500,71 @@ final class WalletStore {
     /// 화면을 그릴 때마다 호출되므로 이미 있으면 그대로 돌려준다. 박스를 새로 채우는 것은
     /// 처음 열 때와 다 팔렸을 때뿐이다.
     func oripaBox(index: CardIndex) -> OripaBox {
-        if let box = state.oripa, !box.isEmpty { return box }
-        var generator = SystemRandomNumberGenerator()
-        let box = Oripa.makeBox(index: index, serial: (state.oripa?.serial ?? 0) + 1,
-                                using: &generator)
-        state.oripa = box
+        // 봉투 수가 맞지 않는 박스는 버린다. 구성표를 바꾼 배포에서 넘어온 옛 박스라
+        // 그대로 두면 격자가 넘치거나 값이 구성표와 어긋난다.
+        if let box = state.oripa, !box.isEmpty, box.cards.count == OripaConfig.slotsPerBox {
+            return box
+        }
+        state.oripa = freshOripaBox(index: index)
         save()
-        return box
+        return state.oripa!
+    }
+
+    /// 미보유 카드를 앞세워 박스를 채운다. 최소 보상을 올리는 것이 목적이다.
+    private func freshOripaBox(index: CardIndex) -> OripaBox {
+        var generator = SystemRandomNumberGenerator()
+        return Oripa.makeBox(index: index, serial: (state.oripa?.serial ?? 0) + 1,
+                             owns: { self.cardCount($0) > 0 },
+                             using: &generator)
     }
 
     /// 박스를 버리고 새로 받는다. 값은 받지 않는다.
     ///
-    /// 마음에 안 드는 박스를 비우려면 100슬롯을 다 사야 한다면, 그건 30억을 태워야 진열이
+    /// 마음에 안 드는 박스를 비우려면 40봉투를 다 사야 한다면, 그건 850만원을 태워야 진열이
     /// 바뀐다는 뜻이라 기능이 아니라 함정이다. 실제 오리파 사이트도 박스를 여러 개 늘어놓고
     /// 고르게 한다.
     ///
-    /// 무료로 둬도 기댓값이 오르지 않는다 — 뽑기는 남은 슬롯에서 균등 추첨이라 새 박스든
-    /// 뽑던 박스든 한 번 뽑기의 기댓값이 같다. 교체로 얻는 것은 "원하는 카드가 든 박스를
-    /// 고를 수 있다" 는 것뿐이고, 그 카드를 실제로 뽑으려면 여전히 100슬롯을 헤쳐야 한다.
+    /// 무료로 둬도 기댓값이 오르지 않는다 — 값이 남은 봉투를 따라가므로 어느 박스에서든
+    /// 회수율이 `1/margin` 으로 같다. 교체로 얻는 것은 "원하는 카드가 든 박스를 고를 수
+    /// 있다" 는 것뿐이고, 그 카드를 실제로 뽑으려면 여전히 40봉투를 헤쳐야 한다.
+    ///
+    /// 값이 남은 것을 따라가므로 **올라가는 경우도 생긴다** — 싼 봉투만 빠지면 남은 평균이
+    /// 오른다. 그때 버릴 수 있어야 실제 값이 새 박스 값을 넘지 않는다.
     func replaceOripaBox(index: CardIndex) {
-        var generator = SystemRandomNumberGenerator()
-        let serial = (state.oripa?.serial ?? 0) + 1
-        state.oripa = Oripa.makeBox(index: index, serial: serial, using: &generator)
+        let box = freshOripaBox(index: index)
+        state.oripa = box
         save()
-        AppLog.write("oripa box replaced serial=\(serial)")
+        AppLog.write("oripa box replaced serial=\(box.serial)")
     }
 
-    /// 오리파 슬롯 값. 팩 할인 혜택이 여기에도 걸린다 — 같은 상점에서 사는 물건이다.
+    /// 지금 박스에서 봉투 하나를 여는 값. **남은 봉투에 따라 바뀐다.**
+    ///
+    /// 팩 할인 혜택이 여기에도 걸린다 — 같은 상점에서 사는 물건이다.
     func oripaPrice(index: CardIndex? = CardIndex.shared) -> Int {
-        let base = index.map { OripaConfig.slotPrice(index: $0) } ?? 30_000_000
+        guard let index else { return 30_000_000 }
+        let base = OripaConfig.slotPrice(box: oripaBox(index: index))
         guard perks.packDiscount > 0 else { return base }
         // 할인을 곱하면 100원 칸에서 벗어난다. 곱한 뒤에 다시 끊는다.
         return MarketEconomy.quantized(Int((Double(base) * (1 - perks.packDiscount)).rounded()))
     }
 
-    /// 한 슬롯을 뽑는다. 잔액이 모자라면 아무것도 하지 않고 nil.
+    /// 고른 봉투를 연다. 잔액이 모자라거나 이미 연 봉투면 아무것도 하지 않고 nil.
     ///
     /// 차감을 먼저 한다. 뽑기가 먼저면 실패했을 때 카드만 나가고 값을 못 받는다.
     @discardableResult
-    func pullOripa(index: CardIndex) -> (card: PulledCard, completions: [DexCompletion])? {
+    func pullOripa(index: CardIndex, envelope: Int)
+        -> (card: PulledCard, completions: [DexCompletion])? {
         var box = oripaBox(index: index)
-        guard !box.isEmpty, spend(oripaPrice(index: index)) else { return nil }
+        guard box.cards.indices.contains(envelope), !box.opened.contains(envelope),
+              spend(oripaPrice(index: index)) else { return nil }
 
-        var generator = SystemRandomNumberGenerator()
-        guard let id = Oripa.pull(from: &box, using: &generator) else { return nil }
+        guard let id = Oripa.open(envelope, in: &box) else { return nil }
         let isNew = cardCount(id) == 0
         state.oripa = box
         let completions = collect([id])   // 저장까지 여기서 한다
         // 가림막을 걷기 전까지는 값을 올리지 않는다 — 오리파도 뒤집어 보는 연출이다.
         holdForReveal([id])
-        AppLog.write("oripa pulled \(id) box=\(box.serial) remaining=\(box.remaining)")
+        AppLog.write("oripa opened \(envelope) -> \(id) box=\(box.serial) remaining=\(box.remaining)")
         return (PulledCard(id: id, tier: index.card(id)?.tier ?? .doubleRare, isNew: isNew),
                 completions)
     }

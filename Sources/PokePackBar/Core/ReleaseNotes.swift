@@ -1,6 +1,6 @@
 import Foundation
 
-/// 판올림 항목 하나. 아래에 딸린 세부가 있을 수 있다.
+/// 업데이트 항목 하나. 아래에 딸린 세부가 있을 수 있다.
 ///
 /// 큰 개편은 제목 한 줄로는 무엇이 바뀌었는지 알 수 없고, 세부를 같은 층에 늘어놓으면
 /// 열 줄이 평평하게 이어져 어디까지가 한 덩이인지 읽히지 않는다.
@@ -12,7 +12,7 @@ struct ReleaseNoteItem: Sendable, Equatable {
     var lines: [String] { [text] + details }
 }
 
-/// 한 판올림에서 바뀐 것.
+/// 한 업데이트에서 바뀐 것.
 struct ReleaseNote: Identifiable, Sendable, Equatable {
     let version: String
     let items: [ReleaseNoteItem]
@@ -23,13 +23,13 @@ struct ReleaseNote: Identifiable, Sendable, Equatable {
         self.items = items
     }
 
-    /// 세부가 없는 목록. 예전 판올림은 전부 이 모양이다.
+    /// 세부가 없는 목록. 예전 업데이트은 전부 이 모양이다.
     init(version: String, lines: [String]) {
         self.init(version: version, items: lines.map { ReleaseNoteItem(text: $0) })
     }
 }
 
-/// 판올림 기록. 새 버전을 내기 전에 여기에 먼저 적는다 —
+/// 업데이트 기록. 새 버전을 내기 전에 여기에 먼저 적는다 —
 /// `ReleaseNotesTests` 가 배포 버전에 해당하는 항목이 없으면 실패시킨다.
 ///
 /// 문구는 `L` 이 들고 있어 언어를 따라간다. 목록은 최신이 앞이다.
@@ -56,6 +56,51 @@ extension L {
 
     var releaseNotes: [ReleaseNote] {
         [
+            ReleaseNote(version: "0.7.0", items: [
+                ReleaseNoteItem(text: t("오리파 대개편",
+                                         "Oripa overhaul",
+                                         "オリパ大改編",
+                                         "Renovación del Oripa",
+                                         "Refonte de l'Oripa",
+                                         "Reforma do Oripa"), details: [
+                    t("봉투를 직접 골라서 뽑도록 변경",
+                      "You now pick the envelope yourself",
+                      "封を自分で選んで引く方式に変更",
+                      "Ahora eliges el sobre tú mismo",
+                      "Tu choisis désormais la pochette",
+                      "Agora você escolhe o envelope"),
+                    t("박스마다 대표 카드 지정 — 뽑기값의 6배",
+                      "Each box gets a headline card, worth 6 pulls",
+                      "箱ごとに目玉カードを設定 — 引き値の6倍",
+                      "Cada caja tiene carta estrella: 6 tiradas",
+                      "Chaque boîte a une carte vedette : 6 tirages",
+                      "Cada caixa tem carta principal: 6 tiragens"),
+                    t("대표 카드에 따라 박스 규모가 달라짐",
+                      "The box scales with its headline card",
+                      "目玉カードに応じて箱の規模が変わる",
+                      "La caja escala con su carta estrella",
+                      "La boîte s'échelonne selon sa vedette",
+                      "A caixa escala com sua carta principal"),
+                    t("뽑기값 785,100원 → 보통 박스 240,000원 안팎",
+                      "785,100 KRW a pull became about 240,000 for a typical box",
+                      "引き値 785,100ウォン → 普通の箱は240,000ウォン前後",
+                      "De 785 100 KRW a unos 240 000 en una caja típica",
+                      "De 785 100 KRW à environ 240 000 pour une boîte type",
+                      "De 785.100 KRW para cerca de 240.000 numa caixa típica"),
+                    t("100칸 → 40봉투, 기존 박스는 새 박스로 교체",
+                      "100 slots became 40 envelopes; a box in progress is replaced",
+                      "100枠 → 40封、進行中の箱は新しい箱に交換",
+                      "De 100 huecos a 40 sobres; la caja en curso se reemplaza",
+                      "De 100 cases à 40 pochettes ; la boîte en cours est remplacée",
+                      "De 100 espaços para 40 envelopes; a caixa em curso é trocada"),
+                ]),
+                ReleaseNoteItem(text: t("업데이트 기념 사료 1,000,000원 지급",
+                                         "1,000,000 KRW treat for the update",
+                                         "アップデート記念のごはん 1,000,000ウォン進呈",
+                                         "Obsequio de 1 000 000 KRW por la actualización",
+                                         "Cadeau de 1 000 000 KRW pour la mise à jour",
+                                         "Presente de 1.000.000 KRW pela atualização")),
+            ]),
             ReleaseNote(version: "0.6.0", items: [
                 ReleaseNoteItem(text: t("카드 등급 세분화",
                                          "Finer card rarities",

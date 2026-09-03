@@ -48,6 +48,48 @@ final class PopoverConstructionTests: XCTestCase {
             .environment(updater).environment(nav))
     }
 
+    /// 오리파 **뽑기 창**은 스크롤 없이 탭 높이에 들어가야 한다.
+    ///
+    /// 봉투 격자에는 스크롤이 없다 — 못 보는 봉투는 고를 수 없다. 넘치면 격자가 눌리거나
+    /// 뽑기 줄이 잘리는데, 둘 다 메뉴바를 클릭해야만 보이므로 여기서 재 둔다.
+    ///
+    /// 공지 보드는 카드 목록을 세로로 넘기므로 이 제약이 없다. 재야 하는 것은 뽑기 창이다.
+    func testOripaPickingScreenFitsTheTabHeight() throws {
+        let (_, wallet, _, _) = makeEnvironment()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        var worst: CGFloat = 0
+        for _ in 0..<6 {
+            wallet.replaceOripaBox(index: index)
+            let screen = OripaPickingScreen(wallet: wallet, index: index,
+                                            box: wallet.oripaBox(index: index),
+                                            picked: .constant(3),
+                                            onBack: {}, onPull: {})
+            let controller = NSHostingController(
+                rootView: screen.frame(width: PopoverMetrics.contentWidth))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: PopoverMetrics.width,
+                                                      height: PopoverMetrics.tabHeight + 60),
+                                  styleMask: [.borderless], backing: .buffered, defer: false)
+            window.contentViewController = controller
+            controller.view.layoutSubtreeIfNeeded()
+            controller.view.displayIfNeeded()
+            worst = max(worst, controller.view.fittingSize.height)
+        }
+        // 상점 탭은 위에 갈래 선택 줄(28pt)과 그 아래 간격(8pt)을 두고 오리파를 얹는다.
+        let budget = PopoverMetrics.tabHeight - 36
+        XCTAssertLessThanOrEqual(worst, budget,
+                                 "뽑기 창이 \(Int(worst))pt 로 \(Int(budget))pt 예산을 넘는다 "
+                                 + "— 봉투 열을 늘리거나 머리 줄을 줄여야 한다")
+    }
+
+    /// 공지 보드도 한 번 지어 본다. 여기서 죽으면 오리파 탭이 통째로 사라진다.
+    func testOripaBoardBuilds() throws {
+        let (_, wallet, _, nav) = makeEnvironment()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        hostAndLayout(OripaView(wallet: wallet, index: index)
+            .frame(width: PopoverMetrics.contentWidth, height: PopoverMetrics.tabHeight)
+            .environment(nav))
+    }
+
     /// 카드를 가진 상태 — 컬렉션 격자와 등급 현황이 실제 데이터로 그려진다.
     func testCollectionBuildsWithOwnedCards() throws {
         let (store, wallet, updater, nav) = makeEnvironment()

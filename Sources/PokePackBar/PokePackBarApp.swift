@@ -67,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 팩이 안 들어와 있고, 안내도 그만큼 늦는다.
         wallet.claim(WalletStore.apologyGift)
         wallet.claim(WalletStore.patchGift)
+        wallet.claim(WalletStore.oripaUpdateGift)
         updater = UpdateChecker()
         store.localizationLanguage = wallet.language   // 알림 현지화용 미러 시드
         store.onRefresh = { [weak self] in self?.onStoreRefreshed() }   // 한도 로드 후 companion·사탕 지급

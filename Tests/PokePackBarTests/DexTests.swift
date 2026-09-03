@@ -707,16 +707,72 @@ final class OripaTests: XCTestCase {
         }, "RR 미만이 섞였다")
     }
 
-    /// 뽑으면 그 카드가 박스에서 빠진다. 재고가 줄지 않으면 오리파가 아니라 그냥 비싼 팩이다.
-    func testPullRemovesTheSlot() throws {
+    /// 봉투 자리를 섞는다. 칸 순서대로 담으면 0번 봉투가 늘 1등이라 고를 이유가 없어진다.
+    func testTopPrizeIsNotAlwaysTheFirstEnvelope() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
+        var g = SeededGenerator(seed: 21)
+        let spots = (1...40).map { serial -> Int in
+            let box = Oripa.makeBox(shelf: shelf, serial: serial, using: &g)
+            let top = box.cards.enumerated().max {
+                MarketEconomy.usd(cardID: $0.element, prices: prices)
+                    < MarketEconomy.usd(cardID: $1.element, prices: prices)
+            }
+            return top?.offset ?? 0
+        }
+        XCTAssertGreaterThan(Set(spots).count, 10,
+                             "1등이 늘 같은 자리에 있다 — 자리를 섞지 않았다")
+    }
+
+    /// 고른 봉투에 들어 있던 카드가 그대로 나온다. 누른 뒤에 정하면 고르는 일이 장식이 된다.
+    func testOpeningAnEnvelopeYieldsWhatWasPlantedInIt() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         var g = SeededGenerator(seed: 3)
         var box = Oripa.makeBox(index: index, serial: 1, using: &g)
+        let planted = box.cards[17]
         let before = box.remaining
 
-        let pulled = try XCTUnwrap(Oripa.pull(from: &box, using: &g))
+        XCTAssertEqual(Oripa.open(17, in: &box), planted)
         XCTAssertEqual(box.remaining, before - 1)
-        XCTAssertFalse(box.slots.contains(pulled))
+        XCTAssertFalse(box.slots.contains(planted), "연 봉투가 남은 목록에 그대로 있다")
+        XCTAssertNil(Oripa.open(17, in: &box), "같은 봉투를 두 번 열 수 있으면 안 된다")
+        // 공지 보드는 `cards` 를 그린다. 뽑은 카드가 여기서 빠지면 무엇이 나갔는지
+        // 보여 줄 수 없고, 1등이 빠진 박스와 아직 있는 박스가 같아 보인다.
+        XCTAssertEqual(box.cards.count, OripaConfig.slotsPerBox,
+                       "뽑았다고 박스 목록에서 카드가 사라졌다")
+        XCTAssertTrue(box.cards.contains(planted))
+    }
+
+    /// 공지 보드는 **안 연 봉투의 번호를 적지 않는다.**
+    ///
+    /// 보드가 박스에 든 카드를 전부 늘어놓으므로, 카드마다 번호가 보이면 목록에서 1등을
+    /// 찾아 그 번호를 누르면 끝이다 — 고르는 일이 통째로 사라진다. 실제로 그렇게 나갔다.
+    func testUnopenedEnvelopeNumbersNeverLeak() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        var g = SeededGenerator(seed: 41)
+        var box = Oripa.makeBox(index: index, serial: 1, using: &g)
+
+        for id in box.cards {
+            XCTAssertNil(Oripa.revealedEnvelope(of: id, in: box),
+                         "안 연 봉투의 번호가 새어 나온다")
+        }
+        let opened = try XCTUnwrap(Oripa.open(9, in: &box))
+        XCTAssertEqual(Oripa.revealedEnvelope(of: opened, in: box), 9)
+        for (number, id) in box.cards.enumerated() where number != 9 {
+            XCTAssertNil(Oripa.revealedEnvelope(of: id, in: box),
+                         "\(number)번 봉투의 번호가 아직 안 열었는데 새어 나온다")
+        }
+    }
+
+    /// 안 연 봉투는 무엇이 들었는지 답하지 않는다. 화면이 실수로 물어봐도 새면 안 된다.
+    func testUnopenedEnvelopesKeepTheirSecret() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        var g = SeededGenerator(seed: 5)
+        var box = Oripa.makeBox(index: index, serial: 1, using: &g)
+        XCTAssertNil(box.card(at: 0))
+        let opened = try XCTUnwrap(Oripa.open(0, in: &box))
+        XCTAssertEqual(box.card(at: 0), opened)
     }
 
     /// 박스를 끝까지 비우면 처음 들어 있던 것을 전부 얻는다.
@@ -724,19 +780,156 @@ final class OripaTests: XCTestCase {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         var g = SeededGenerator(seed: 7)
         var box = Oripa.makeBox(index: index, serial: 1, using: &g)
-        let planted = Set(box.slots)
+        let planted = Set(box.cards)
 
         var got: Set<String> = []
-        while let id = Oripa.pull(from: &box, using: &g) { got.insert(id) }
+        for envelope in box.cards.indices {
+            got.insert(try XCTUnwrap(Oripa.open(envelope, in: &box)))
+        }
         XCTAssertEqual(got, planted)
-        XCTAssertNil(Oripa.pull(from: &box, using: &g), "빈 박스에서 더 나오면 안 된다")
+        XCTAssertTrue(box.isEmpty)
+    }
+
+    /// 박스는 아직 없는 카드로 채운다. **기대값을 건드리지 않고 최소 보상을 올리는 방법이다.**
+    func testBoxPrefersCardsYouDoNotOwn() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
+        var g = SeededGenerator(seed: 13)
+        // 첫 박스에 든 것을 전부 가졌다고 치고 다시 채운다.
+        let owned = Set(Oripa.makeBox(shelf: shelf, serial: 1, using: &g).cards)
+        let next = Oripa.makeBox(shelf: shelf, serial: 2, owns: { owned.contains($0) }, using: &g)
+
+        XCTAssertEqual(next.cards.count, OripaConfig.slotsPerBox)
+        XCTAssertTrue(owned.isDisjoint(with: next.cards),
+                      "가진 카드가 다시 들어갔다 — 미보유 후보가 아직 남아 있는데도")
+    }
+
+    /// 값은 남은 봉투를 따라간다. 상위 카드가 빠진 박스에서 같은 값을 받으면
+    /// 안을 다 보여 주는 뜻이 없다.
+    func testPriceFollowsWhatIsLeftInTheBox() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        var g = SeededGenerator(seed: 29)
+        var box = Oripa.makeBox(index: index, serial: 1, using: &g)
+        let fresh = OripaConfig.slotPrice(box: box, prices: prices)
+
+        // 가장 비싼 봉투를 연다.
+        let top = try XCTUnwrap(box.cards.enumerated().max {
+            MarketEconomy.usd(cardID: $0.element, prices: prices)
+                < MarketEconomy.usd(cardID: $1.element, prices: prices)
+        })
+        _ = Oripa.open(top.offset, in: &box)
+
+        XCTAssertLessThan(OripaConfig.slotPrice(box: box, prices: prices), fresh,
+                          "1등이 빠졌는데 값이 그대로다")
+        XCTAssertEqual(OripaConfig.slotPrice(box: OripaBox(cards: [], serial: 1), prices: prices), 0,
+                       "빈 박스에 값을 매기면 안 된다")
+    }
+
+    /// **보통 박스**의 봉투 값이 팩 한 개 값 언저리여야 한다. 뽑을 수 없을 만큼 비싸면
+    /// 기능이 없는 것과 같다. 박스마다 규모가 다르므로 대표 카드 구간의 한가운데로 잰다.
+    func testTypicalPullCostsAboutOnePack() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
+        let slot = OripaConfig.typicalSlotPrice(shelf: shelf, prices: prices)
+        let packs = index.sets.map { PackPricing.price(setID: $0.id, index: index, prices: prices) }
+            .sorted()
+        let median = packs[packs.count / 2]
+        XCTAssertLessThan(Double(slot) / Double(median), 2.5,
+                          "보통 박스 한 장이 팩 \(Double(slot) / Double(median)) 개 값이다")
+    }
+
+    /// 값과 보상이 어긋나지 않는지 한자리에서 본다.
+    ///
+    /// **본전 이상인 칸 수가 이 테스트의 핵심이다.** 박스 안이 다 보이는 뽑기에서 본전
+    /// 칸이 하나뿐이면 「39/40 확률로 진다」가 화면에 적혀 있는 것이고, 그러면 아무도
+    /// 뽑지 않는다. 예산(=회수율)이 고정이라 이 수를 늘리면 바닥이 깎이므로 둘을 같이 본다.
+    ///
+    /// 박스마다 규모가 다르지만 **비율은 같아야 한다** — 구성표가 대표 카드에 대한 비율이라
+    /// 그렇게 나오게 되어 있고, 그게 깨지면 어떤 박스가 다른 박스보다 유리해진다.
+    func testEveryBoxKeepsTheSameShape() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
+        var g = SeededGenerator(seed: 91)
+
+        for round in 1...12 {
+            let box = Oripa.makeBox(shelf: shelf, serial: round, using: &g)
+            let price = Double(OripaConfig.slotPrice(box: box, prices: prices))
+            let ratios = box.cards.map {
+                Double(MarketEconomy.tokens(usd: MarketEconomy.usd(cardID: $0, prices: prices),
+                                            prices: prices)) / price
+            }
+            let winners = ratios.filter { $0 >= 1.0 }.count
+            XCTAssertGreaterThanOrEqual(winners, 4,
+                                        "박스 \(round): 본전 이상인 칸이 \(winners)개뿐이다")
+            XCTAssertGreaterThan(ratios.min() ?? 0, 0.10,
+                                 "박스 \(round): 바닥이 낸 값의 \(Int((ratios.min() ?? 0) * 100))% 다")
+            XCTAssertGreaterThan(ratios.max() ?? 0, 4.5,
+                                 "박스 \(round): 천장이 \(ratios.max() ?? 0) 배뿐이다")
+        }
+    }
+
+    /// **박스마다 대표 카드가 다르고, 규모가 그만큼 갈린다.** 전부 같은 값이면 대표 카드를
+    /// 두는 뜻이 없다.
+    func testBoxesVaryInScale() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
+        var g = SeededGenerator(seed: 97)
+
+        let prices20 = (1...20).map { serial -> Int in
+            OripaConfig.slotPrice(box: Oripa.makeBox(shelf: shelf, serial: serial, using: &g),
+                                  prices: prices)
+        }
+        let low = Double(prices20.min() ?? 1), high = Double(prices20.max() ?? 1)
+        XCTAssertGreaterThan(high / low, 3.0,
+                             "박스 스무 개의 값이 \(high / low) 배 안에서만 갈린다 — 규모가 안 다르다")
+    }
+
+    /// 대표 카드가 뽑기값의 여섯 배 언저리여야 한다. 이 배수가 오리파를 하는 이유다.
+    func testHeadlineIsWorthSixPulls() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let prices = try XCTUnwrap(CardPrices.loadBundled())
+        let shelf = OripaConfig.shelf(index: index, prices: prices)
+        XCTAssertEqual(OripaConfig.headlineMultiple, 6.0, accuracy: 0.15)
+
+        var g = SeededGenerator(seed: 101)
+        for round in 1...8 {
+            let box = Oripa.makeBox(shelf: shelf, serial: round, using: &g)
+            let head = try XCTUnwrap(Oripa.headline(of: box, prices: prices))
+            let price = Double(OripaConfig.slotPrice(box: box, prices: prices))
+            let value = Double(MarketEconomy.tokens(usd: MarketEconomy.usd(cardID: head, prices: prices),
+                                                    prices: prices))
+            XCTAssertGreaterThan(value / price, 4.5, "박스 \(round): 대표가 \(value / price) 배뿐이다")
+        }
+    }
+
+    /// 예전 저장 파일에는 남은 카드만 들어 있었다. 읽을 수 있어야 한다.
+    func testLegacyBoxDecodes() throws {
+        let json = Data(#"{"slots":["a","b","c"],"serial":4}"#.utf8)
+        let box = try JSONDecoder().decode(OripaBox.self, from: json)
+        XCTAssertEqual(box.cards, ["a", "b", "c"])
+        XCTAssertEqual(box.serial, 4)
+        XCTAssertTrue(box.opened.isEmpty)
+    }
+
+    /// 연 봉투까지 저장에 살아남아야 한다. 안 그러면 재시작마다 박스가 다시 가득 찬다.
+    func testOpenedEnvelopesSurviveEncoding() throws {
+        var box = OripaBox(cards: ["a", "b", "c"], serial: 2)
+        _ = Oripa.open(1, in: &box)
+        let again = try JSONDecoder().decode(OripaBox.self, from: JSONEncoder().encode(box))
+        XCTAssertEqual(again, box)
+        XCTAssertEqual(again.slots, ["a", "c"])
     }
 
     /// 값을 못 내면 카드도 나가지 않는다.
     func testPullRejectedWithoutTokens() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         let s = makeStore()
-        XCTAssertNil(s.pullOripa(index: index))
+        XCTAssertNil(s.pullOripa(index: index, envelope: 0))
         XCTAssertEqual(s.totalCardCount, 0)
         XCTAssertEqual(s.oripaBox(index: index).remaining, OripaConfig.slotsPerBox)
     }
@@ -750,13 +943,29 @@ final class OripaTests: XCTestCase {
         s.update(todayTokensByProvider: ["p": 500_000_000], todayDate: "2026-08-28", hasUsageData: true)
 
         let before = s.availableTokens
-        let result = try XCTUnwrap(s.pullOripa(index: index))
-        XCTAssertEqual(s.availableTokens, before - s.oripaPrice(index: index))
+        // 값은 남은 봉투에서 나오므로 뽑기 **전에** 받아 둔다. 뽑고 나면 남은 것이 달라진다.
+        let paid = s.oripaPrice(index: index)
+        let result = try XCTUnwrap(s.pullOripa(index: index, envelope: 5))
+        XCTAssertEqual(s.availableTokens, before - paid)
         XCTAssertEqual(s.cardCount(result.card.id), 1)
 
-        let remaining = s.oripaBox(index: index).slots
+        let box = s.oripaBox(index: index)
+        XCTAssertTrue(box.opened.contains(5))
         let reloaded = WalletStore(fileURL: dir.appendingPathComponent("game-state.json"), dexes: [])
-        XCTAssertEqual(reloaded.oripaBox(index: index).slots, remaining, "박스가 재시작에 살아남지 않았다")
+        XCTAssertEqual(reloaded.oripaBox(index: index), box, "박스가 재시작에 살아남지 않았다")
+    }
+
+    /// 같은 봉투를 두 번 열 수 없다. 두 번째 값만 나가고 카드는 안 나오면 도둑질이 된다.
+    func testOpenedEnvelopeCannotBePulledAgain() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let s = makeStore()
+        s.update(todayTokensByProvider: ["p": 0], todayDate: "2026-08-28", hasUsageData: true)
+        s.update(todayTokensByProvider: ["p": 500_000_000], todayDate: "2026-08-28", hasUsageData: true)
+
+        XCTAssertNotNil(s.pullOripa(index: index, envelope: 2))
+        let after = s.availableTokens
+        XCTAssertNil(s.pullOripa(index: index, envelope: 2))
+        XCTAssertEqual(s.availableTokens, after, "이미 연 봉투에 값을 받았다")
     }
 
     /// 마음에 안 드는 박스는 값 없이 버릴 수 있어야 한다.
@@ -778,50 +987,47 @@ final class OripaTests: XCTestCase {
         XCTAssertNotEqual(after.slots, before.slots, "내용이 그대로면 교체가 아니다")
     }
 
-    /// 팔아서 버는 경로가 되면 안 된다. 오리파 한 슬롯의 기대 판매가가 값보다 한참 낮아야 한다.
+    /// 팔아서 버는 경로가 되면 안 된다.
+    ///
+    /// **지켜야 하는 선은 1.0 이다** — 환급이 값을 넘으면 사서 갈기를 반복해 잔액이 무한히
+    /// 늘어난다. 마진 8 시절에는 이 값이 0.17 이라 0.5 를 걸어 두었는데, 마진 2.5 에서
+    /// 혜택을 최대로 받으면 0.54 다(회수율 40% × 판매 추가금 15% ÷ 팩 할인 15%).
+    /// 0.7 로 두면 마진이 1.93 아래로 내려가는 순간 걸린다 — 무한 증식까지 가기 전에 잡는다.
     func testOripaIsNeverWorthGrinding() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         let prices = try XCTUnwrap(CardPrices.loadBundled())
         let shelf = OripaConfig.shelf(index: index, prices: prices)
-        let slotUSD = shelf.slotUSD
-        let dust = Double(MarketEconomy.tokens(usd: slotUSD)) * (1 + DexPerks.caps.dustBonus)
-        let paid = Double(OripaConfig.slotPrice(index: index, prices: prices))
-            * (1 - DexPerks.caps.packDiscount)
-        XCTAssertLessThan(dust / paid, 0.5,
-                          "혜택 최대일 때 환급이 값의 \(Int(dust / paid * 100))% 다")
+        var g = SeededGenerator(seed: 103)
+
+        for round in 1...8 {
+            let box = Oripa.makeBox(shelf: shelf, serial: round, using: &g)
+            let boxUSD = box.cards.reduce(0.0) { $0 + MarketEconomy.usd(cardID: $1, prices: prices) }
+            let dust = Double(MarketEconomy.tokens(usd: boxUSD / Double(box.cards.count),
+                                                   prices: prices))
+                * (1 + DexPerks.caps.dustBonus)
+            let paid = Double(OripaConfig.slotPrice(box: box, prices: prices))
+                * (1 - DexPerks.caps.packDiscount)
+            XCTAssertLessThan(dust / paid, 0.7,
+                              "박스 \(round): 혜택 최대일 때 환급이 값의 \(Int(dust / paid * 100))% 다")
+        }
     }
 
-    /// 박스는 값 구간으로 채운다. 맨 위 칸에는 늘 최상위권 카드가 들어가야 한다 —
-    /// 등급으로 채우던 시절에는 값싼 UR 만 들어찬 박스가 나올 수 있었다.
-    func testEveryBoxCarriesATopValueCard() throws {
+    /// 박스에는 늘 대표 카드가 든다. 대표가 없으면 나머지 칸의 값도 정할 수 없다.
+    func testEveryBoxCarriesAHeadlineCard() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         let prices = try XCTUnwrap(CardPrices.loadBundled())
         let shelf = OripaConfig.shelf(index: index, prices: prices)
-        let topBand = Set(try XCTUnwrap(shelf.bands.first))
-        XCTAssertFalse(topBand.isEmpty)
+        let low = OripaConfig.headlineBand.lowerBound * shelf.baseUSD
         var generator = SystemRandomNumberGenerator()
+
         for serial in 1...20 {
             let box = Oripa.makeBox(shelf: shelf, serial: serial, using: &generator)
-            XCTAssertEqual(box.slots.count, OripaConfig.slotsPerBox)
-            XCTAssertEqual(Set(box.slots).count, box.slots.count, "같은 카드가 두 번 들었다")
-            XCTAssertFalse(topBand.isDisjoint(with: box.slots),
-                           "박스 \(serial) 에 최상위권 카드가 없다")
+            XCTAssertEqual(box.cards.count, OripaConfig.slotsPerBox)
+            XCTAssertEqual(Set(box.cards).count, box.cards.count, "같은 카드가 두 번 들었다")
+            let head = try XCTUnwrap(Oripa.headline(of: box, prices: prices))
+            XCTAssertGreaterThanOrEqual(MarketEconomy.usd(cardID: head, prices: prices), low * 0.8,
+                                        "박스 \(serial) 의 대표 카드가 구간 아래다")
         }
-    }
-
-    /// 박스마다 값이 크게 흔들리면 같은 값에 파는 것이 말이 안 된다.
-    func testBoxValueIsStableAcrossBoxes() throws {
-        let index = try XCTUnwrap(CardIndex.loadBundled())
-        let prices = try XCTUnwrap(CardPrices.loadBundled())
-        let shelf = OripaConfig.shelf(index: index, prices: prices)
-        var generator = SystemRandomNumberGenerator()
-        let totals = (1...100).map { serial -> Double in
-            Oripa.makeBox(shelf: shelf, serial: serial, using: &generator)
-                .slots.reduce(0.0) { $0 + MarketEconomy.usd(cardID: $1, prices: prices) }
-        }
-        let low = totals.min() ?? 0, high = totals.max() ?? 0
-        XCTAssertLessThan(high / max(low, 0.01), 1.10,
-                          "박스 값이 \(Int((high / low - 1) * 100))%까지 갈린다 — 구간이 너무 넓다")
     }
 }
 

@@ -318,7 +318,7 @@ extension L {
             return t("사죄의 사료", "An apology treat", "おわびのごはん",
                       "Un obsequio de disculpa", "Un cadeau d'excuse", "Um agrado de desculpas")
         case .celebration:
-            return t("판올림 기념 사료", "A treat for the update", "アップデート記念のごはん",
+            return t("업데이트 기념 사료", "A treat for the update", "アップデート記念のごはん",
                       "Un obsequio por la actualización", "Un cadeau pour la mise à jour",
                       "Um agrado pela atualização")
         }
@@ -336,7 +336,7 @@ extension L {
                       "Désolé pour les prix mal affichés. \(packs) boosters et \(money) t'attendent.",
                       "Desculpe pelos preços exibidos errado. \(packs) pacotes e \(money) estão na carteira.")
         case .celebration:
-            return t("새 판올림을 기념해 \(money)을 넣어 뒀어요.",
+            return t("업데이트를 기념해 \(money)을 넣어 뒀어요.",
                       "\(money) is in your wallet to mark the new update.",
                       "アップデートを記念して \(money) を入れておきました。",
                       "Te dejamos \(money) para celebrar la actualización.",
@@ -456,30 +456,45 @@ extension L {
 
     // MARK: 오리파
     var oripaTitle: String { t("오리파", "Oripa", "オリパ", "Oripa", "Oripa", "Oripa") }
-    var oripaSubtitle: String { t("상위 등급만 담은 뽑기", "A draw of high rarities only",
-                                   "上位レアだけの一発勝負", "Solo cartas de alta rareza",
-                                   "Uniquement des hautes raretés", "Só cartas de alta raridade") }
-    /// 두 문장을 각각 한 줄에 둔다. 이어 붙이면 줄바꿈이 문장 가운데서 일어나 읽기 나쁘다.
-    var oripaHint: String { t("여러 세트에서 골라 담은 100장짜리 박스예요.\n한 장씩 뽑으면 그 카드는 박스에서 빠집니다.",
-                               "A 100-card box drawn from every set.\nEach pull removes that card from the box.",
-                               "全セットから選んだ100枚の箱です。\n引いたカードは箱から抜けます。",
-                               "Una caja de 100 cartas de todos los sets.\nCada tirada retira esa carta.",
-                               "Une boîte de 100 cartes tirées de tous les sets.\nChaque tirage retire la carte.",
-                               "Uma caixa de 100 cartas de todos os sets.\nCada tiragem remove a carta.") }
-    var oripaPull: String { t("뽑기", "Pull", "引く", "Tirar", "Tirer", "Tirar") }
+    /// 이 박스의 얼굴. 값이 가장 비싼 한 장이고, 박스 규모가 이 카드에서 나온다.
+    var oripaHeadline: String { t("대표", "Top prize", "目玉", "Premio", "Gros lot", "Prêmio") }
+    /// 대표 카드가 뽑기값의 몇 배인가. 이 배수가 오리파를 하는 이유다.
+    func oripaHeadlineWorth(_ times: Int) -> String {
+        t("뽑기값의 \(times)배", "\(times)× the pull price", "引き値の\(times)倍",
+           "\(times)× el precio", "\(times)× le prix", "\(times)× o preço")
+    }
+    /// 공지 보드에서 이미 나간 카드에 얹는 표시. **흑백으로만 두면 「미보유」로 읽힌다** —
+    /// 컬렉션이 미보유를 그렇게 그리므로 나갔다는 것은 글자로 적는다.
+    var oripaDrawnMark: String { t("뽑음", "Pulled", "済", "Sacada", "Tirée", "Tirada") }
+    /// 어느 봉투에 들어 있(었)는지. 대응이 미리 굳어 있었다는 흔적이다.
+    func oripaCardInEnvelope(_ number: Int, _ name: String) -> String {
+        t("\(number)번 봉투 · \(name)", "Envelope #\(number) · \(name)",
+           "\(number)番の封 · \(name)", "Sobre n.º \(number) · \(name)",
+           "Pochette n° \(number) · \(name)", "Envelope nº \(number) · \(name)")
+    }
     var oripaDrawHint: String { t("밀어서 확인", "Slide to reveal", "スライドして確認",
                                   "Desliza para ver", "Fais glisser pour voir",
                                   "Deslize para ver") }
-    var oripaPullConfirm: String { t("뽑을까요?", "Draw?", "引きますか？",
-                                     "¿Tirar?", "Tirer ?", "Tirar?") }
     /// 마지막 장에서 요약으로 넘어가는 버튼.
     var packSeeResult: String { t("결과 보기", "See results", "結果を見る",
                                    "Ver resultados", "Voir les résultats", "Ver resultados") }
     var oripaSeeDetail: String { t("자세히 보기", "See details", "詳しく見る",
                                     "Ver detalles", "Voir la carte", "Ver detalhes") }
+    var oripaPull: String { t("뽑기", "Pull", "引く", "Tirar", "Tirer", "Tirar") }
+    /// 공지 보드에서 뽑기 창으로 들어가는 버튼. **여기서 바로 뽑지 않는다** —
+    /// 무엇이 걸려 있는지 본 다음 봉투를 고르는 것이 순서다.
+    var oripaGoPull: String { t("뽑으러 가기", "Go pull", "引きに行く",
+                                 "Ir a tirar", "Aller tirer", "Ir tirar") }
+    /// 봉투를 아직 안 골랐을 때 뽑기 줄에 적는 말.
+    var oripaPickHint: String { t("봉투를 골라 주세요", "Pick an envelope", "封を選んでください",
+                                   "Elige un sobre", "Choisis une pochette", "Escolha um envelope") }
+    func oripaPicked(_ number: Int) -> String {
+        t("\(number)번 봉투", "Envelope #\(number)", "\(number)番の封",
+           "Sobre n.º \(number)", "Pochette n° \(number)", "Envelope nº \(number)")
+    }
     func oripaRemaining(_ left: Int, _ total: Int) -> String {
-        t("남은 슬롯 \(left) / \(total)", "\(left) of \(total) slots left", "残り \(left) / \(total)",
-           "\(left) de \(total) ranuras", "\(left) sur \(total) restantes", "\(left) de \(total) restantes")
+        t("남은 봉투 \(left) / \(total)", "\(left) of \(total) left", "残り \(left) / \(total)",
+           "\(left) de \(total) sobres", "\(left) sur \(total) restantes", "\(left) de \(total) restantes")
     }
     func oripaBoxNumber(_ serial: Int) -> String {
         t("\(serial)번 박스", "Box #\(serial)", "\(serial)番の箱",
