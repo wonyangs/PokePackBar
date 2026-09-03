@@ -128,26 +128,6 @@ struct OripaView: View {
                     .fixedSize()
                 }
             }
-            // **이 박스의 얼굴.** 규모가 이 카드에서 나오므로 살지 말지의 첫 근거다.
-            if let head = Oripa.headline(of: box), let entry = index.card(head) {
-                HStack(spacing: 5) {
-                    Text(l.oripaHeadline)
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 5).padding(.vertical, 1)
-                        .background(Color.accentColor, in: Capsule())
-                    Text(entry.displayName(wallet.language))
-                        .font(Typography.labelSemibold).lineLimit(1).truncationMode(.tail)
-                    Text(MarketEconomy.money(
-                        tokens: MarketEconomy.tokens(usd: MarketEconomy.usd(cardID: head,
-                                                                            prices: CardPrices.shared)),
-                        language: wallet.language))
-                        .font(Typography.labelSemibold).monospacedDigit()
-                        .foregroundStyle(Color.accentColor)
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                }
-            }
             // 할 말이 있을 때만 한 줄 붙인다. 늘 자리를 잡아 두면 빈 줄이 남는다.
             if refilled || owned > 0 {
                 Text(refilled ? l.oripaRefilled : l.oripaOwnedCount(owned))
@@ -205,7 +185,6 @@ struct OripaView: View {
     /// 들어가야 하는 것은 **고르는 자리**(봉투 격자)다.
     private func contents(_ l: L, _ box: OripaBox) -> some View {
         let ordered = Oripa.sortedByValue(box.cards, index: index)
-        let headline = Oripa.headline(of: box)
         let columns = CardGrid.oripa.items
         return LazyVGrid(columns: columns, spacing: CardGrid.oripa.spacing) {
             ForEach(ordered, id: \.self) { id in
@@ -240,16 +219,6 @@ struct OripaView: View {
                                         .padding(2)
                                 }
                             }
-                            .overlay(alignment: .topLeading) {
-                                if id == headline {
-                                    Text(l.oripaHeadline)
-                                        .font(.system(size: 13, weight: .heavy))
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, 4).padding(.vertical, 1)
-                                        .background(Color.accentColor, in: Capsule())
-                                        .padding(2)
-                                }
-                            }
                         if let entry = index.card(id) {
                             Text(l.tierBadge(entry.tier))
                                 .font(.system(size: 13, weight: .heavy))
@@ -280,11 +249,6 @@ struct OripaView: View {
         let affordable = wallet.availableTokens >= price && !box.isEmpty
         return VStack(spacing: 4) {
             HStack(spacing: 6) {
-                // 대표 카드가 뽑기값의 몇 배인지 적는다. 값 옆에 두어야 「이 돈을 왜 내는가」에
-                // 답이 된다 — 박스마다 규모가 달라도 이 배수는 같다.
-                Text(l.oripaHeadlineWorth(Int(OripaConfig.headlineMultiple.rounded())))
-                    .font(Typography.label).foregroundStyle(.secondary)
-                    .lineLimit(1)
                 Spacer()
                 Text(MarketEconomy.money(tokens: price, language: wallet.language))
                     .font(Typography.amount).monospacedDigit()

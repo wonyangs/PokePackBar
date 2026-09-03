@@ -56,6 +56,21 @@ extension L {
 
     var releaseNotes: [ReleaseNote] {
         [
+            ReleaseNote(version: "0.7.1", items: [
+                ReleaseNoteItem(text: t("오리파 공지 보드 문구 정리",
+                                         "Tidied the oripa board",
+                                         "オリパの案内表示を整理",
+                                         "Tablero del Oripa depurado",
+                                         "Tableau de l'Oripa allégé",
+                                         "Quadro do Oripa limpo"), details: [
+                    t("대표 카드 표시와 배수 문구 제거",
+                      "Dropped the headline-card label and the multiplier line",
+                      "目玉カードの表示と倍率の文言を削除",
+                      "Quitados la etiqueta de carta estrella y el multiplicador",
+                      "Suppression du libellé carte vedette et du multiplicateur",
+                      "Removidos o rótulo de carta principal e o multiplicador"),
+                ]),
+            ]),
             ReleaseNote(version: "0.7.0", items: [
                 ReleaseNoteItem(text: t("오리파 대개편",
                                          "Oripa overhaul",
@@ -94,12 +109,6 @@ extension L {
                       "De 100 cases à 40 pochettes ; la boîte en cours est remplacée",
                       "De 100 espaços para 40 envelopes; a caixa em curso é trocada"),
                 ]),
-                ReleaseNoteItem(text: t("업데이트 기념 사료 1,000,000원 지급",
-                                         "1,000,000 KRW treat for the update",
-                                         "アップデート記念のごはん 1,000,000ウォン進呈",
-                                         "Obsequio de 1 000 000 KRW por la actualización",
-                                         "Cadeau de 1 000 000 KRW pour la mise à jour",
-                                         "Presente de 1.000.000 KRW pela atualização")),
             ]),
             ReleaseNote(version: "0.6.0", items: [
                 ReleaseNoteItem(text: t("카드 등급 세분화",

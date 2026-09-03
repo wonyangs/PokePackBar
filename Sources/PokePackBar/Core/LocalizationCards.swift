@@ -456,13 +456,6 @@ extension L {
 
     // MARK: 오리파
     var oripaTitle: String { t("오리파", "Oripa", "オリパ", "Oripa", "Oripa", "Oripa") }
-    /// 이 박스의 얼굴. 값이 가장 비싼 한 장이고, 박스 규모가 이 카드에서 나온다.
-    var oripaHeadline: String { t("대표", "Top prize", "目玉", "Premio", "Gros lot", "Prêmio") }
-    /// 대표 카드가 뽑기값의 몇 배인가. 이 배수가 오리파를 하는 이유다.
-    func oripaHeadlineWorth(_ times: Int) -> String {
-        t("뽑기값의 \(times)배", "\(times)× the pull price", "引き値の\(times)倍",
-           "\(times)× el precio", "\(times)× le prix", "\(times)× o preço")
-    }
     /// 공지 보드에서 이미 나간 카드에 얹는 표시. **흑백으로만 두면 「미보유」로 읽힌다** —
     /// 컬렉션이 미보유를 그렇게 그리므로 나갔다는 것은 글자로 적는다.
     var oripaDrawnMark: String { t("뽑음", "Pulled", "済", "Sacada", "Tirée", "Tirada") }
