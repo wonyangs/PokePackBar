@@ -184,6 +184,14 @@ struct CardIndex: Sendable {
     private let bySetID: [String: CardSet]
 
     func card(_ id: String) -> CardEntry? { byID[id] }
+
+    /// 그 세트에 든 카드 전부. **세트 도감의 목표가 이 목록의 크기다.**
+    ///
+    /// `pools` 를 등급별로 쪼개 두었으므로 합쳐 준다. 도감 진행을 잴 때마다 부르므로
+    /// 정렬은 하지 않는다 — 세는 것이 목적이고 순서는 쓰이지 않는다.
+    func cards(inSet setID: String) -> [String] {
+        (pools[setID] ?? [:]).values.flatMap { $0 }
+    }
     func set(_ id: String) -> CardSet? { bySetID[id] }
 
     /// 이 세트의 팩 시대. 팩 구성과 봉입률이 여기서 갈린다.

@@ -1,50 +1,77 @@
 import SwiftUI
 
-/// 도감 — 카드 몇 장을 묶은 조합의 진행 상황과 보상.
+/// 도감 — 조합의 진행 상황과 보상.
 ///
-/// 목록에서 구성 카드와 보상까지 보인다. 들어가지 않고도 무엇을 모으는 조합인지 읽혀야
-/// 22개를 훑을 수 있다. 상세는 설명과 카드를 크게 보기 위한 자리다.
+/// **262개가 되면서 평면 목록을 버렸다.** 조합 도감이 7세트만 덮던 시절에는 22줄이라
+/// 훑을 수 있었지만, 이제 조합 140개와 세트 122개다. 상점이 이미 같은 문제를 풀었으므로
+/// 같은 구조를 쓴다 — 갈래(조합 / 세트) + 시대 → 세트 한 단계.
 @MainActor
 struct DexView: View {
     let wallet: WalletStore
     let index: CardIndex?
 
-    @State private var selected: String?
+    enum Section: CaseIterable { case theme, set }
 
-    private var statuses: [DexStatus] {
-        DexProgress.sorted(DexProgress.statuses(dexes: wallet.dexes,
-                                                owned: { wallet.cardCount($0) > 0 },
-                                                claimed: wallet.claimedDexIDs))
+    @State private var section: Section = .theme
+    @State private var openedEra: String?
+    @State private var selected: String?
+    /// 확정 카드로 방금 받은 것. 뒤집어 볼 때까지 이 화면이 덮는다.
+    @State private var granted: PulledCard?
+    /// 그 카드의 가림막이 이미 걷혔는가.
+    @State private var revealed = false
+
+    private func statuses(_ dexes: [Dex]) -> [DexStatus] {
+        DexProgress.sorted(dexes.map { wallet.dexStatus($0, index: index) })
     }
 
     var body: some View {
         Group {
-            if wallet.dexes.isEmpty {
+            if let granted, let entry = index?.card(granted.id) {
+                // **받은 카드를 보여 준다.** 조용히 컬렉션에 넣으면 「확정 카드 1장」이라
+                // 적어 놓고 무엇을 줬는지 알 길이 없다. 오리파와 같은 연출을 쓴다.
+                PulledCardView(wallet: wallet, card: granted, startOpened: revealed,
+                               onReveal: { revealed = true; wallet.markAllRevealed() },
+                               onDetail: { selected = nil; self.granted = nil },
+                               onDone: { self.granted = nil },
+                               name: entry.displayName(wallet.language))
+            } else if wallet.dexes.isEmpty {
                 Text(wallet.l.dexEmpty)
                     .font(Typography.body).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let selected, let dex = wallet.dexes.first(where: { $0.id == selected }) {
-                DexDetailView(wallet: wallet, index: index, dex: dex) { self.selected = nil }
+                DexDetailView(wallet: wallet, index: index, dex: dex,
+                              onGranted: show) { self.selected = nil }
             } else {
-                list
+                VStack(spacing: 8) {
+                    sectionPicker
+                    switch section {
+                    case .theme: themeList
+                    case .set:   setBrowser
+                    }
+                }
             }
         }
         .frame(height: PopoverMetrics.tabHeight)
     }
 
-    /// 누적 혜택도 목록과 함께 스크롤한다.
-    ///
-    /// 고정해 두면 목록의 첫 줄을 계속 가린다. 같은 스크롤 안에 두면 폭도 저절로 맞는다
-    /// (스크롤 밖에 두면 스크롤바가 차지하는 만큼 좌우가 어긋난다).
-    private var list: some View {
-        let all = statuses
+    private var sectionPicker: some View {
+        SegmentedTabs(items: [
+            .init(value: Section.theme, label: wallet.l.dexThemeSection),
+            .init(value: Section.set, label: wallet.l.dexSetSection),
+        ], selection: $section)
+    }
+
+    /// 조합 도감 — 예전 목록 그대로. 140개라 스크롤로 훑는다.
+    private var themeList: some View {
+        let all = statuses(wallet.dexes.filter { $0.kind == .theme })
         return ScrollView {
             LazyVStack(spacing: 8) {
                 header(all)
                 ForEach(all) { status in
                     // 버튼으로 감싸지 않는다. 버튼 라벨 안에 들어간 자식 뷰는
                     // 마우스를 버튼이 가져가 `.help` 툴팁이 뜨지 않는다.
-                    DexRow(wallet: wallet, index: index, status: status)
+                    DexRow(wallet: wallet, index: index, status: status,
+                           onGranted: show)
                         .contentShape(Rectangle())
                         .onTapGesture { selected = status.id }
                 }
@@ -52,11 +79,105 @@ struct DexView: View {
         }
     }
 
+    /// 받은 카드를 뒤집어 보는 화면으로 넘긴다.
+    private func show(_ claim: DexClaim) {
+        guard let card = claim.card, let entry = index?.card(card) else { return }
+        revealed = false
+        granted = PulledCard(id: card, tier: entry.tier, isNew: wallet.cardCount(card) <= 1)
+    }
+
+    /// 세트 도감 — 시대를 한 단계 두고 그 안에서 세트를 늘어놓는다.
+    @ViewBuilder
+    private var setBrowser: some View {
+        if let index, let openedEra,
+           let era = index.eras.first(where: { $0.name == openedEra }) {
+            let ids = Set(era.sets.map(\.id))
+            let rows = statuses(wallet.dexes.filter { $0.kind == .set && ids.contains($0.homeSet) })
+            VStack(spacing: 6) {
+                HStack(spacing: 6) {
+                    BackButton(action: { self.openedEra = nil })
+                    Text(era.name).font(Typography.bodySemibold)
+                    Spacer(minLength: 0)
+                    Text(wallet.l.dexCountSummary(rows.filter(\.claimed).count, rows.count))
+                        .font(Typography.label).foregroundStyle(.secondary).monospacedDigit()
+                }
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        ForEach(rows) { status in
+                            DexRow(wallet: wallet, index: index, status: status,
+                                   onGranted: show)
+                                .contentShape(Rectangle())
+                                .onTapGesture { selected = status.id }
+                        }
+                    }
+                }
+            }
+        } else if let index {
+            eraList(index)
+        }
+    }
+
+    /// 시대 목록. 시대마다 그 안 세트 도감의 진행을 요약한다.
+    private func eraList(_ index: CardIndex) -> some View {
+        let all = statuses(wallet.dexes.filter { $0.kind == .set })
+        let byEra = Dictionary(grouping: all) { status in
+            index.eras.first { $0.sets.contains { $0.id == status.dex.homeSet } }?.name ?? ""
+        }
+        return ScrollView {
+            LazyVStack(spacing: 8) {
+                header(all)
+                ForEach(index.eras, id: \.name) { era in
+                    let rows = byEra[era.name] ?? []
+                    if !rows.isEmpty {
+                        eraRow(era.name, rows)
+                            .contentShape(Rectangle())
+                            .onTapGesture { openedEra = era.name }
+                    }
+                }
+            }
+        }
+    }
+
+    private func eraRow(_ name: String, _ rows: [DexStatus]) -> some View {
+        let claimable = rows.contains { $0.isClaimable }
+        let steps = rows.reduce(0) { $0 + $1.claimedSteps.count }
+        let total = rows.reduce(0) { $0 + $1.steps.count }
+        return HStack(spacing: 8) {
+            Text(name).font(Typography.bodySemibold).lineLimit(1)
+            Spacer(minLength: 0)
+            if claimable {
+                Image(systemName: "gift.fill")
+                    .font(.system(size: 14)).foregroundStyle(Color.accentColor)
+            }
+            Text("\(steps) / \(total)")
+                .font(Typography.body).foregroundStyle(.secondary).monospacedDigit()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 9).padding(.horizontal, CardGrid.dexRowPadding)
+        .background(claimable ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: 9))
+    }
+
+    /// 누적 혜택도 목록과 함께 스크롤한다.
+    ///
+    /// 고정해 두면 목록의 첫 줄을 계속 가린다. 같은 스크롤 안에 두면 폭도 저절로 맞는다
+    /// (스크롤 밖에 두면 스크롤바가 차지하는 만큼 좌우가 어긋난다).
     private func header(_ all: [DexStatus]) -> some View {
         let l = wallet.l
+        let done = wallet.completedDexCount
+        let next = wallet.ladder.first { done < $0.completed }
         return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 6) {
                 Text(l.dexPerksHeader).font(Typography.bodySemibold)
+                // 칭호가 여기 붙는다. 얻었는데 보여 줄 자리가 없으면 보상이 아니다.
+                if let title = wallet.title {
+                    Text(title.text(wallet.language))
+                        .font(Typography.labelSemibold)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(Color.accentColor, in: Capsule())
+                }
                 Spacer()
                 Text(l.dexCountSummary(all.filter(\.claimed).count, all.count))
                     .font(Typography.label).foregroundStyle(.secondary).monospacedDigit()
@@ -66,6 +187,9 @@ struct DexView: View {
             } else {
                 DexPerkLine(wallet: wallet, perks: wallet.perks)
             }
+            // 계단 — 영구 혜택이 여기서 나온다. 도감마다 나눠 주면 한 칸이 0.1% 가 된다.
+            Text(next.map { l.dexLadderNext(done, $0.completed) } ?? l.dexLadderDone)
+                .font(Typography.label).foregroundStyle(.tertiary).monospacedDigit()
         }
         .padding(.horizontal, 8).padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -112,6 +236,8 @@ private struct DexRow: View {
     let wallet: WalletStore
     let index: CardIndex?
     let status: DexStatus
+    /// 확정 카드를 받았을 때 알린다.
+    var onGranted: ((DexClaim) -> Void)? = nil
 
     /// 한 줄에 넣는 카드 수와 폭. 줄 카드의 여백 안쪽에 맞춘 값이라 `CardGrid` 에서 온다 —
     /// 여기 숫자를 따로 적어 두었더니 팝오버를 넓힐 때 띠만 줄 밖으로 넘쳤다.
@@ -127,8 +253,13 @@ private struct DexRow: View {
         VStack(alignment: .leading, spacing: 6) {
             title
             dexValue
-            DexCardStrip(wallet: wallet, index: index, cards: dex.cards,
-                         limit: Self.maxShown, onTap: nil)
+            if dex.kind == .set {
+                // 284장을 띠로 늘어놓을 수 없다. 마일스톤 세 칸의 진행을 막대로 보인다.
+                DexMilestoneBars(wallet: wallet, status: status)
+            } else {
+                DexCardStrip(wallet: wallet, index: index, cards: dex.cards,
+                             limit: Self.maxShown, onTap: nil)
+            }
             footer
         }
         .padding(.vertical, 8).padding(.horizontal, CardGrid.dexRowPadding)
@@ -159,9 +290,13 @@ private struct DexRow: View {
     }
 
     /// 이 도감에 든 카드값의 합. 난이도의 근거이므로 별 옆에 숫자로도 보여 준다.
+    ///
+    /// **세트 도감에는 적지 않는다.** 목표가 「전부」가 아니라 「몇 할」이라 그 합이 무엇의
+    /// 값인지 말할 수 없고(값싼 것부터 세는 계산값이다), 어차피 무엇을 모으게 될지 고를 수
+    /// 없으므로 판단에 쓰이지도 않는다.
     @ViewBuilder
     private var dexValue: some View {
-        if let prices = CardPrices.shared {
+        if dex.kind != .set, let prices = CardPrices.shared {
             Text(wallet.l.dexTotalValue(prices.formattedWithKRW(DexProgress.value(of: dex),
                                                            language: wallet.language)))
                 .font(Typography.body).foregroundStyle(.tertiary)
@@ -172,45 +307,110 @@ private struct DexRow: View {
     /// 보상은 항상 보이고, 다 모으면 수령 버튼이 켜진다.
     private var footer: some View {
         HStack(spacing: 6) {
-            DexRewardLine(wallet: wallet, index: index, dex: dex)
+            DexRewardLine(wallet: wallet, index: index,
+                          reward: status.reward(status.claimableStep
+                                                ?? status.nextStep ?? status.steps.last ?? 0),
+                          homeSet: dex.homeSet)
             Spacer(minLength: 0)
-            DexClaimAction(wallet: wallet, status: status)
+            DexClaimAction(wallet: wallet, status: status, onGranted: onGranted)
         }
     }
 }
 
-/// 보상 한 줄 — 영구 혜택과 곁들이는 팩. 각 항목에 설명 툴팁이 붙는다.
+/// 보상 한 줄 — 통로를 성질 순으로 늘어놓는다. 각 항목에 설명 툴팁이 붙는다.
 ///
-/// **혜택을 앞에 둔다.** 보상의 본체는 영구 패시브이고 팩은 부수적인 재미다. 팩을 앞에 두면
-/// 개수가 먼저 읽혀 보상 크기를 개수로 가늠하게 되는데, 세트마다 팩값이 47배 갈려서 개수는
-/// 크기를 말해 주지 않는다.
+/// **영구 혜택을 앞에 둔다.** 남아 있는 곳은 손제작 도감과 완성 수 계단뿐이라 그것이 보이면
+/// 특별한 도감이라는 뜻이다. 그 뒤로 확정 카드 · 부스터 · 스킨 · 토큰 · 팩 순이다.
 @MainActor
-private struct DexRewardLine: View {
+struct DexRewardLine: View {
     let wallet: WalletStore
     let index: CardIndex?
-    let dex: Dex
+    let reward: DexReward
+    let homeSet: String
 
     var body: some View {
         let l = wallet.l
         return WrapLayout(spacing: 6, lineSpacing: 3) {
-            ForEach(Array(dex.reward.perks.enumerated()), id: \.offset) { _, perk in
+            ForEach(Array(reward.perks.enumerated()), id: \.offset) { _, perk in
                 Text(l.dexPerkText(perk))
                     .font(Typography.labelSemibold)
                     .foregroundStyle(Color.accentColor)
-                    .fixedSize()
-                    .contentShape(Rectangle())
+                    .fixedSize().contentShape(Rectangle())
                     .help(l.dexPerkHelp(perk.kind))
             }
-            HStack(spacing: 5) {
-                Image(systemName: "shippingbox.fill")
-                    .font(.system(size: 14)).foregroundStyle(.secondary)
-                Text(l.dexRewardPacks(dex.reward.packs))
-                    .font(Typography.labelSemibold)
+            if let card = reward.card {
+                chip("sparkles", l.dexRewardCard(card.tierFloor), l.dexRewardCardHelp)
             }
-            .fixedSize()
-            .contentShape(Rectangle())
-            .help(l.dexRewardPacksHelp(dex.reward.packs,
-                                        index?.set(dex.homeSet)?.name ?? dex.homeSet))
+            ForEach(Array(reward.coupons.enumerated()), id: \.offset) { _, coupon in
+                chip("ticket.fill",
+                     l.dexRewardCoupon(index?.set(homeSet)?.name ?? homeSet,
+                                       Int((coupon.value * 100).rounded()), coupon.count),
+                     l.dexCouponHelp)
+            }
+            if reward.tokens > 0 {
+                chip("wonsign.circle.fill",
+                     MarketEconomy.money(tokens: reward.tokens, language: wallet.language),
+                     l.walletBalance)
+            }
+            if reward.packs > 0 {
+                chip("shippingbox.fill", l.dexRewardPacks(reward.packs),
+                     l.dexRewardPacksHelp(reward.packs,
+                                          index?.set(homeSet)?.name ?? homeSet))
+            }
+        }
+    }
+
+    private func chip(_ symbol: String, _ text: String, _ help: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: symbol)
+                .font(.system(size: 14)).foregroundStyle(.secondary)
+            Text(text).font(Typography.labelSemibold)
+        }
+        .fixedSize().contentShape(Rectangle()).help(help)
+    }
+}
+
+/// 세트 도감의 마일스톤 막대.
+///
+/// 칸마다 「몇 할 · 몇 종」과 수령 여부를 적는다. 목표가 「전부」가 아니라 「몇 할」이라
+/// 빠진 카드 목록은 뜻을 갖지 않고, 284장을 띠로 보여 줄 화면도 없다.
+@MainActor
+private struct DexMilestoneBars: View {
+    let wallet: WalletStore
+    let status: DexStatus
+
+    var body: some View {
+        let l = wallet.l
+        return VStack(alignment: .leading, spacing: 3) {
+            ForEach(status.steps, id: \.self) { step in
+                let need = status.need(step)
+                let reached = status.isReached(step)
+                let claimed = status.isClaimed(step)
+                HStack(spacing: 6) {
+                    Text(l.dexMilestone(Int((status.dex.milestones[safe: step]?.fraction ?? 1) * 100)))
+                        .font(Typography.label)
+                        .foregroundStyle(reached ? AnyShapeStyle(.primary)
+                                                 : AnyShapeStyle(.secondary))
+                        .frame(width: 74, alignment: .leading)
+                    GeometryReader { geometry in
+                        let filled = min(1, Double(status.ownedCount) / Double(max(1, need)))
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.secondary.opacity(0.18))
+                            Capsule()
+                                .fill(claimed ? Color.green : Color.accentColor)
+                                .frame(width: geometry.size.width * filled)
+                        }
+                    }
+                    .frame(height: 6)
+                    Text(l.dexMilestoneNeed(need, status.total))
+                        .font(Typography.label).foregroundStyle(.tertiary).monospacedDigit()
+                        .fixedSize()
+                    if claimed {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13)).foregroundStyle(.green)
+                    }
+                }
+            }
         }
     }
 }
@@ -220,15 +420,23 @@ private struct DexRewardLine: View {
 private struct DexClaimAction: View {
     let wallet: WalletStore
     let status: DexStatus
+    /// 확정 카드를 받았을 때 알린다. 화면이 그 카드를 뒤집어 보여 준다.
+    var onGranted: ((DexClaim) -> Void)? = nil
 
     var body: some View {
         let l = wallet.l
-        if status.claimed {
+        if let step = status.claimableStep {
+            Button(l.dexClaim) {
+                // 확정 카드를 받았으면 무엇이 나왔는지 보여 준다. 조용히 컬렉션에 넣으면
+                // 「MUR 이상 1장」이라 적어 놓고 무엇을 줬는지 알 길이 없다.
+                if let claim = wallet.claim(status.dex.id, step: step), claim.card != nil {
+                    onGranted?(claim)
+                }
+            }
+            .buttonStyle(.borderedProminent).font(Typography.button)
+        } else if status.claimed {
             Label(l.dexClaimed, systemImage: "checkmark.circle.fill")
                 .font(Typography.label).foregroundStyle(.green)
-        } else if status.isClaimable {
-            Button(l.dexClaim) { wallet.claim(status.dex.id) }
-                .buttonStyle(.borderedProminent).font(Typography.button)
         }
     }
 }
@@ -304,6 +512,8 @@ private struct DexDetailView: View {
     let wallet: WalletStore
     let index: CardIndex?
     let dex: Dex
+    /// 확정 카드를 받았을 때 알린다.
+    var onGranted: ((DexClaim) -> Void)? = nil
     let onClose: () -> Void
 
     @Environment(PopoverNavigation.self) private var nav
@@ -313,7 +523,8 @@ private struct DexDetailView: View {
 
     private var status: DexStatus {
         DexProgress.status(for: dex, owned: { wallet.cardCount($0) > 0 },
-                           claimed: wallet.claimedDexIDs.contains(dex.id))
+                           claimed: wallet.claimedDexIDs,
+                           setCards: { index?.cards(inSet: $0) ?? [] })
     }
 
     var body: some View {
@@ -353,7 +564,7 @@ private struct DexDetailView: View {
                         .foregroundStyle(state.claimed ? .green : .secondary)
                         .monospacedDigit()
                 }
-                if let prices = CardPrices.shared {
+                if dex.kind != .set, let prices = CardPrices.shared {
                     Text(wallet.l.dexTotalValue(prices.formattedWithKRW(DexProgress.value(of: dex),
                                                                    language: wallet.language)))
                         .font(Typography.title)
@@ -369,17 +580,45 @@ private struct DexDetailView: View {
             .padding(.vertical, 8)
 
             ScrollView {
-                DexCardStrip(wallet: wallet, index: index, cards: dex.cards,
-                             limit: dex.cards.count) { spotlight = $0 }
+                if dex.kind == .set {
+                    // 세트 도감은 목표가 「몇 할」이라 빠진 카드 목록이 뜻을 갖지 않는다.
+                    // 칸마다 무엇이 걸려 있는지를 대신 늘어놓는다.
+                    VStack(alignment: .leading, spacing: 8) {
+                        DexMilestoneBars(wallet: wallet, status: state)
+                        ForEach(state.steps, id: \.self) { step in
+                            let reward = state.reward(step)
+                            if !reward.isEmpty {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(l.dexMilestone(Int((dex.milestones[safe: step]?.fraction ?? 1) * 100)))
+                                        .font(Typography.labelSemibold)
+                                        .foregroundStyle(state.isClaimed(step) ? .green : .secondary)
+                                    DexRewardLine(wallet: wallet, index: index,
+                                                  reward: reward, homeSet: dex.homeSet)
+                                }
+                                .padding(.vertical, 5).padding(.horizontal, 8)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.secondary.opacity(0.07),
+                                            in: RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 2)
+                } else {
+                    DexCardStrip(wallet: wallet, index: index, cards: dex.cards,
+                                 limit: dex.cards.count) { spotlight = $0 }
+                }
             }
 
             Spacer(minLength: 0)
 
             VStack(spacing: 6) {
                 VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 6) {
-                        DexRewardLine(wallet: wallet, index: index, dex: dex)
-                        Spacer(minLength: 0)
+                    if dex.kind != .set {
+                        HStack(spacing: 6) {
+                            DexRewardLine(wallet: wallet, index: index, reward: dex.reward,
+                                          homeSet: dex.homeSet)
+                            Spacer(minLength: 0)
+                        }
                     }
                     // 상세에서는 혜택 뜻을 **보이는 글자로** 적는다. 마우스를 올려야만
                     // 알 수 있으면 「판매 추가금 +2.5%」가 무슨 말인지 알 길이 없다.
@@ -394,7 +633,7 @@ private struct DexDetailView: View {
                 .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
 
                 HStack(spacing: 8) {
-                    DexClaimAction(wallet: wallet, status: state)
+                    DexClaimAction(wallet: wallet, status: state, onGranted: onGranted)
                     if !state.isFilled {
                         Button {
                             nav.shopSet = dex.homeSet

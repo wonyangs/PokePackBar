@@ -74,6 +74,15 @@ struct GameState: Codable, Sendable {
     /// 도감 기능이 생기기 전에 이미 모아 둔 카드도 그래야 완성으로 잡힌다.
     var claimedDex: [String] = []
 
+    /// 갖고 있는 팩 할인 쿠폰. **세트가 정해져 있고 팩을 살 때 한 장씩 쓰인다.**
+    ///
+    /// 영구 혜택과 따로 둔다 — 혜택은 도감 목록에서 매번 다시 더하지만 쿠폰은 남은
+    /// 장수가 상태라 저장해야 한다.
+    var coupons: [PackCoupon] = []
+
+    /// 고른 칭호의 완성 수 계단 번호. 없으면 칭호를 달지 않는다.
+    var title: Int? = nil
+
     /// 오리파 박스. 남은 슬롯이 곧 재고라 반드시 영속이어야 한다 —
     /// 재시작마다 새로 채워지면 UR 이 남을 때까지 앱을 껐다 켜는 것이 최적 전략이 된다.
     var oripa: OripaBox? = nil
@@ -94,7 +103,21 @@ struct GameState: Codable, Sendable {
     /// 한도 창별 지급 상태(창 key → 지급 여부). 영속이어야 한다 —
     /// 재시작마다 같은 창에서 다시 지급되는 것을 막는다.
     /// 창이 100% 아래로 내려가면 항목이 제거되어 다시 무장된다.
+    ///
+    /// **판(instance)을 구분할 수 없는 창에만 쓴다.** 초기화 시각도 계정도 알 수 없는
+    /// 프로바이더가 여기 해당한다. 그 외에는 `packGrantedInstances` 를 본다.
     var packGrantTier: [String: Int] = [:]
+
+    /// 이미 지급한 **한도 창의 판**(창 key → 판 id 목록). 판 = 그 창을 가진 계정과 초기화 시각.
+    ///
+    /// 「100% 아래로 내려가면 다시 무장」만으로는 계정 전환을 사용량 초기화와 구분하지 못한다.
+    /// 계정을 바꾸면 사용률이 0% 로 떨어지므로 무장이 풀리고, 원래 계정으로 돌아오는 것만으로
+    /// 같은 창이 또 지급됐다 — 오가기만 하면 팩이 무한히 늘어났다.
+    ///
+    /// 창 하나에 값 하나가 아니라 **목록**이다. 두 계정이 모두 100% 면 판이 번갈아 바뀌므로,
+    /// 마지막 판만 적어 두면 전환할 때마다 다시 지급된다. 판은 초기화 시각을 지나면 다시
+    /// 나타나지 않으므로 오래된 것부터 버려도 안전하다.
+    var packGrantedInstances: [String: [String]] = [:]
 
     /// 보너스 팩 기능의 첫 실행 시드 완료 여부.
     /// 설치 직후 이미 100% 였던 창에 소급 지급하지 않기 위해 필요하다.
@@ -151,7 +174,10 @@ struct GameState: Codable, Sendable {
         perkTokens = value(.perkTokens, 0)
         packPity = value(.packPity, [:])
         oripa = try? c.decodeIfPresent(OripaBox.self, forKey: .oripa)
+        coupons = value(.coupons, [PackCoupon]())
+        title = try? c.decodeIfPresent(Int.self, forKey: .title)
         packGrantTier = value(.packGrantTier, [:])
+        packGrantedInstances = value(.packGrantedInstances, [:])
         packGrantSeeded = value(.packGrantSeeded, false)
         grantedGifts = value(.grantedGifts, [String]())
         language = value(.language, AppLanguage.systemDefault)

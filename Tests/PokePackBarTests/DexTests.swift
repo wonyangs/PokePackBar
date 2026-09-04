@@ -43,11 +43,11 @@ final class BundledDexTests: XCTestCase {
         let (cards, dexes) = try loadIndexes()
         let prices = try XCTUnwrap(CardPrices.loadBundled())
         for dex in dexes.dexes {
-            let packs = DexDifficulty.packsNeeded(cards: dex.cards, quantile: 0.5, index: cards)
+            let packs = DexDifficulty.packsNeeded(for: dex, quantile: 0.5, index: cards)
             XCTAssertEqual(packs, dex.medianPacks,
                            "\(dex.id): 저장된 \(dex.medianPacks)팩 vs 재계산 \(packs)팩")
 
-            let value = DexProgress.recomputedValue(of: dex, prices: prices)
+            let value = DexProgress.recomputedValue(of: dex, prices: prices, index: cards)
             XCTAssertEqual(value, dex.valueUSD, accuracy: 0.02,
                            "\(dex.id): 저장된 값 \(dex.valueUSD) vs 재계산 \(value)")
             XCTAssertEqual(DexDifficulty.tier(forValueUSD: value), dex.tier,
@@ -67,6 +67,10 @@ final class BundledDexTests: XCTestCase {
             // 0 개도 정상이다. 세트가 126개가 되면서 팩 한 개가 830만원인 세트가 생겼고,
             // 그런 세트를 홈으로 둔 도감이 한 개라도 주면 보상이 목표의 몇 배가 된다.
             // 값이 맞지 않는 팩은 아예 얹지 않고 패시브가 다 맡는다.
+            for (step, milestone) in dex.milestones.enumerated() {
+                XCTAssertTrue((0...DexDifficulty.maxRewardPacks).contains(milestone.reward.packs),
+                              "\(dex.id)#\(step): 지급 팩 \(milestone.reward.packs)개가 상한을 넘는다")
+            }
             XCTAssertTrue((0...DexDifficulty.maxRewardPacks).contains(dex.reward.packs),
                           "\(dex.id): 지급 팩 \(dex.reward.packs)개는 0~"
                           + "\(DexDifficulty.maxRewardPacks) 범위를 벗어난다")
@@ -79,13 +83,44 @@ final class BundledDexTests: XCTestCase {
         }
     }
 
-    /// 보상의 본체는 영구 패시브다. 팩만 주는 조합은 예외로만 남는다.
-    func testMostDexesGrantAPermanentPerk() throws {
+    /// **영구 혜택이 사는 곳은 두 곳뿐이다** — 테마 조합과 완성 수 계단.
+    ///
+    /// 예전에는 「도감 대부분이 패시브를 준다」를 지켰다. 도감이 25개였기 때문이다. 277개가
+    /// 되면서 그 규칙이 깨졌다 — 상한이 고정이므로 277개가 나눠 가지면 한 칸이 0.1% 가 되고,
+    /// 그건 보상이 아니다. 그래서 세트 도감은 혜택을 주지 않고, 남는 예산은 계단이 갖는다.
+    func testPermanentPerksLiveOnlyInThemeDexesAndTheLadder() throws {
         let (_, dexes) = try loadIndexes()
-        let withPerk = dexes.dexes.filter { !$0.reward.perks.isEmpty }.count
-        XCTAssertGreaterThanOrEqual(withPerk, dexes.dexes.count * 4 / 5,
-                                    "\(dexes.dexes.count)개 중 \(withPerk)개만 패시브를 준다 — "
-                                    + "팩이 보상의 본체가 되어 버렸다")
+        let sets = dexes.dexes.filter { $0.kind == .set }
+        XCTAssertGreaterThan(sets.count, 100, "세트 도감이 이 정도로 적을 수 없다")
+        for dex in sets {
+            XCTAssertTrue(dex.reward.perks.isEmpty,
+                          "\(dex.id): 세트 도감이 영구 혜택을 준다 — 122개가 예산을 나눠 가지면 "
+                          + "한 칸이 0.1% 가 된다")
+            for (step, milestone) in dex.milestones.enumerated() {
+                XCTAssertTrue(milestone.reward.perks.isEmpty,
+                              "\(dex.id)#\(step): 마일스톤이 영구 혜택을 준다")
+            }
+        }
+        XCTAssertFalse(dexes.ladder.isEmpty, "계단이 없으면 영구 혜택을 얻을 길이 없다")
+        XCTAssertTrue(dexes.ladder.allSatisfy { !$0.perks.isEmpty },
+                      "혜택 없는 계단 칸은 올라갈 이유가 없다")
+    }
+
+    /// 계단은 뒤 칸이 앞 칸보다 두툼하다. 뒤가 얇으면 올라갈 이유가 없다.
+    func testLadderGrowsAsItRises() throws {
+        let (_, dexes) = try loadIndexes()
+        let steps = dexes.ladder
+        XCTAssertEqual(steps.map(\.completed), steps.map(\.completed).sorted(),
+                       "계단이 오름차순이 아니다")
+        for kind in DexPerkKind.allCases {
+            let seen = steps.compactMap { step in
+                step.perks.first { $0.kind == kind }?.value
+            }
+            XCTAssertEqual(seen, seen.sorted(), "\(kind): 뒤 칸이 앞 칸보다 얇다")
+        }
+        // 마지막 칸은 도감을 전부 완성했을 때 열려야 한다.
+        XCTAssertEqual(steps.last?.completed, dexes.dexes.count,
+                       "마지막 계단이 도감 수와 어긋난다 — 열 수 없거나 너무 일찍 열린다")
     }
 
     /// 같은 종류의 혜택은 **완성 비용**이 오를 때 값이 줄지 않는다.
@@ -110,20 +145,39 @@ final class BundledDexTests: XCTestCase {
     }
 
 
-    /// 혜택이 없는 조합은 지급 팩이 목표를 **정확히** 채운다.
+    /// **테마 도감은 전부 손으로 짓는다.** 자동 생성한 것이 한 개도 남아 있으면 안 된다.
     ///
-    /// 채울 것이 팩뿐이라 반 팩의 반올림 말고는 어긋날 이유가 없다. 여기가 틀어지면
-    /// 스크립트가 비율에서 거꾸로 계산하지 않고 어딘가에 손으로 적은 값이 남아 있다는 뜻이다.
-    func testPerklessDexesLandOnTheTarget() throws {
+    /// 한때 진화 관계로 나머지 세트를 자동으로 채웠다. 그러면 122세트가 「XX의 성장기」 하나로
+    /// 수렴해 모을 이유가 없어진다. 지금은 122세트 전부에 사람이 지은 조합이 있고, 소개 문안이
+    /// 비어 있다는 것은 기계가 쓴 것이 다시 섞여 들어왔다는 뜻이다.
+    func testEverySetHasAHandWrittenThemeDex() throws {
         let (cards, dexes) = try loadIndexes()
-        let plain = dexes.dexes.filter { $0.reward.perks.isEmpty }
-        for dex in plain {
-            let packPrice = Double(PackPricing.price(setID: dex.homeSet, index: cards))
-            let paid = Double(dex.reward.packs) * packPrice
-            let target = Double(dex.medianTokens) * DexDifficulty.targetReturn
-            XCTAssertEqual(paid, target, accuracy: packPrice / 2 + 1,
-                           "\(dex.id): 목표 \(target) 인데 \(paid) 를 준다")
+        let themes = dexes.dexes.filter { $0.kind == .theme }
+        for dex in themes {
+            XCTAssertFalse(dex.blurb.ko.isEmpty, "\(dex.id): 소개 문안이 비었다 — 자동 생성이다")
+            XCTAssertFalse(dex.blurb.en.isEmpty, "\(dex.id): 영문 소개 문안이 비었다")
+            XCTAssertFalse(dex.name.ko.hasSuffix("의 성장기"),
+                           "\(dex.id): 자동 생성 이름이 남아 있다")
+            XCTAssertGreaterThanOrEqual(dex.cards.count, 2,
+                                        "\(dex.id): 한 장짜리는 조합이 아니다")
         }
+        let packSets = Set(cards.cards.map { $0.id.prefix(while: { $0 != "-" }) })
+            .map(String.init)
+        let covered = Set(themes.map(\.homeSet))
+        let missing = packSets.filter { !covered.contains($0) }.sorted()
+        XCTAssertTrue(missing.isEmpty, "테마 도감이 없는 세트: \(missing.joined(separator: ", "))")
+    }
+
+    /// 보상 통로를 전부 토큰으로 환산한다. 통로마다 값이 실리는 방식이 달라 한자리에 모은다.
+    private func rewardValue(_ reward: DexReward, packPrice: Double) -> Double {
+        var total = Double(reward.packs) * packPrice + Double(reward.tokens)
+        for coupon in reward.coupons {
+            total += Double(coupon.count) * packPrice * coupon.value
+        }
+        if let card = reward.card {
+            total += card.targetUSD * MarketEconomy.tokensPerUSD
+        }
+        return total
     }
 
     /// 구성 카드는 상위 등급이 앞에 온다. 목록에서 뒤가 접힐 때 남는 것이
@@ -140,7 +194,9 @@ final class BundledDexTests: XCTestCase {
     /// 넘으면 팩이 사실상 공짜가 되고 게임이 성립하지 않는다.
     func testPerkTotalsStayWithinCaps() throws {
         let (_, dexes) = try loadIndexes()
-        let all = DexPerks.total(completed: Set(dexes.dexes.map(\.id)), dexes: dexes.dexes)
+        // 계단까지 다 올린 상태로 잰다. 계단이 예산의 주인이므로 빼고 재면 뜻이 없다.
+        let all = DexPerks.total(completed: Set(dexes.dexes.map(\.completionKey)),
+                                 dexes: dexes.dexes, ladder: dexes.ladder)
         XCTAssertLessThanOrEqual(all.tokenGain, DexPerks.caps.tokenGain)
         XCTAssertLessThanOrEqual(all.packDiscount, DexPerks.caps.packDiscount)
         XCTAssertLessThanOrEqual(all.dustBonus, DexPerks.caps.dustBonus)
@@ -154,6 +210,101 @@ final class BundledDexTests: XCTestCase {
         let tiers = Set(dexes.dexes.map(\.tier))
         XCTAssertTrue(tiers.contains(1), "가장 쉬운 도감이 없다")
         XCTAssertTrue(tiers.contains(5), "최고 난도 도감이 없다")
+    }
+
+    /// **세트마다 도감이 있어야 한다** — 세트 도감 하나와 조합 도감 최소 하나.
+    ///
+    /// 손으로 지은 25개가 7세트만 덮고 있었다. 115세트에는 도감이 없었고, 그 방식으로
+    /// 122세트를 덮으려면 사람이 17,666장을 훑어야 한다.
+    func testEverySetHasBothKindsOfDex() throws {
+        let (cards, dexes) = try loadIndexes()
+        let setIDs = Set(cards.sets.map(\.id))
+        let covered = Set(dexes.dexes.filter { $0.kind == .set }.map(\.homeSet))
+        let themed = Set(dexes.dexes.filter { $0.kind == .theme }.map(\.homeSet))
+        XCTAssertTrue(setIDs.subtracting(covered).isEmpty,
+                      "세트 도감이 없는 세트: \(setIDs.subtracting(covered).sorted())")
+        XCTAssertTrue(setIDs.subtracting(themed).isEmpty,
+                      "조합 도감이 없는 세트: \(setIDs.subtracting(themed).sorted())")
+    }
+
+    /// 마일스톤은 오름차순이고 **100% 는 없다.**
+    ///
+    /// 전량은 어느 세트도 불가능하다 — Fusion Strike 는 281종에서 284종으로 가는 데만
+    /// 32,000팩이 더 든다(쿠폰 수집가 문제의 꼬리). 도달 못 하는 칸을 화면에 남기면
+    /// 그건 목표가 아니라 벽이다.
+    func testSetMilestonesRiseAndNeverDemandEverything() throws {
+        let (cards, dexes) = try loadIndexes()
+        for dex in dexes.dexes where dex.kind == .set {
+            let total = cards.cards(inSet: dex.homeSet).count
+            XCTAssertFalse(dex.milestones.isEmpty, "\(dex.id): 목표가 없다")
+            XCTAssertEqual(dex.milestones.map(\.need), dex.milestones.map(\.need).sorted(),
+                           "\(dex.id): 마일스톤이 오름차순이 아니다")
+            for milestone in dex.milestones {
+                XCTAssertLessThan(milestone.need, total,
+                                  "\(dex.id): \(milestone.need)종은 전량(\(total))이다 — 도달 불가")
+                XCTAssertGreaterThan(milestone.need, 0)
+            }
+        }
+    }
+
+    /// 마일스톤 보상도 목표 회수율을 넘지 않는다.
+    ///
+    /// 팩 한 개가 830만원인 세트가 있어서, 목표가 그보다 작은 칸에 팩을 한 개라도 얹으면
+    /// 보상이 목표의 몇 배가 된다. 그때는 토큰으로 줘야 액수를 정확히 맞출 수 있다.
+    func testSetMilestoneRewardsStayWithinTheTarget() throws {
+        let (cards, dexes) = try loadIndexes()
+        for dex in dexes.dexes where dex.kind == .set {
+            let packPrice = Double(PackPricing.price(setID: dex.homeSet, index: cards))
+            for (step, milestone) in dex.milestones.enumerated() {
+                let paid = rewardValue(milestone.reward, packPrice: packPrice)
+                let target = Double(milestone.medianTokens) * 0.05
+                XCTAssertLessThanOrEqual(paid, target * 1.2 + 1,
+                                         "\(dex.id)#\(step): 목표 \(target) 인데 \(paid) 를 준다")
+                XCTAssertGreaterThan(paid, 0, "\(dex.id)#\(step): 아무것도 주지 않는다")
+            }
+        }
+    }
+
+    /// 세트 도감은 구성 카드를 나열하지 않는다. 284장을 적으면 파일이 열 배가 된다.
+    func testSetDexesDoNotListTheirCards() throws {
+        let (_, dexes) = try loadIndexes()
+        for dex in dexes.dexes where dex.kind == .set {
+            XCTAssertTrue(dex.cards.isEmpty, "\(dex.id): 세트 도감이 카드를 나열한다")
+        }
+    }
+
+    /// 확정 카드는 **값**으로 뽑는다. 등급 하한만 정하면 대개 1~2만원짜리가 나온다.
+    ///
+    /// 「UR 이상 랜덤 1장」의 중앙값이 17,400원인데 평균은 160,600원이다 — 분포가 아래로
+    /// 심하게 쏠려 있다. 오리파에서 겪은 것과 같은 문제고, 답도 같다.
+    func testCardGrantsCarryAValueTarget() throws {
+        let (_, dexes) = try loadIndexes()
+        var seen = 0
+        for dex in dexes.dexes {
+            for reward in [dex.reward] + dex.milestones.map(\.reward) {
+                guard let card = reward.card else { continue }
+                seen += 1
+                XCTAssertGreaterThan(card.targetUSD, 0, "\(dex.id): 확정 카드에 목표 값이 없다")
+                XCTAssertNotNil(CardTier(rawValue: card.tierFloor),
+                                "\(dex.id): 모르는 등급 하한 \(card.tierFloor)")
+            }
+        }
+        XCTAssertGreaterThan(seen, 50, "확정 카드를 주는 칸이 이 정도로 적을 수 없다")
+    }
+
+    /// 쿠폰은 장수가 있어야 하고, 너무 많으면 「영구 할인」과 구별되지 않는다.
+    func testCouponsAreBoundedInCount() throws {
+        let (_, dexes) = try loadIndexes()
+        for dex in dexes.dexes {
+            for reward in [dex.reward] + dex.milestones.map(\.reward) {
+                for coupon in reward.coupons {
+                    XCTAssertTrue((1...20).contains(coupon.count),
+                                  "\(dex.id): 쿠폰 \(coupon.count)장은 한시라 부르기 어렵다")
+                    XCTAssertGreaterThan(coupon.value, 0)
+                    XCTAssertLessThan(coupon.value, 1, "공짜 팩은 쿠폰이 아니다")
+                }
+            }
+        }
     }
 
     /// 구성원이 비었거나 티어가 범위를 벗어난 줄은 걸러진다.
@@ -388,6 +539,19 @@ final class DexPerkEffectTests: XCTestCase {
     }
 
 
+
+    /// **쿠폰까지 쓴 값에서도 되팔기가 남는 장사가 되면 안 된다.**
+    ///
+    /// 팩을 사서 전부 팔았을 때의 회수율이 1 을 넘으면 팩을 돌리는 것 자체가 재화 순환이 되어
+    /// 게임이 성립하지 않는다. 쿠폰이 반값이므로 영구 할인 위에 그것까지 얹어 잰다.
+    func testResaleNeverPaysEvenWithACoupon() {
+        let coupon = 0.5
+        let effective = 1 - (1 - DexPerks.caps.packDiscount) * (1 - coupon)
+        let ratio = (1 / MarketEconomy.packMargin) * (1 + DexPerks.caps.dustBonus)
+            / (1 - effective)
+        XCTAssertLessThan(ratio, 1.0,
+                          "쿠폰까지 쓰면 회수율이 \(ratio) 다 — 사서 갈기를 반복하면 잔액이 늘어난다")
+    }
 
     /// 레어의 몫이 상위 등급으로 넘어간다. 전체 합은 여전히 1 이다.
     func testHitOddsMovesWeightFromRareToHigherTiers() {
@@ -1185,5 +1349,217 @@ final class KoreanCardNameTests: XCTestCase {
         let untranslated = CardEntry(id: "s-2", name: "Rare Candy", tier: .common,
                                      setID: "s", nameKo: nil)
         XCTAssertEqual(untranslated.displayName(.ko), "Rare Candy")
+    }
+}
+
+/// 도감 개편의 동작 — 마일스톤 수령, 버닝 부스터, 확정 카드, 스킨, 완성 수 계단.
+@MainActor
+final class DexRewardChannelTests: XCTestCase {
+
+    private var dir: URL!
+
+    override func setUp() {
+        super.setUp()
+        dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("dexreward-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    }
+
+    override func tearDown() {
+        try? FileManager.default.removeItem(at: dir)
+        super.tearDown()
+    }
+
+    private func store(_ dexes: [Dex], ladder: [DexLadderStep] = []) -> WalletStore {
+        let s = WalletStore(fileURL: dir.appendingPathComponent("game-state.json"),
+                            dexes: dexes, ladder: ladder)
+        s.update(todayTokensByProvider: ["p": 0], todayDate: "2026-09-03", hasUsageData: true)
+        s.update(todayTokensByProvider: ["p": 5_000_000_000], todayDate: "2026-09-03",
+                 hasUsageData: true)
+        return s
+    }
+
+    private func setDex(_ id: String, homeSet: String, needs: [Int],
+                        rewards: [DexReward]) -> Dex {
+        Dex(id: id, kind: .set, name: DexText(ko: id, en: id),
+            blurb: DexText(ko: "", en: ""), homeSet: homeSet, cards: [], tier: 3,
+            medianPacks: 10, medianTokens: 100_000_000, valueUSD: 50, reward: .none,
+            milestones: zip(needs, rewards).enumerated().map { i, pair in
+                DexMilestone(fraction: Double(i + 1) / Double(needs.count + 1),
+                             need: pair.0, medianPacks: 10, medianTokens: 100_000_000,
+                             reward: pair.1)
+            })
+    }
+
+    /// 마일스톤은 **칸마다 따로** 받는다. 앞 칸을 받았다고 뒤 칸이 열리지 않는다.
+    func testMilestonesAreClaimedOneAtATime() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let setID = try XCTUnwrap(index.sets.first?.id)
+        let cards = index.cards(inSet: setID)
+        let dex = setDex("set-x", homeSet: setID, needs: [2, 4],
+                         rewards: [DexReward(packs: 1, perks: []),
+                                   DexReward(packs: 2, perks: [])])
+        let s = store([dex])
+        _ = s.collect(Array(cards.prefix(3)))          // 3종 — 첫 칸만 도달
+
+        var status = s.dexStatus(dex, index: index)
+        XCTAssertEqual(status.claimableStep, 0)
+        XCTAssertNotNil(s.claim("set-x", step: 0, index: index))
+        XCTAssertNil(s.claim("set-x", step: 0, index: index), "같은 칸을 두 번 받았다")
+        XCTAssertNil(s.claim("set-x", step: 1, index: index), "도달하지 않은 칸을 받았다")
+
+        _ = s.collect(Array(cards.dropFirst(3).prefix(1)))   // 4종 — 둘째 칸 도달
+        status = s.dexStatus(dex, index: index)
+        XCTAssertEqual(status.claimableStep, 1)
+        XCTAssertNotNil(s.claim("set-x", step: 1, index: index))
+        XCTAssertTrue(s.dexStatus(dex, index: index).claimed)
+    }
+
+    /// 쿠폰은 **그 세트에만** 걸린다. 어느 세트에나 걸리면 가장 비싼 팩을 노리고 돈을
+    /// 모으는 것이 최적이 되어, 보상이 소비를 막는다.
+    func testCouponAppliesOnlyToItsOwnSet() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let setID = try XCTUnwrap(index.sets.first?.id)
+        let other = try XCTUnwrap(index.sets.dropFirst().first?.id)
+        let cards = index.cards(inSet: setID)
+        let dex = setDex("set-b", homeSet: setID, needs: [1],
+                         rewards: [DexReward(packs: 0, perks: [],
+                                             coupons: [DexCouponGrant(value: 0.5, count: 3)])])
+        let s = store([dex])
+        _ = s.collect([cards[0]])
+        XCTAssertNotNil(s.claim("set-b", step: 0, index: index))
+
+        XCTAssertEqual(s.couponCount(setID: setID), 3)
+        XCTAssertEqual(s.couponCount(setID: other), 0)
+        XCTAssertLessThan(s.packPrice(setID: setID, index: index),
+                          s.listPrice(setID: setID, index: index), "쿠폰가가 정가와 같다")
+        XCTAssertEqual(s.packPrice(setID: other, index: index),
+                       s.listPrice(setID: other, index: index),
+                       "다른 세트 팩까지 깎였다 — 비싼 팩을 노리게 된다")
+        // 영구 혜택에는 섞이지 않는다.
+        XCTAssertEqual(s.perks.packDiscount, 0, accuracy: 0.0001)
+    }
+
+    /// 쿠폰은 **팩을 살 때 한 장씩** 쓰인다. 안 깎으면 영구 할인이 된다.
+    func testCouponIsSpentPerPack() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let setID = try XCTUnwrap(index.sets.first?.id)
+        let cards = index.cards(inSet: setID)
+        let dex = setDex("set-c2", homeSet: setID, needs: [1],
+                         rewards: [DexReward(packs: 0, perks: [],
+                                             coupons: [DexCouponGrant(value: 0.5, count: 3)])])
+        let s = store([dex])
+        _ = s.collect([cards[0]])
+        XCTAssertNotNil(s.claim("set-c2", step: 0, index: index))
+
+        XCTAssertTrue(s.buyPacks(setID: setID, count: 2, total: 1_000))
+        XCTAssertEqual(s.couponCount(setID: setID), 1, "두 개 사면 두 장 쓰여야 한다")
+        XCTAssertTrue(s.buyPacks(setID: setID, count: 1, total: 1_000))
+        XCTAssertEqual(s.couponCount(setID: setID), 0)
+        XCTAssertEqual(s.packPrice(setID: setID, index: index),
+                       s.listPrice(setID: setID, index: index), "다 쓴 쿠폰이 아직 걸려 있다")
+    }
+
+    /// 같은 세트·같은 할인율 쿠폰은 **한 묶음**이다. 갈라 두면 쿠폰함이 「1장」 두 줄로 보인다.
+    func testCouponsOfTheSameKindMerge() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let setID = try XCTUnwrap(index.sets.first?.id)
+        let cards = index.cards(inSet: setID)
+        let dex = setDex("set-m", homeSet: setID, needs: [1, 2],
+                         rewards: [DexReward(packs: 0, perks: [],
+                                             coupons: [DexCouponGrant(value: 0.5, count: 2)]),
+                                   DexReward(packs: 0, perks: [],
+                                             coupons: [DexCouponGrant(value: 0.5, count: 3)])])
+        let s = store([dex])
+        _ = s.collect(Array(cards.prefix(2)))
+        _ = s.claim("set-m", step: 0, index: index)
+        _ = s.claim("set-m", step: 1, index: index)
+
+        XCTAssertEqual(s.activeCoupons.count, 1, "같은 쿠폰이 두 묶음으로 갈렸다")
+        XCTAssertEqual(s.activeCoupons.first?.left, 5)
+        XCTAssertEqual(s.couponCount(setID: setID), 5)
+    }
+
+    /// **쿠폰보다 많이 사면 나머지는 정가다.** 총액을 낱개 값의 곱으로 적으면 실제로
+    /// 빠지는 액수와 어긋난다.
+    func testTotalMixesCouponAndListPrice() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let setID = try XCTUnwrap(index.sets.first?.id)
+        let cards = index.cards(inSet: setID)
+        let dex = setDex("set-c3", homeSet: setID, needs: [1],
+                         rewards: [DexReward(packs: 0, perks: [],
+                                             coupons: [DexCouponGrant(value: 0.5, count: 1)])])
+        let s = store([dex])
+        _ = s.collect([cards[0]])
+        XCTAssertNotNil(s.claim("set-c3", step: 0, index: index))
+
+        let list = s.listPrice(setID: setID, index: index)
+        let cut = s.packPrice(setID: setID, index: index)
+        XCTAssertEqual(s.packTotal(setID: setID, count: 1, index: index), cut)
+        XCTAssertEqual(s.packTotal(setID: setID, count: 3, index: index), cut + list * 2,
+                       "쿠폰 한 장인데 세 개가 다 할인됐다")
+    }
+
+    /// 확정 카드는 **아직 없는 카드**에서 나온다. 완성 보상이 팔 물건이면 축하가 아니라 정산이다.
+    func testCardGrantPrefersCardsYouDoNotOwn() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let setID = try XCTUnwrap(index.sets.first?.id)
+        let cards = index.cards(inSet: setID)
+        let dex = setDex("set-c", homeSet: setID, needs: [1],
+                         rewards: [DexReward(packs: 0, perks: [],
+                                             card: DexCardGrant(targetUSD: 5, tierFloor: "RR"))])
+        let s = store([dex])
+        _ = s.collect([cards[0]])
+        let before = s.totalCardCount
+        let claim = try XCTUnwrap(s.claim("set-c", step: 0, index: index))
+        let granted = try XCTUnwrap(claim.card)
+        XCTAssertEqual(s.totalCardCount, before + 1)
+        XCTAssertEqual(s.cardCount(granted), 1, "이미 갖고 있던 카드를 줬다")
+        // 값이 목표에서 크게 벗어나면 등급만 보고 뽑은 것이다.
+        let usd = MarketEconomy.usd(cardID: granted, prices: CardPrices.shared)
+        XCTAssertLessThan(abs(usd - 5), 5, "목표 $5 인데 $\(usd) 를 줬다")
+    }
+
+    /// **계단은 완성 수를 센다.** 도감이 늘어도 예산이 늘지 않는 것이 이 구조의 핵심이다.
+    func testLadderOpensOnCompletionCount() throws {
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let setID = try XCTUnwrap(index.sets.first?.id)
+        let cards = index.cards(inSet: setID)
+        let dexes = (0..<3).map { i in
+            setDex("set-\(i)", homeSet: setID, needs: [i + 1],
+                   rewards: [DexReward(packs: 1, perks: [])])
+        }
+        let ladder = [
+            DexLadderStep(completed: 2, title: DexText(ko: "둘", en: "Two"),
+                          perks: [DexPerk(kind: .tokenGain, value: 0.02)]),
+            DexLadderStep(completed: 3, title: DexText(ko: "셋", en: "Three"),
+                          perks: [DexPerk(kind: .tokenGain, value: 0.05)]),
+        ]
+        let s = store(dexes, ladder: ladder)
+        _ = s.collect(Array(cards.prefix(3)))
+
+        XCTAssertEqual(s.perks.tokenGain, 0, accuracy: 0.0001, "아직 하나도 안 받았다")
+        for i in 0..<2 { _ = s.claim("set-\(i)", step: 0, index: index) }
+        XCTAssertEqual(s.completedDexCount, 2)
+        XCTAssertEqual(s.perks.tokenGain, 0.02, accuracy: 0.0001, "두 칸째가 안 열렸다")
+        XCTAssertEqual(s.title?.ko, "둘")
+
+        _ = s.claim("set-2", step: 0, index: index)
+        XCTAssertEqual(s.perks.tokenGain, 0.07, accuracy: 0.0001, "계단이 쌓이지 않는다")
+        XCTAssertEqual(s.titles.count, 2)
+    }
+
+    /// 예전 세이브의 수령 기록(`id` 하나)이 그대로 인정돼야 한다.
+    /// 열쇠를 바꾸면 이미 받은 사람의 혜택이 조용히 사라진다.
+    func testOldThemeClaimKeysStillCount() throws {
+        let dex = Dex(id: "t", name: DexText(ko: "t", en: "t"), blurb: DexText(ko: "", en: ""),
+                      homeSet: "base1", cards: ["base1-1"], tier: 2, medianPacks: 1,
+                      medianTokens: 1, valueUSD: 1,
+                      reward: DexReward(packs: 1, perks: [DexPerk(kind: .hitOdds, value: 0.01)]))
+        let status = DexProgress.status(for: dex, owned: { _ in true }, claimed: ["t"])
+        XCTAssertTrue(status.claimed)
+        XCTAssertFalse(status.isClaimable)
+        let perks = DexPerks.total(completed: ["t"], dexes: [dex])
+        XCTAssertEqual(perks.hitOdds, 0.01, accuracy: 0.0001)
     }
 }

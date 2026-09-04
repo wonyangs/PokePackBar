@@ -81,6 +81,37 @@ final class PopoverConstructionTests: XCTestCase {
                                  + "— 봉투 열을 늘리거나 머리 줄을 줄여야 한다")
     }
 
+    /// **보상 줄이 한 도감을 두 줄 넘게 밀어내지 않는다.**
+    ///
+    /// 보상이 팩 하나뿐이던 시절에는 칩이 하나였다. 통로를 넷으로 나눈 뒤로 「혜택 + 확정 카드
+    /// + 쿠폰 + 토큰」이 한 줄에 붙는 도감이 생겼고, 그러면 `WrapLayout` 이 줄을 늘려 도감
+    /// 한 칸이 두 배로 높아진다. 목록은 세로로 넘기므로 잘리지는 않지만, 한 화면에 두세 칸만
+    /// 남으면 도감을 고를 수 없다. 실제 번들에서 가장 붐비는 보상으로 재 둔다.
+    func testDexRewardLineStaysWithinTwoLines() throws {
+        let (_, wallet, _, _) = makeEnvironment()
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let dexes = try XCTUnwrap(DexIndex.loadBundled())
+        let busiest = try XCTUnwrap(dexes.dexes.max {
+            $0.reward.channelCount < $1.reward.channelCount
+        })
+        XCTAssertGreaterThanOrEqual(busiest.reward.channelCount, 3,
+                                    "통로가 셋 이상인 도감이 없으면 이 테스트가 아무것도 재지 않는다")
+        let line = DexRewardLine(wallet: wallet, index: index,
+                                 reward: busiest.reward, homeSet: busiest.homeSet)
+        let controller = NSHostingController(
+            rootView: line.frame(width: PopoverMetrics.contentWidth))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: PopoverMetrics.width,
+                                                  height: PopoverMetrics.tabHeight),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentViewController = controller
+        controller.view.layoutSubtreeIfNeeded()
+        controller.view.displayIfNeeded()
+        let height = controller.view.fittingSize.height
+        // 칩 한 줄 ≈ 17pt, 줄 간격 3pt. 두 줄까지 허용한다.
+        XCTAssertLessThanOrEqual(height, 40,
+                                 "\(busiest.id) 의 보상 줄이 \(Int(height))pt — 세 줄로 넘쳤다")
+    }
+
     /// 공지 보드도 한 번 지어 본다. 여기서 죽으면 오리파 탭이 통째로 사라진다.
     func testOripaBoardBuilds() throws {
         let (_, wallet, _, nav) = makeEnvironment()

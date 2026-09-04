@@ -3,43 +3,113 @@ import Foundation
 /// 도감 하나의 진행 상황. 순수 값이라 화면 없이 검증할 수 있다.
 struct DexStatus: Sendable, Equatable, Identifiable {
     let dex: Dex
-    /// 갖고 있는 구성원 수.
+    /// 갖고 있는 구성원 수. 세트 도감은 그 세트에서 가진 **종** 수다.
     let ownedCount: Int
     /// 아직 없는 구성원. 순서는 도감 정의 순서를 따른다.
-    let missing: [String]
-    /// 보상을 이미 수령했는가. 수령한 도감만 혜택을 준다.
     ///
-    /// 지금 보유 상태와 따로 둔다. 수령은 영구 기록이라, 나중에 도감에 카드가 추가돼
-    /// 구성이 바뀌어도 이미 받은 혜택을 회수하지 않는다.
-    let claimed: Bool
+    /// **세트 도감은 비운다.** 284장을 늘어놓을 화면이 없고, 목표가 「전부」가 아니라
+    /// 「몇 할」이라 빠진 목록이 뜻을 갖지 않는다.
+    let missing: [String]
+    /// 대상이 되는 종 수. 테마는 구성원 수, 세트는 그 세트의 종 수다.
+    let total: Int
+    /// 수령한 마일스톤 번호. 테마 도감은 수령했으면 `[0]` 이다.
+    let claimedSteps: Set<Int>
 
     var id: String { dex.id }
 
-    var total: Int { dex.cards.count }
+    /// 목표 칸. 테마 도감은 「구성원 전부」 한 칸이다.
+    var steps: [Int] {
+        dex.kind == .set ? Array(dex.milestones.indices) : [0]
+    }
 
-    /// 지금 보유분만으로 완성 조건을 만족하는가.
-    var isFilled: Bool { missing.isEmpty }
+    /// 이 칸에 필요한 종 수.
+    func need(_ step: Int) -> Int {
+        dex.kind == .set ? (dex.milestones[safe: step]?.need ?? total) : total
+    }
+
+    /// 이 칸의 보상.
+    func reward(_ step: Int) -> DexReward {
+        dex.kind == .set ? (dex.milestones[safe: step]?.reward ?? .none) : dex.reward
+    }
+
+    func isReached(_ step: Int) -> Bool { ownedCount >= need(step) }
+    func isClaimed(_ step: Int) -> Bool { claimedSteps.contains(step) }
+
+    /// 보상을 이미 수령했는가 — 마지막 칸까지 받았는지를 본다.
+    ///
+    /// 지금 보유 상태와 따로 둔다. 수령은 영구 기록이라, 나중에 도감에 카드가 추가돼
+    /// 구성이 바뀌어도 이미 받은 혜택을 회수하지 않는다.
+    var claimed: Bool { steps.last.map(isClaimed) ?? false }
+
+    /// 지금 보유분만으로 마지막 칸을 만족하는가.
+    var isFilled: Bool { steps.last.map(isReached) ?? false }
 
     /// 화면에서 완성으로 취급하는가.
     var isComplete: Bool { claimed || isFilled }
 
-    /// 다 모았는데 아직 보상을 안 받은 상태. 목록 맨 위로 올린다.
-    var isClaimable: Bool { isFilled && !claimed }
+    /// 받을 것이 있는 칸. 목록에서 테두리로 드러낸다.
+    var claimableStep: Int? {
+        steps.first { isReached($0) && !isClaimed($0) && !reward($0).isEmpty }
+    }
+
+    var isClaimable: Bool { claimableStep != nil }
+
+    /// 아직 도달하지 않은 첫 칸. 「다음 목표」로 적는다.
+    var nextStep: Int? { steps.first { !isReached($0) } }
 
     var fraction: Double { total > 0 ? Double(ownedCount) / Double(total) : 0 }
+
+    /// 다음 칸까지의 진행(0~1). 막대가 이 값을 쓴다.
+    var stepFraction: Double {
+        guard let next = nextStep else { return 1 }
+        let want = need(next)
+        return want > 0 ? min(1, Double(ownedCount) / Double(want)) : 1
+    }
+}
+
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }
 
 enum DexProgress {
 
+    /// 테마 도감의 진행.
+    static func status(for dex: Dex, owned: (String) -> Bool,
+                       claimed: Set<String>) -> DexStatus {
+        status(for: dex, owned: owned, claimed: claimed, setCards: { _ in [] })
+    }
+
+    /// 칸이 하나인 도감의 진행 — 수령 여부를 참·거짓으로 준다.
     static func status(for dex: Dex, owned: (String) -> Bool, claimed: Bool) -> DexStatus {
+        status(for: dex, owned: owned, claimed: claimed ? [dex.id] : [])
+    }
+
+    /// 진행을 잰다. **세트 도감은 그 세트의 종 목록이 필요하다** — 구성 카드를 들고 있지
+    /// 않으므로 밖에서 받는다.
+    static func status(for dex: Dex, owned: (String) -> Bool, claimed: Set<String>,
+                       setCards: (String) -> [String]) -> DexStatus {
+        if dex.kind == .set {
+            let pool = setCards(dex.homeSet)
+            let have = pool.reduce(0) { $0 + (owned($1) ? 1 : 0) }
+            let steps = Set(dex.milestones.indices.filter { claimed.contains(dex.claimKey($0)) })
+            return DexStatus(dex: dex, ownedCount: have, missing: [], total: pool.count,
+                             claimedSteps: steps)
+        }
         let missing = dex.cards.filter { !owned($0) }
+        // 테마 도감의 수령 기록은 예전부터 id 하나였다. 새 열쇠(`id#0`)도 함께 본다 —
+        // 이미 받은 사람의 기록이 무효가 되면 혜택이 사라진다.
+        let got = claimed.contains(dex.id) || claimed.contains(dex.claimKey(0))
         return DexStatus(dex: dex, ownedCount: dex.cards.count - missing.count,
-                         missing: missing, claimed: claimed)
+                         missing: missing, total: dex.cards.count,
+                         claimedSteps: got ? [0] : [])
     }
 
     static func statuses(dexes: [Dex], owned: (String) -> Bool,
-                         claimed: Set<String>) -> [DexStatus] {
-        dexes.map { status(for: $0, owned: owned, claimed: claimed.contains($0.id)) }
+                         claimed: Set<String>,
+                         setCards: @escaping (String) -> [String] = { _ in [] }) -> [DexStatus] {
+        dexes.map { status(for: $0, owned: owned, claimed: claimed, setCards: setCards) }
     }
 
     /// 도감이 담고 있는 카드값의 합(달러). 난이도와 정렬의 기준이다.
@@ -51,8 +121,20 @@ enum DexProgress {
     }
 
     /// 시세에서 다시 계산한 값. 저장된 값과 대조할 때 쓴다.
-    static func recomputedValue(of dex: Dex, prices: CardPrices?) -> Double {
-        dex.cards.reduce(0.0) { $0 + MarketEconomy.usd(cardID: $1, prices: prices) }
+    ///
+    /// **세트 도감은 마지막 칸에 필요한 종만 센다.** 목표가 「전부」가 아니므로 세트 전체를
+    /// 더하면 실제 목표보다 비싸게 잡힌다. 어느 종을 셀지는 생성기와 같은 규칙 —
+    /// 값이 싼 것부터 `need` 장이다(무엇을 모으게 될지 고를 수 없으므로 바닥부터 찬다).
+    static func recomputedValue(of dex: Dex, prices: CardPrices?,
+                                index: CardIndex? = CardIndex.shared) -> Double {
+        guard dex.kind == .set else {
+            return dex.cards.reduce(0.0) { $0 + MarketEconomy.usd(cardID: $1, prices: prices) }
+        }
+        guard let index, let need = dex.milestones.last?.need else { return 0 }
+        let sorted = index.cards(inSet: dex.homeSet)
+            .map { MarketEconomy.usd(cardID: $0, prices: prices) }
+            .sorted()
+        return sorted.prefix(need).reduce(0, +)
     }
 
     /// 표시 순서 — 어려운 것부터. 같은 난이도면 **값비싼 카드가 든 것**이 먼저다.
@@ -150,6 +232,36 @@ enum DexDifficulty {
     ///
     /// 세트마다 따로 사야 하므로 세트별로 구해 더한다. 한 세트 안에서는 카드마다 독립이라
     /// n 팩 뒤에 전부 모였을 확률이 곱이 되고, 그 값이 `quantile` 을 넘는 최소 n 을 찾는다.
+    /// 도감 하나를 완성하는 데 필요한 팩 수. 갈래에 따라 셈법이 다르다.
+    static func packsNeeded(for dex: Dex, quantile: Double, index: CardIndex,
+                            perks: DexPerks = .none) -> Int {
+        guard dex.kind == .set else {
+            return packsNeeded(cards: dex.cards, quantile: quantile, index: index, perks: perks)
+        }
+        guard let need = dex.milestones.last?.need else { return 0 }
+        return packsForDistinct(setID: dex.homeSet, need: need, index: index, perks: perks)
+    }
+
+    /// 그 세트에서 **서로 다른** `need` 종을 모으는 데 필요한 팩 수.
+    ///
+    /// 「전부 모으기」와 달리 기대 종수로 잰다 — 세트 도감은 몇 할까지가 목표이므로
+    /// 「n 팩 뒤에 몇 종을 갖고 있을까」가 그대로 답이다. 전량을 재면 쿠폰 수집가 문제의
+    /// 꼬리에 걸려 값이 수만 팩으로 튄다.
+    static func packsForDistinct(setID: String, need: Int, index: CardIndex,
+                                 perks: DexPerks = .none) -> Int {
+        let probabilities = index.cards(inSet: setID)
+            .map { pullProbability(cardID: $0, index: index, perks: perks) }
+            .filter { $0 > 0 }
+        guard !probabilities.isEmpty, need > 0 else { return 0 }
+        var low = 1, high = 2_000_000
+        while low < high {
+            let mid = (low + high) / 2
+            let distinct = probabilities.reduce(0.0) { $0 + (1 - pow(1 - $1, Double(mid))) }
+            if distinct >= Double(need) { high = mid } else { low = mid + 1 }
+        }
+        return low
+    }
+
     static func packsNeeded(cards: [String], quantile: Double, index: CardIndex,
                             perks: DexPerks = .none) -> Int {
         var bySet: [String: [Double]] = [:]

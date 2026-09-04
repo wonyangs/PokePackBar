@@ -226,7 +226,7 @@ struct CardSpotlightView: View {
         let owned: (String) -> Bool = { wallet.cardCount($0) > 0 }
         var out: [DexStatus] = []
         for dex in wallet.dexes where dex.cards.contains(cardID) && !claimed.contains(dex.id) {
-            out.append(DexProgress.status(for: dex, owned: owned, claimed: false))
+            out.append(DexProgress.status(for: dex, owned: owned, claimed: []))
         }
         out.sort { a, b in
             if a.missing.count != b.missing.count { return a.missing.count < b.missing.count }

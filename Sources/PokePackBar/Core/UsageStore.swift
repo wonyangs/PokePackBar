@@ -377,30 +377,40 @@ final class UsageStore {
     var bonusEligibleWindows: [BonusWindow] {
         let l = L(localizationLanguage)
         var windows: [BonusWindow] = []
+        // 같은 창이라도 **누구의 것이고 언제 초기화되는지**가 다르면 다른 판이다. 계정을 바꾸면
+        // 사용률이 0% 로 떨어지는데, 그것과 창이 실제로 초기화된 것을 구분하는 유일한 근거다.
+        let claudeOwner = limits?.accountEmail ?? ""
         if let u = limits?.fiveHour?.utilization {
             windows.append(BonusWindow(key: "claude.fiveHour", name: l.claudeFiveHour,
-                                       kind: .session, utilization: u))
+                                       kind: .session, utilization: u,
+                                       instance: Self.instance(claudeOwner,
+                                                               limits?.fiveHour?.resetsAt)))
         }
         if let u = limits?.sevenDay?.utilization {
             windows.append(BonusWindow(key: "claude.sevenDay", name: l.claudeWeekly,
-                                       kind: .weekly, utilization: u))
+                                       kind: .weekly, utilization: u,
+                                       instance: Self.instance(claudeOwner,
+                                                               limits?.sevenDay?.resetsAt)))
         }
         for bucket in codexLimits?.visibleSnapshots ?? [] {
             let bucketKey = bucket.limitId ?? bucket.limitName ?? "codex"
             let bucketName = bucket.bucketDisplayName
+            let owner = bucket.planType ?? ""
             if let primary = bucket.primary {
                 windows.append(BonusWindow(
                     key: "codex.\(bucketKey).primary",
                     name: "\(bucketName) \(l.codexWindow(primary.windowDurationMins))",
                     kind: Self.windowClass(minutes: primary.windowDurationMins),
-                    utilization: Double(primary.usedPercent)))
+                    utilization: Double(primary.usedPercent),
+                    instance: Self.instance(owner, primary.resetsAt.map(String.init))))
             }
             if let secondary = bucket.secondary {
                 windows.append(BonusWindow(
                     key: "codex.\(bucketKey).secondary",
                     name: "\(bucketName) \(l.codexWindow(secondary.windowDurationMins))",
                     kind: Self.windowClass(minutes: secondary.windowDurationMins),
-                    utilization: Double(secondary.usedPercent)))
+                    utilization: Double(secondary.usedPercent),
+                    instance: Self.instance(owner, secondary.resetsAt.map(String.init))))
             }
         }
         for group in antigravityLimits?.groups ?? [] {
@@ -410,17 +420,28 @@ final class UsageStore {
                     key: "antigravity.\(groupKey).5h",
                     name: "\(group.displayName) \(l.fiveHourSession)",
                     kind: .session,
-                    utilization: fiveHour.usedPercent))
+                    utilization: fiveHour.usedPercent,
+                    instance: Self.instance("", fiveHour.resetTime)))
             }
             if let weekly = group.weeklyBucket {
                 windows.append(BonusWindow(
                     key: "antigravity.\(groupKey).weekly",
                     name: "\(group.displayName) \(l.weekly)",
                     kind: .weekly,
-                    utilization: weekly.usedPercent))
+                    utilization: weekly.usedPercent,
+                    instance: Self.instance("", weekly.resetTime)))
             }
         }
         return windows
+    }
+
+    /// 한도 창의 판 id — "소유자|초기화시각". **초기화 시각이 없으면 판을 만들지 않는다**(빈 값).
+    ///
+    /// 소유자만 있는 판은 영원히 같은 값이라 창이 실제로 초기화돼도 다시 지급되지 않는다.
+    /// 그럴 바에는 판이 없다고 하고 예전 규칙(100% 아래로 내려가면 재무장)에 맡기는 편이 낫다.
+    nonisolated static func instance(_ owner: String, _ resetsAt: String?) -> String {
+        guard let resetsAt, !resetsAt.isEmpty else { return "" }
+        return "\(owner)|\(resetsAt)"
     }
 
     /// Codex 창 분류 — ≤24h(1440분)=세션, 초과=주간. 미상(nil)은 세션으로 간주(보수적).

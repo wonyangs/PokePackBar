@@ -9,9 +9,14 @@ struct CardShopView: View {
     let wallet: WalletStore
     let index: CardIndex?
 
-    /// 상점의 두 갈래. 파는 물건이 아예 다르므로 한 격자에 섞지 않는다 —
+    /// 상점의 갈래. 파는 물건이 아예 다르므로 한 격자에 섞지 않는다 —
     /// 팩은 세트를 고르는 것이고 오리파는 박스 하나에서 뽑는 것이다.
-    enum Section: CaseIterable { case packs, oripa }
+    ///
+    /// **쿠폰함은 늘 자리를 지킨다.** 처음에는 쿠폰이 있을 때만 띄웠는데, 칸이 폭을 똑같이
+    /// 나눠 가지므로 갈래가 둘에서 셋으로 오갈 때마다 옆 칸의 폭과 자리가 함께 움직였다 —
+    /// 마지막 쿠폰을 쓰는 순간 탭 줄이 덜컹거린다. 쿠폰을 받기 전에 그런 것이 있는 줄
+    /// 모른다는 문제도 있었다.
+    enum Section: CaseIterable { case packs, oripa, coupons }
 
     /// 상세를 보고 있는 세트. nil 이면 목록.
     @State private var selectedSet: String?
@@ -41,6 +46,7 @@ struct CardShopView: View {
                         switch section {
                         case .packs: eraList(index)
                         case .oripa: OripaView(wallet: wallet, index: index)
+                        case .coupons: couponBox(index)
                         }
                     }
                 }
@@ -70,10 +76,88 @@ struct CardShopView: View {
     }
 
     private var sectionPicker: some View {
-        SegmentedTabs(items: [
+        let total = wallet.activeCoupons.reduce(0) { $0 + $1.left }
+        return SegmentedTabs(items: [
             .init(value: Section.packs, label: wallet.l.shopPacksSection),
             .init(value: Section.oripa, label: wallet.l.oripaTitle),
+            .init(value: Section.coupons, label: wallet.l.shopCouponsSection(total)),
         ], selection: $section)
+    }
+
+    /// 쿠폰함 — 갖고 있는 쿠폰을 세트별로 늘어놓는다.
+    ///
+    /// 상점에 두는 이유는 **쿠폰이 팩을 사는 물건이기 때문**이다. 도감이나 설정에 두면
+    /// 쓰려면 화면을 두 번 옮겨야 하고, 어느 팩에 쓸 수 있는지도 그 자리에서 못 본다.
+    /// 줄을 누르면 그 팩 상세로 바로 넘어간다.
+    ///
+    /// 비어 있어도 자리를 지킨다. 빈 화면에는 **어떻게 얻는지**를 적는다 — 그러지 않으면
+    /// 쿠폰을 한 번도 못 받은 사람에게는 뜻 없는 빈 칸이다.
+    private func couponBox(_ index: CardIndex) -> some View {
+        let l = wallet.l
+        // 할인이 센 것부터, 같으면 장수가 많은 것부터. 쓸 순서가 곧 이 순서다.
+        let rows = wallet.activeCoupons.sorted {
+            $0.value != $1.value ? $0.value > $1.value : $0.left > $1.left
+        }
+        return ScrollView {
+            LazyVStack(spacing: 8) {
+                if rows.isEmpty {
+                    VStack(spacing: 6) {
+                        Image(systemName: "ticket")
+                            .font(.system(size: 34, weight: .light))
+                            .foregroundStyle(.tertiary)
+                        Text(l.couponBoxEmpty)
+                            .font(Typography.body).foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 60).padding(.bottom, 10)
+                }
+                Text(l.couponBoxHint)
+                    .font(Typography.label).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: rows.isEmpty ? .center : .leading)
+                    .padding(.horizontal, 4)
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, coupon in
+                    couponRow(index, coupon)
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedSet = coupon.setID }
+                }
+            }
+            .padding(.horizontal, 1)
+        }
+    }
+
+    private func couponRow(_ index: CardIndex, _ coupon: PackCoupon) -> some View {
+        let l = wallet.l
+        let list = wallet.listPrice(setID: coupon.setID, index: index)
+        let cut = wallet.packPrice(setID: coupon.setID, index: index)
+        return HStack(spacing: 8) {
+            PackImageView(setID: coupon.setID, width: 26)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(index.set(coupon.setID)?.name ?? coupon.setID)
+                    .font(Typography.bodySemibold).lineLimit(1)
+                HStack(spacing: 5) {
+                    Text(l.couponRowDiscount(Int((coupon.value * 100).rounded())))
+                        .font(Typography.label).foregroundStyle(Color.accentColor)
+                    Text(MarketEconomy.money(tokens: list, language: wallet.language))
+                        .font(Typography.label).foregroundStyle(.tertiary)
+                        .strikethrough().monospacedDigit()
+                    Text(MarketEconomy.money(tokens: cut, language: wallet.language))
+                        .font(Typography.labelSemibold).monospacedDigit()
+                }
+                .lineLimit(1).minimumScaleFactor(0.8)
+            }
+            Spacer(minLength: 0)
+            HStack(spacing: 4) {
+                Image(systemName: "ticket.fill")
+                    .font(.system(size: 13)).foregroundStyle(Color.accentColor)
+                Text(l.packCouponsLeft(coupon.left))
+                    .font(Typography.labelSemibold).monospacedDigit()
+            }
+            .fixedSize()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold)).foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 7).padding(.horizontal, 8)
+        .background(Color.accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
     }
 
     private func consumeRequestedSet() {
@@ -206,8 +290,9 @@ private struct PackGridCell: View {
     private static let artWidth = CardGrid.packShelf.width - 20
 
     var body: some View {
-        let price = PackPricing.price(setID: set.id, index: index, perks: wallet.perks)
+        let price = wallet.packPrice(setID: set.id, index: index)
         let owned = wallet.packCount(setID: set.id)
+        let coupons = wallet.couponCount(setID: set.id)
         return VStack(spacing: 5) {
             ZStack(alignment: .topTrailing) {
                 PackImageView(setID: set.id, width: Self.artWidth)
@@ -226,10 +311,20 @@ private struct PackGridCell: View {
                 .font(Typography.bodySemibold)
                 .lineLimit(1).minimumScaleFactor(0.7)
                 .padding(.horizontal, 4)
-            Text(MarketEconomy.money(tokens: price, language: wallet.language))
-                .font(Typography.amount).monospacedDigit()
-                .lineLimit(1).minimumScaleFactor(0.75)
-                .foregroundStyle(wallet.availableTokens >= price ? .secondary : .tertiary)
+            HStack(spacing: 3) {
+                // 쿠폰이 있는 팩은 진열에서부터 표시한다. 상세에 들어가야 알 수 있으면
+                // 122개 중 어디에 쿠폰이 있는지 찾을 수가 없다.
+                if coupons > 0 {
+                    Image(systemName: "ticket.fill")
+                        .font(.system(size: 13)).foregroundStyle(Color.accentColor)
+                }
+                Text(MarketEconomy.money(tokens: price, language: wallet.language))
+                    .font(Typography.amount).monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                    .foregroundStyle(coupons > 0 ? AnyShapeStyle(Color.accentColor)
+                                     : wallet.availableTokens >= price
+                                       ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
@@ -252,7 +347,11 @@ private struct PackDetailView: View {
     /// 그 목록에서 크게 보고 있는 카드.
     @State private var spotlight: String?
 
-    private var price: Int { PackPricing.price(setID: set.id, index: index, perks: wallet.perks) }
+    /// 실제로 낼 낱개 값 — 쿠폰이 있으면 쿠폰가다.
+    private var price: Int { wallet.packPrice(setID: set.id, index: index) }
+    /// 쿠폰을 빼기 전의 값. 쿠폰이 있을 때만 줄을 그어 함께 보인다.
+    private var listPrice: Int { wallet.listPrice(setID: set.id, index: index) }
+    private var coupons: Int { wallet.couponCount(setID: set.id) }
     private var cardsPerPack: Int { PackPricing.cardCount(setID: set.id, index: index, perks: wallet.perks) }
     /// 이 팩에서 나올 수 있는 카드. **값이 비싼 것부터** — 무엇을 노리고 사는지가 먼저 읽혀야 한다.
     /// 인덱스가 이미 값순으로 세워 둔 것을 거르므로 여기서 다시 정렬하지 않는다.
@@ -261,7 +360,9 @@ private struct PackDetailView: View {
 
     /// 잔액으로 살 수 있는 최대 수량. 한 번에 스무 개면 충분하다.
     private var maxQuantity: Int { max(1, min(20, wallet.availableTokens / max(price, 1))) }
-    private var total: Int { price * quantity }
+    /// 총액은 낱개 값의 곱이 아니다 — **쿠폰은 한 장에 팩 하나**라, 쿠폰보다 많이 사면
+    /// 나머지는 정가다. 값을 곱으로 적으면 살 때 빠지는 액수와 어긋난다.
+    private var total: Int { wallet.packTotal(setID: set.id, count: quantity, index: index) }
     private var canBuy: Bool { wallet.availableTokens >= total }
 
     var body: some View {
@@ -437,10 +538,35 @@ private struct PackDetailView: View {
                 }
                 .fixedSize()
                 Spacer()
-                Text(MarketEconomy.money(tokens: total, language: wallet.language))
-                    .font(Typography.amount).monospacedDigit()
+                // 쿠폰이 있으면 **정가에 줄을 그어 함께 보인다.** 값에 조용히 곱해지면
+                // 할인을 받은 줄 알 수가 없다.
+                if coupons > 0 {
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text(MarketEconomy.money(tokens: listPrice * quantity,
+                                                 language: wallet.language))
+                            .font(Typography.label).monospacedDigit()
+                            .foregroundStyle(.tertiary).strikethrough()
+                        Text(MarketEconomy.money(tokens: total, language: wallet.language))
+                            .font(Typography.amount).monospacedDigit()
+                            .foregroundStyle(canBuy ? AnyShapeStyle(Color.accentColor)
+                                                    : AnyShapeStyle(.secondary))
+                    }
                     .lineLimit(1).minimumScaleFactor(0.75)
-                    .foregroundStyle(canBuy ? .primary : .secondary)
+                } else {
+                    Text(MarketEconomy.money(tokens: total, language: wallet.language))
+                        .font(Typography.amount).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.75)
+                        .foregroundStyle(canBuy ? .primary : .secondary)
+                }
+            }
+            if coupons > 0 {
+                HStack(spacing: 5) {
+                    Image(systemName: "ticket.fill")
+                        .font(.system(size: 13)).foregroundStyle(Color.accentColor)
+                    Text(l.packCouponsLeft(coupons))
+                        .font(Typography.label).foregroundStyle(Color.accentColor)
+                    Spacer(minLength: 0)
+                }
             }
             Button(canBuy ? l.buyCount(quantity) : l.notEnoughTokens) { buy() }
                 .buttonStyle(.borderedProminent)
@@ -456,8 +582,8 @@ private struct PackDetailView: View {
 
     private func buy() {
         // 총액을 한 번에 차감한다. 개당 차감하면 중간에 실패했을 때 몇 개를 준 건지 흐려진다.
-        guard wallet.spend(total) else { return }
-        wallet.addPack(setID: set.id, count: quantity)
+        // 값 차감·보유량·할인 부스터 소모를 한 곳에서 한다. 따로 부르면 한 군데를 잊는다.
+        guard wallet.buyPacks(setID: set.id, count: quantity, total: total) else { return }
         quantity = 1
     }
 }

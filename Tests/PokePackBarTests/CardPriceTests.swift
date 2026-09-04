@@ -165,4 +165,26 @@ final class CardPriceTests: XCTestCase {
                                      perks: DexPerks(dustBonus: DexPerks.caps.dustBonus))
         XCTAssertGreaterThan(boosted, plain)
     }
+
+    /// **실제 세트로도 보너스 팩이 예산 안에 든다.** 어느 세트가 걸리든 값이 같아야 한다.
+    ///
+    /// 팩값은 시세를 다시 받을 때마다 움직인다. 예산 규칙만 테스트하고 번들 데이터를 안 보면,
+    /// 어느 날 값싼 세트가 전부 예산 위로 올라가 후보가 비어도 아무도 모른다.
+    func testBonusPacksStayInBudgetForRealSets() throws {
+        let prices = try XCTUnwrap(Self.prices)
+        let index = try XCTUnwrap(CardIndex.loadBundled())
+        let sets = index.setIDs.map {
+            BonusSet(id: $0, price: PackPricing.basePrice(setID: $0, index: index, prices: prices))
+        }
+        let affordable = sets.filter { $0.price > 0 && $0.price <= PackConfig.bonusBudget }
+        XCTAssertGreaterThan(affordable.count, 20,
+                             "예산으로 살 수 있는 세트가 이렇게 적으면 보너스가 늘 같은 세트만 준다")
+        for set in affordable {
+            let count = min(PackConfig.bonusPackCap, max(1, PackConfig.bonusBudget / set.price))
+            XCTAssertLessThanOrEqual(set.price * count, PackConfig.bonusBudget,
+                                     "\(set.id): 보너스가 예산을 넘는다")
+            XCTAssertGreaterThan(set.price * count, PackConfig.bonusBudget / 2,
+                                 "\(set.id): 보너스가 예산의 절반도 안 된다")
+        }
+    }
 }

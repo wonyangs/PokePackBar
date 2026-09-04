@@ -51,6 +51,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     generalGroup(store)
                     menuBarGroup(store)
+                    collectorGroup
                     notificationsGroup(store)
                     updateGroup(store)
                     advancedGroup(store)
@@ -154,6 +155,32 @@ struct SettingsView: View {
                             launchAtLogin = LoginItem.isEnabled
                         }
                     }
+            }
+        }
+    }
+
+    /// 도감으로 얻은 칭호를 고르는 자리.
+    ///
+    /// **얻었는데 고를 데가 없으면 보상이 아니다.** 칭호는 도감 탭 머리에 붙는다.
+    /// 하나도 없으면 이 묶음을 아예 두지 않는다 — 빈 선택기는 「무엇을 해야 열리는지」를
+    /// 말해 주지 않으므로 도움이 안 된다.
+    @ViewBuilder
+    private var collectorGroup: some View {
+        if !wallet.titles.isEmpty {
+            settingsSection(l.titleSectionLabel) {
+                groupRow {
+                    Text(l.titleSectionLabel)
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: { wallet.stateTitleChoice ?? -1 },
+                        set: { wallet.setTitle($0 < 0 ? nil : $0) })) {
+                        Text(l.titleNone).tag(-1)
+                        ForEach(wallet.titles) { step in
+                            Text(step.title.text(wallet.language)).tag(step.completed)
+                        }
+                    }
+                    .labelsHidden().frame(width: 180)
+                }
             }
         }
     }

@@ -544,6 +544,87 @@ extension L {
     var dexGoBuyPack: String { t("이 팩 사러 가기", "Buy this pack", "このパックを買う",
                                   "Comprar este sobre", "Acheter ce booster", "Comprar este pacote") }
     var dexReward: String { t("완성 보상", "Reward", "完成報酬", "Recompensa", "Récompense", "Recompensa") }
+    // MARK: 도감 개편 — 갈래·마일스톤·새 보상 통로
+    var dexThemeSection: String { t("조합", "Combos", "組み合わせ", "Combos", "Combos", "Combos") }
+    var dexSetSection: String { t("세트", "Sets", "セット", "Sets", "Sets", "Sets") }
+    /// 세트 도감의 목표 — 그 세트의 **종**을 몇 할까지 모으는가.
+    func dexMilestone(_ percent: Int) -> String {
+        t("\(percent)% 수집", "\(percent)% collected", "\(percent)% 収集",
+           "\(percent)% reunido", "\(percent)% réuni", "\(percent)% reunido")
+    }
+    func dexMilestoneNeed(_ need: Int, _ total: Int) -> String {
+        t("\(need)종 / \(total)종", "\(need) of \(total)", "\(need)種 / \(total)種",
+           "\(need) de \(total)", "\(need) sur \(total)", "\(need) de \(total)")
+    }
+    /// 팩 할인 쿠폰. **세트가 정해져 있다** — 아껴 둘 이유가 없어야 한다.
+    func dexRewardCoupon(_ setName: String, _ percent: Int, _ count: Int) -> String {
+        t("\(setName) 팩 \(percent)% 쿠폰 \(count)장",
+           "\(count)× \(percent)% off \(setName) packs",
+           "\(setName) パック \(percent)% クーポン \(count)枚",
+           "\(count) cupones \(percent)% \(setName)",
+           "\(count) bons \(percent)% \(setName)",
+           "\(count) cupons \(percent)% \(setName)")
+    }
+    var dexCouponHelp: String { t("그 세트 팩을 살 때 한 장씩 쓰여요. 상점에 할인가가 표시됩니다.",
+                                   "Spent one per pack of that set. The shop shows the cut price.",
+                                   "そのセットのパックを買うと1枚使われます。店に割引価格が出ます。",
+                                   "Se gasta uno por sobre de ese set. La tienda muestra el precio rebajado.",
+                                   "Un bon par booster de ce set. La boutique affiche le prix réduit.",
+                                   "Um por pacote desse set. A loja mostra o preço com desconto.") }
+    /// 상점의 쿠폰함 갈래. **늘 자리를 지킨다** — 칸이 폭을 나눠 가지므로 갈래가 생겼다
+    /// 사라지면 옆 칸의 폭과 자리가 함께 움직인다. 장수는 있을 때만 덧붙인다.
+    func shopCouponsSection(_ count: Int) -> String {
+        guard count > 0 else {
+            return t("쿠폰", "Coupons", "クーポン", "Cupones", "Bons", "Cupons")
+        }
+        return t("쿠폰 \(count)", "Coupons \(count)", "クーポン \(count)",
+                  "Cupones \(count)", "Bons \(count)", "Cupons \(count)")
+    }
+    var couponBoxEmpty: String { t("아직 쿠폰이 없어요.", "No coupons yet.", "クーポンはまだありません。",
+                                    "Aún no tienes cupones.", "Pas encore de bons.",
+                                    "Ainda sem cupons.") }
+    /// 쿠폰함 한 줄 — 어느 세트 팩을 얼마에 살 수 있는가.
+    func couponRowDiscount(_ percent: Int) -> String {
+        t("\(percent)% 할인", "\(percent)% off", "\(percent)% 割引",
+           "\(percent)% dto.", "\(percent)% de remise", "\(percent)% off")
+    }
+    var couponBoxHint: String { t("도감을 완성하면 그 세트 팩 쿠폰이 들어와요.",
+                                   "Completing a dex hands you coupons for that set's packs.",
+                                   "図鑑をコンプリートすると、そのセットのクーポンが入ります。",
+                                   "Completar un dex te da cupones de ese set.",
+                                   "Compléter un dex donne des bons pour ce set.",
+                                   "Completar um dex dá cupons desse set.") }
+
+    /// 상점에 적는 쿠폰 잔량.
+    func packCouponsLeft(_ count: Int) -> String {
+        t("쿠폰 \(count)장", "\(count) coupons", "クーポン \(count)枚",
+           "\(count) cupones", "\(count) bons", "\(count) cupons")
+    }
+    /// 확정 카드 한 장. 등급 하한은 표시용이고 실제 선택은 값이 한다.
+    func dexRewardCard(_ tier: String) -> String {
+        t("\(tier) 이상 카드 1장", "One \(tier) or better", "\(tier)以上 1枚",
+           "1 carta \(tier)+", "1 carte \(tier)+", "1 carta \(tier)+")
+    }
+    var dexRewardCardHelp: String { t("아직 없는 카드 중에서 값이 맞는 한 장을 드려요.",
+                                       "A card you do not own yet, matched by value.",
+                                       "未所持のカードから、値に合う1枚を差し上げます。",
+                                       "Una carta que no tienes, elegida por valor.",
+                                       "Une carte qui te manque, choisie par valeur.",
+                                       "Uma carta que falta, escolhida por valor.") }
+    var titleSectionLabel: String { t("칭호", "Title", "称号", "Título", "Titre", "Título") }
+    var titleNone: String { t("없음", "None", "なし", "Ninguno", "Aucun", "Nenhum") }
+    /// 완성 수 계단 — 도감을 몇 개 완성했는가로 영구 혜택이 열린다.
+    func dexLadderNext(_ done: Int, _ need: Int) -> String {
+        t("완성 \(done) / \(need) — 다음 혜택까지", "\(done) of \(need) to the next perk",
+           "コンプリート \(done) / \(need) — 次のボーナスまで",
+           "\(done) de \(need) para la próxima ventaja",
+           "\(done) sur \(need) avant le prochain bonus",
+           "\(done) de \(need) até o próximo bônus")
+    }
+    var dexLadderDone: String { t("계단을 다 올랐어요.", "You topped out the ladder.",
+                                   "階段を上りきりました。", "Has subido toda la escalera.",
+                                   "Tu as gravi toute l'échelle.", "Você subiu tudo.") }
+
     var dexPerksHeader: String { t("누적 혜택", "Perks", "累積ボーナス", "Ventajas", "Bonus", "Bônus") }
     var dexCompletedBanner: String { t("도감 완성!", "Dex complete!", "図鑑コンプリート！",
                                         "¡Dex completo!", "Dex complété !", "Dex completo!") }

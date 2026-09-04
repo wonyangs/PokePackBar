@@ -224,11 +224,15 @@ final class WalletStoreTests: XCTestCase {
 
     // MARK: 보너스 팩
 
+    /// 예산이 딱 한 팩인 세트. 지급 개수가 1 로 고정되므로 「몇 번 줬나」만 세면 된다.
+    private let oneEach = [BonusSet(id: "sv10", price: PackConfig.bonusBudget)]
+    private let threeSets = ["a", "b", "c"].map { BonusSet(id: $0, price: PackConfig.bonusBudget) }
+
     /// 첫 실행에는 이미 100% 인 창에 소급 지급하지 않는다. 시드만 한다.
     func testFirstRunSeedsWithoutGranting() {
         let s = makeStore()
         let w = [BonusWindow(key: "claude.fiveHour", name: "5h", kind: .session, utilization: 100)]
-        s.grantBonusPacks(from: w, limitsReady: true, availableSets: ["sv10"])
+        s.grantBonusPacks(from: w, limitsReady: true, availableSets: oneEach)
         XCTAssertEqual(s.totalPackCount, 0)
         XCTAssertTrue(s.state.packGrantSeeded)
     }
@@ -239,18 +243,18 @@ final class WalletStoreTests: XCTestCase {
         let key = "claude.fiveHour"
         // 시드 (아직 100% 미만)
         s.grantBonusPacks(from: [BonusWindow(key: key, name: "5h", kind: .session, utilization: 40)],
-                          limitsReady: true, availableSets: ["sv10"])
+                          limitsReady: true, availableSets: oneEach)
         XCTAssertEqual(s.totalPackCount, 0)
 
         let full = [BonusWindow(key: key, name: "5h", kind: .session, utilization: 100)]
-        s.grantBonusPacks(from: full, limitsReady: true, availableSets: ["sv10"])
-        XCTAssertEqual(s.totalPackCount, PackConfig.bonusPackCount)
+        s.grantBonusPacks(from: full, limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 1)
 
-        s.grantBonusPacks(from: full, limitsReady: true, availableSets: ["sv10"])
-        XCTAssertEqual(s.totalPackCount, PackConfig.bonusPackCount, "같은 창에서 재지급하지 않는다")
+        s.grantBonusPacks(from: full, limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 1, "같은 창에서 재지급하지 않는다")
     }
 
-    /// 창이 100% 아래로 내려가면 다시 무장되고, 다음 도달에 또 지급한다.
+    /// 판을 모르는 창은 100% 아래로 내려가면 다시 무장되고, 다음 도달에 또 지급한다.
     /// 재무장 상태가 영속되지 않으면 재시작 후 지급이 누락된다.
     func testReArmsAfterDroppingBelowFullAndPersists() {
         let s = makeStore()
@@ -258,22 +262,189 @@ final class WalletStoreTests: XCTestCase {
         func windows(_ u: Double) -> [BonusWindow] {
             [BonusWindow(key: key, name: "5h", kind: .session, utilization: u)]
         }
-        s.grantBonusPacks(from: windows(10), limitsReady: true, availableSets: ["sv10"])
-        s.grantBonusPacks(from: windows(100), limitsReady: true, availableSets: ["sv10"])
-        XCTAssertEqual(s.totalPackCount, PackConfig.bonusPackCount)
+        s.grantBonusPacks(from: windows(10), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: windows(100), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 1)
 
-        s.grantBonusPacks(from: windows(5), limitsReady: true, availableSets: ["sv10"])   // 재무장
+        s.grantBonusPacks(from: windows(5), limitsReady: true, availableSets: oneEach)   // 재무장
         // 재시작을 흉내낸다 — 재무장이 저장돼 있어야 다음 도달에 지급된다.
         let reloaded = makeStore()
-        reloaded.grantBonusPacks(from: windows(100), limitsReady: true, availableSets: ["sv10"])
-        XCTAssertEqual(reloaded.totalPackCount, PackConfig.bonusPackCount * 2)
+        reloaded.grantBonusPacks(from: windows(100), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(reloaded.totalPackCount, 2)
+    }
+
+    // MARK: 보너스 팩 — 계정 전환
+
+    private func window(_ utilization: Double, _ instance: String,
+                        key: String = "claude.fiveHour") -> [BonusWindow] {
+        [BonusWindow(key: key, name: "5h", kind: .session,
+                     utilization: utilization, instance: instance)]
+    }
+
+    /// **계정을 오가는 것만으로 같은 창이 두 번 지급되면 안 된다.**
+    ///
+    /// 계정을 바꾸면 사용률이 0% 로 떨어진다. 「내려가면 재무장」 규칙만 있으면 그 순간 무장이
+    /// 풀리고, 원래 계정으로 돌아오는 것만으로 같은 판이 또 지급된다 — 오가기만 하면 팩이
+    /// 무한히 늘어난다. 실제로 그렇게 복사됐다.
+    func testSwitchingAccountsDoesNotPayTheSameWindowTwice() {
+        let s = makeStore()
+        s.grantBonusPacks(from: window(40, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 1)
+
+        // 다른 계정으로 전환 — 새 계정은 0% 다.
+        s.grantBonusPacks(from: window(0, "b@x|T2"), limitsReady: true, availableSets: oneEach)
+        // 원래 계정으로 복귀 — 같은 판이다.
+        s.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 1,
+                       "계정을 오가는 것만으로 재지급됐다")
+    }
+
+    /// 두 계정이 **모두** 100% 여도 각 판에 한 번씩만이다.
+    /// 창마다 마지막 판 하나만 적어 두면 전환할 때마다 판이 바뀌어 매번 지급된다.
+    func testTwoFullAccountsPayOncePerWindowNotPerSwitch() {
+        let s = makeStore()
+        s.grantBonusPacks(from: window(40, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        for _ in 0..<5 {
+            s.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+            s.grantBonusPacks(from: window(100, "b@x|T2"), limitsReady: true, availableSets: oneEach)
+        }
+        XCTAssertEqual(s.totalPackCount, 2,
+                       "계정 두 개를 번갈아 보는 것만으로 팩이 늘어난다")
+    }
+
+    /// 창이 **실제로 초기화되면** 다시 지급한다. 초기화 시각이 바뀐 것이 그 근거다.
+    /// 이걸 막으면 버그는 사라지지만 보상 자체가 한 번으로 끝난다.
+    func testANewWindowInstancePaysAgain() {
+        let s = makeStore()
+        s.grantBonusPacks(from: window(40, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: window(20, "a@x|T2"), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: window(100, "a@x|T2"), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 2)
+    }
+
+    /// 100% 를 유지한 채 창만 초기화돼도(중간에 내려간 관측이 없어도) 다음 판은 지급된다.
+    /// 예전 규칙은 「내려간 적이 없다」는 이유로 이걸 놓쳤다.
+    func testResetWhileStillFullStillPays() {
+        let s = makeStore()
+        s.grantBonusPacks(from: window(40, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: window(100, "a@x|T2"), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 2)
+    }
+
+    /// 판 기록은 재시작을 넘어 남아야 한다. 안 남으면 껐다 켜는 것으로 다시 받을 수 있다.
+    func testPaidInstancesSurviveRestart() {
+        let s = makeStore()
+        s.grantBonusPacks(from: window(40, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+
+        let reloaded = makeStore()
+        reloaded.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true,
+                                 availableSets: oneEach)
+        XCTAssertEqual(reloaded.totalPackCount, 1)
+    }
+
+    /// 판 기록이 생기기 전 세이브를 이어 받는다 — 업데이트 직후 한 번 더 주면 안 된다.
+    func testLegacySaveIsNotPaidAgainAfterUpgrade() throws {
+        let file = dir.appendingPathComponent("game-state.json")
+        let legacy = """
+        {"packGrantSeeded":true,"packGrantTier":{"claude.fiveHour":1}}
+        """
+        try Data(legacy.utf8).write(to: file)
+
+        let s = makeStore()
+        s.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 0, "옛 세이브의 지급 기록을 잃고 다시 줬다")
+
+        // 물려받은 뒤에도 다음 판은 정상 지급된다.
+        s.grantBonusPacks(from: window(100, "a@x|T2"), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 1)
+    }
+
+    /// 초기화 시각이 응답에서 잠깐 빠져 판을 못 만들어도, 이미 준 창을 다시 주지 않는다.
+    func testLosingTheResetTimeDoesNotPayAgain() {
+        let s = makeStore()
+        s.grantBonusPacks(from: window(40, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        s.grantBonusPacks(from: window(100, "a@x|T1"), limitsReady: true, availableSets: oneEach)
+        // 같은 창인데 이번 응답에는 초기화 시각이 없다 — 판을 만들 수 없다.
+        s.grantBonusPacks(from: window(100, ""), limitsReady: true, availableSets: oneEach)
+        XCTAssertEqual(s.totalPackCount, 1)
+    }
+
+    // MARK: 보너스 팩 — 크기
+
+    /// **보상은 개수가 아니라 값이다.** 어느 세트가 걸리든 예산 근처에서 끝나야 한다.
+    ///
+    /// 예전에는 세트와 무관하게 10팩이었다. 팩값이 세트마다 700배 갈리므로 무작위로 고른
+    /// 세트에 개수를 고정하면 한 번에 예산의 수십 배가 나갔다.
+    func testBonusIsWorthTheBudgetWhicheverSetIsPicked() {
+        let budget = PackConfig.bonusBudget
+        let sets = [
+            BonusSet(id: "cheap", price: budget / 7),      // 제일 싼 세트
+            BonusSet(id: "mid", price: budget / 2),
+            BonusSet(id: "exact", price: budget),
+        ]
+        for seed in UInt64(1)...50 {
+            var g = SeededGenerator(seed: seed)
+            let payout = WalletStore.bonusPayout(from: sets, using: &g)
+            let price = sets.first { $0.id == payout.setID }!.price
+            let value = price * payout.count
+            XCTAssertLessThanOrEqual(value, budget, "\(payout.setID): 예산을 넘겼다")
+            XCTAssertGreaterThan(value, budget / 2, "\(payout.setID): 예산의 절반도 안 준다")
+        }
+    }
+
+    /// 예산으로 한 팩도 못 사는 세트는 후보에서 뺀다. 남겨 두면 그 세트가 걸리는 순간
+    /// 예산의 몇십 배가 한 번에 나가고, 그게 「랜덤이라 값이 튄다」는 문제 그 자체다.
+    func testSetsAboveTheBudgetAreNeverPicked() {
+        let budget = PackConfig.bonusBudget
+        let sets = [
+            BonusSet(id: "affordable", price: budget),
+            BonusSet(id: "vintage", price: budget * 90),
+        ]
+        for seed in UInt64(1)...50 {
+            var g = SeededGenerator(seed: seed)
+            XCTAssertEqual(WalletStore.bonusPayout(from: sets, using: &g).setID, "affordable")
+        }
+    }
+
+    /// 살 수 있는 세트가 하나도 없으면 제일 싼 세트로 한 팩. 보상이 아예 안 나오면 안 된다.
+    func testFallsBackToTheCheapestSetWhenNothingIsAffordable() {
+        let budget = PackConfig.bonusBudget
+        let sets = [BonusSet(id: "pricey", price: budget * 3),
+                    BonusSet(id: "cheapest", price: budget * 2)]
+        var g = SeededGenerator(seed: 1)
+        let payout = WalletStore.bonusPayout(from: sets, using: &g)
+        XCTAssertEqual(payout.setID, "cheapest")
+        XCTAssertEqual(payout.count, 1)
+    }
+
+    /// 팩값을 못 읽어 헐값으로 잡혀도 개수가 폭주하지 않는다.
+    func testCountIsCappedWhenAPackLooksAlmostFree() {
+        var g = SeededGenerator(seed: 1)
+        let payout = WalletStore.bonusPayout(from: [BonusSet(id: "broken", price: 1)], using: &g)
+        XCTAssertEqual(payout.count, PackConfig.bonusPackCap)
+    }
+
+    /// 기억하는 판 수에는 상한이 있다. 없으면 세이브가 끝없이 자란다.
+    func testPaidInstanceListIsBounded() {
+        let s = makeStore()
+        s.grantBonusPacks(from: window(40, "a@x|T0"), limitsReady: true, availableSets: oneEach)
+        for i in 1...(WalletStore.grantMemory + 10) {
+            s.grantBonusPacks(from: window(100, "a@x|T\(i)"), limitsReady: true,
+                              availableSets: oneEach)
+        }
+        XCTAssertEqual(s.state.packGrantedInstances["claude.fiveHour"]?.count,
+                       WalletStore.grantMemory)
     }
 
     /// 한도가 아직 로드되지 않았으면 시드도 지급도 하지 않는다.
     func testWaitsUntilLimitsReady() {
         let s = makeStore()
         let w = [BonusWindow(key: "k", name: "5h", kind: .session, utilization: 100)]
-        s.grantBonusPacks(from: w, limitsReady: false, availableSets: ["sv10"])
+        s.grantBonusPacks(from: w, limitsReady: false, availableSets: oneEach)
         XCTAssertFalse(s.state.packGrantSeeded)
         XCTAssertEqual(s.totalPackCount, 0)
     }
@@ -289,15 +460,17 @@ final class WalletStoreTests: XCTestCase {
     /// 판정은 순수 함수라 난수를 고정하면 결과가 재현된다.
     func testEvaluateGrantsIsDeterministicWithSeededGenerator() {
         var tier: [String: Int] = [:]
+        var paid: [String: [String]] = [:]
         var g1 = SeededGenerator(seed: 7)
         var g2 = SeededGenerator(seed: 7)
         let w = [BonusWindow(key: "k", name: "5h", kind: .session, utilization: 100)]
 
         var tier2 = tier
-        let a = WalletStore.evaluateGrants(windows: w, grantTier: &tier,
-                                          availableSets: ["a", "b", "c"], using: &g1)
-        let b = WalletStore.evaluateGrants(windows: w, grantTier: &tier2,
-                                          availableSets: ["a", "b", "c"], using: &g2)
+        var paid2 = paid
+        let a = WalletStore.evaluateGrants(windows: w, grantTier: &tier, grantedInstances: &paid,
+                                          availableSets: threeSets, using: &g1)
+        let b = WalletStore.evaluateGrants(windows: w, grantTier: &tier2, grantedInstances: &paid2,
+                                          availableSets: threeSets, using: &g2)
         XCTAssertEqual(a, b)
         XCTAssertEqual(a.count, 1)
     }

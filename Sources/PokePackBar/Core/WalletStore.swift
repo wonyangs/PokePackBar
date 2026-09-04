@@ -11,6 +11,30 @@ struct BonusWindow: Sendable {
     let name: String
     let kind: WindowClass
     let utilization: Double   // 0~100+
+
+    /// 이 창의 **판** — 누구의 창인지와 언제 초기화되는지를 합친 값. 한 판에 한 번만 지급한다.
+    ///
+    /// 계정을 바꾸면 사용률이 0% 로 떨어진다. 그것을 「창이 초기화됐다」로 읽으면 계정을
+    /// 오가는 것만으로 같은 창이 몇 번이고 지급된다. 판이 있으면 둘을 구분할 수 있다.
+    ///
+    /// 빈 문자열은 **구분할 수 없다**는 뜻이다(계정도 초기화 시각도 못 얻은 프로바이더).
+    /// 그런 창만 예전 규칙 — 100% 아래로 내려가면 다시 무장 — 에 기댄다.
+    let instance: String
+
+    init(key: String, name: String, kind: WindowClass, utilization: Double, instance: String = "") {
+        self.key = key
+        self.name = name
+        self.kind = kind
+        self.utilization = utilization
+        self.instance = instance
+    }
+}
+
+/// 보너스로 줄 수 있는 세트 하나 — id 와 **정가**. 도감 할인·쿠폰을 뺀 값이다.
+/// 할인된 값으로 개수를 세면 혜택이 많은 사람일수록 보너스가 커진다.
+struct BonusSet: Sendable, Equatable {
+    let id: String
+    let price: Int
 }
 
 /// 보너스 팩 지급 1건. 순수 판정 결과라 부수효과와 분리해 검증할 수 있다.
@@ -19,6 +43,15 @@ struct PackGrant: Equatable, Sendable {
     let windowName: String
     let setID: String
     let count: Int
+}
+
+/// 수령 결과. 화면이 「무엇을 받았는지」를 알릴 때 쓴다.
+struct DexClaim: Sendable, Equatable {
+    let dex: Dex
+    let step: Int
+    let reward: DexReward
+    /// 확정 카드로 받은 카드. 없으면 nil.
+    let card: String?
 }
 
 /// 이번 개봉으로 다 모인 도감 1건. 개봉 결과 화면이 이걸 받아 알린다.
@@ -49,6 +82,8 @@ final class WalletStore {
 
     /// 조합 도감 목록. 테스트가 갈아 끼울 수 있게 주입받는다.
     let dexes: [Dex]
+    /// 완성 수 계단. 영구 혜택의 주인이다.
+    let ladder: [DexLadderStep]
 
     /// 완성한 도감에서 나온 영구 혜택.
     ///
@@ -56,11 +91,22 @@ final class WalletStore {
     /// 사용량 적립도 매 새로고침마다 읽는다.
     private(set) var perks: DexPerks = .none
 
-    init(fileURL: URL? = nil, dexes: [Dex]? = nil) {
+    init(fileURL: URL? = nil, dexes: [Dex]? = nil, ladder: [DexLadderStep]? = nil) {
         self.fileURL = fileURL ?? Self.defaultURL()
-        self.dexes = dexes ?? DexIndex.loadBundled().dexes
+        let bundled = (dexes == nil || ladder == nil) ? DexIndex.loadBundled() : nil
+        self.dexes = dexes ?? bundled?.dexes ?? []
+        self.ladder = ladder ?? bundled?.ladder ?? []
         load()
-        perks = DexPerks.total(completed: claimedDexIDs, dexes: self.dexes)
+        refreshPerks()
+    }
+
+    /// 영구 혜택을 다시 모은다 — 도감 + 계단.
+    ///
+    /// **쿠폰은 여기 합치지 않는다.** 쿠폰은 세트가 정해져 있어서 `DexPerks` 로는 표현할 수
+    /// 없다 — 합쳐 두면 어느 세트에나 걸려서 「가장 비싼 팩을 노리고 돈을 모으는 것이 최적」이
+    /// 된다. 팩값은 `packPrice(setID:)` 가 쿠폰까지 보고 계산한다.
+    private func refreshPerks() {
+        perks = DexPerks.total(completed: claimedDexIDs, dexes: dexes, ladder: ladder)
     }
 
     static func defaultURL() -> URL {
@@ -352,6 +398,14 @@ final class WalletStore {
     static let oripaUpdateGift = Gift(id: "v0.7.0-patch", tokens: 213_370_000, packsPerSet: 0,
                                       kind: .celebration)
 
+    /// v0.8.0 업데이트 기념 사료. 100만원.
+    ///
+    /// 앞의 두 기념과 값이 같은 이유는 셋 다 **정확히 100만원**이기 때문이다 —
+    /// 100원 한 칸이 21,337토큰이므로 만 칸이면 딱 떨어진다. `id` 는 반드시 달라야 한다.
+    /// 같으면 앞 버전에서 이미 받은 사람이 이번 것을 못 받는다.
+    static let dexUpdateGift = Gift(id: "v0.8.0-patch", tokens: 213_370_000, packsPerSet: 0,
+                                    kind: .celebration)
+
     /// 준 적이 없고 대상이면 준다. 이미 줬으면 아무것도 하지 않는다.
     ///
     /// **이미 팩을 사 본 세이브만** 받는다. 갓 설치한 사람이 백만원을 들고 시작하면
@@ -576,63 +630,285 @@ final class WalletStore {
 
     var claimedDexCount: Int { state.claimedDex.count }
 
-    /// 지금 보유 카드로 다 모였고 아직 수령하지 않은 도감.
+    /// 완성으로 세어지는 도감 수. **계단이 이 값을 센다.**
+    var completedDexCount: Int {
+        let claimed = claimedDexIDs
+        return dexes.filter { claimed.contains($0.completionKey) }.count
+    }
+
+    /// 열린 계단 칸.
+    var reachedLadder: [DexLadderStep] {
+        let done = completedDexCount
+        return ladder.filter { done >= $0.completed }
+    }
+
+    /// 얻은 칭호 — 열린 계단 칸이 그대로 칭호다.
+    var titles: [DexLadderStep] { reachedLadder }
+
+    /// 고른 칭호. 아직 안 골랐으면 가장 높은 것을 쓴다 — 얻었는데 안 보이면 보상이 아니다.
+    var title: DexText? {
+        let got = titles
+        guard !got.isEmpty else { return nil }
+        if let picked = state.title, let step = got.first(where: { $0.completed == picked }) {
+            return step.title
+        }
+        return got.last?.title
+    }
+
+    /// 고른 칭호의 계단 번호. 안 골랐으면 nil — 화면의 선택기가 이 값을 쓴다.
+    var stateTitleChoice: Int? { state.title }
+
+    func setTitle(_ completed: Int?) { state.title = completed; save() }
+
+    /// 갖고 있는 쿠폰 — 남은 장수가 있는 것만, **세트와 할인율이 같으면 한 줄로 묶는다.**
+    ///
+    /// 도감 칸마다 따로 들어오므로 저장에는 여러 묶음이 남는다. 쿠폰함이 그것을 그대로
+    /// 늘어놓으면 「Base 50% 1장」이 두 줄로 보여서 몇 장인지 세게 된다.
+    var activeCoupons: [PackCoupon] {
+        var merged: [PackCoupon] = []
+        for coupon in state.coupons where coupon.left > 0 {
+            if let i = merged.firstIndex(where: { $0.setID == coupon.setID
+                                                  && $0.value == coupon.value }) {
+                merged[i].left += coupon.left
+            } else {
+                merged.append(coupon)
+            }
+        }
+        return merged
+    }
+
+    /// 그 세트에 쓸 수 있는 쿠폰 장수.
+    func couponCount(setID: String) -> Int {
+        state.coupons.filter { $0.setID == setID }.reduce(0) { $0 + max(0, $1.left) }
+    }
+
+    /// 그 세트 쿠폰의 할인율. 여러 장이면 가장 센 것을 쓴다.
+    func couponDiscount(setID: String) -> Double {
+        state.coupons.filter { $0.setID == setID && $0.left > 0 }
+            .map(\.value).max() ?? 0
+    }
+
+    /// 정가 — 영구 할인만 반영한다. 상점이 줄을 그어 보여 줄 값이다.
+    func listPrice(setID: String, index: CardIndex) -> Int {
+        PackPricing.price(setID: setID, index: index, perks: perks)
+    }
+
+    /// **실제로 낼 값.** 쿠폰이 있으면 그만큼 더 깎인다.
+    ///
+    /// 쿠폰은 한 번에 한 장씩 쓰이므로, 여러 개를 살 때는 쿠폰이 있는 만큼만 할인된다.
+    /// 그래서 총액은 낱개 값의 곱이 아니라 이 함수로 세어야 한다.
+    func packTotal(setID: String, count: Int, index: CardIndex) -> Int {
+        let list = listPrice(setID: setID, index: index)
+        let discounted = couponCount(setID: setID)
+        guard discounted > 0 else { return list * count }
+        let rate = couponDiscount(setID: setID)
+        let cut = MarketEconomy.quantized(Int((Double(list) * (1 - rate)).rounded()))
+        let withCoupon = min(count, discounted)
+        return cut * withCoupon + list * (count - withCoupon)
+    }
+
+    /// 낱개 값 — 쿠폰이 있으면 쿠폰가다. 상점이 큰 글씨로 적는 값이다.
+    func packPrice(setID: String, index: CardIndex) -> Int {
+        let list = listPrice(setID: setID, index: index)
+        let rate = couponDiscount(setID: setID)
+        guard rate > 0 else { return list }
+        return MarketEconomy.quantized(Int((Double(list) * (1 - rate)).rounded()))
+    }
+
+    /// 도감 진행. 세트 도감은 그 세트의 종 목록이 필요하다.
+    func dexStatus(_ dex: Dex, index: CardIndex? = CardIndex.shared) -> DexStatus {
+        DexProgress.status(for: dex, owned: { (state.cards[$0] ?? 0) > 0 },
+                           claimed: claimedDexIDs,
+                           setCards: { index?.cards(inSet: $0) ?? [] })
+    }
+
+    /// 지금 보유 카드로 받을 것이 있는 도감.
     ///
     /// 완성 여부를 저장하지 않고 매번 보유 카드에서 계산한다 — 도감 기능이 생기기 전에
     /// 모아 둔 카드도 그래야 완성으로 잡힌다. 이벤트로만 기록하면 그런 도감은 영영 안 뜬다.
     var claimableDexes: [Dex] {
-        dexes.filter { dex in
-            !claimedDexIDs.contains(dex.id) && dex.cards.allSatisfy { (state.cards[$0] ?? 0) > 0 }
-        }
+        dexes.filter { dexStatus($0).isClaimable }
     }
 
-    /// 보상을 수령한다. 팩을 주고 혜택을 켠다.
+    /// 보상을 수령한다.
     ///
-    /// 두 번 주면 도감으로 팩을 무한히 만들 수 있으므로 이미 수령한 것은 거른다.
-    /// 다 모으지 못한 도감도 거른다 — 화면이 잘못 눌러도 지급되지 않아야 한다.
+    /// 두 번 주면 도감으로 재화를 무한히 만들 수 있으므로 이미 수령한 칸은 거른다.
+    /// 도달하지 못한 칸도 거른다 — 화면이 잘못 눌러도 지급되지 않아야 한다.
     @discardableResult
-    func claim(_ dexID: String) -> Dex? {
-        guard let dex = dexes.first(where: { $0.id == dexID }),
-              !claimedDexIDs.contains(dexID),
-              dex.cards.allSatisfy({ (state.cards[$0] ?? 0) > 0 }) else { return nil }
+    func claim(_ dexID: String, step: Int = 0,
+               index: CardIndex? = CardIndex.shared) -> DexClaim? {
+        guard let dex = dexes.first(where: { $0.id == dexID }) else { return nil }
+        let status = dexStatus(dex, index: index)
+        guard status.steps.contains(step), status.isReached(step), !status.isClaimed(step)
+        else { return nil }
 
-        state.claimedDex.append(dexID)
-        if dex.reward.packs > 0 { state.packs[dex.homeSet, default: 0] += dex.reward.packs }
+        let reward = status.reward(step)
+        state.claimedDex.append(dex.claimKey(step))
+
+        if reward.packs > 0 { state.packs[dex.homeSet, default: 0] += reward.packs }
+        if reward.tokens > 0 { state.perkTokens += reward.tokens }
+        // 쿠폰은 **그 도감의 세트**에 묶인다. 어느 세트에나 쓸 수 있으면 가장 비싼 팩을
+        // 노리고 돈을 모으는 것이 최적이 되어, 보상이 소비를 막는다.
+        for coupon in reward.coupons where coupon.count > 0 {
+            // 같은 세트·같은 할인율은 한 묶음에 더한다. 따로 쌓으면 저장이 늘어나기만 한다.
+            if let i = state.coupons.firstIndex(where: { $0.setID == dex.homeSet
+                                                         && $0.value == coupon.value }) {
+                state.coupons[i].left += coupon.count
+            } else {
+                state.coupons.append(PackCoupon(setID: dex.homeSet, value: coupon.value,
+                                                left: coupon.count))
+            }
+        }
+        var granted: String?
+        if let want = reward.card, let index {
+            granted = grantCard(want, index: index)
+        }
         // 혜택은 즉시 반영한다 — 수령 직후의 구매·개봉부터 적용되어야 보상으로 읽힌다.
-        perks = DexPerks.total(completed: claimedDexIDs, dexes: dexes)
+        refreshPerks()
         save()
-        AppLog.write("dex claimed \(dexID) tier=\(dex.tier) packs=\(dex.reward.packs)")
-        return dex
+        AppLog.write("dex claimed \(dex.claimKey(step)) packs=\(reward.packs)"
+                     + " tokens=\(reward.tokens) coupons=\(reward.coupons.count)"
+                     + " card=\(granted ?? "-")")
+        return DexClaim(dex: dex, step: step, reward: reward, card: granted)
+    }
+
+    /// 확정 카드를 한 장 준다.
+    ///
+    /// **등급이 아니라 값으로 고른다.** 「UR 이상 랜덤」의 중앙값이 17,400원인데 평균은
+    /// 160,600원이다 — 분포가 아래로 쏠려 있어 등급만 정하면 대개 1~2만원짜리가 나온다.
+    /// 오리파에서 겪은 것과 같은 문제고, 답도 같다.
+    ///
+    /// **미보유부터 고른다.** 중복 한 장은 「팔 물건」이고, 완성 보상이 팔 물건이면 축하가
+    /// 아니라 정산이 된다. 값이 맞는 미보유가 없으면 가진 카드로 메운다.
+    private func grantCard(_ want: DexCardGrant, index: CardIndex) -> String? {
+        let floor = CardTier(rawValue: want.tierFloor)
+        let pool = index.cards.filter { entry in
+            guard let floor else { return true }
+            return entry.tier.rank >= floor.rank
+        }
+        guard !pool.isEmpty else { return nil }
+        let distance = { (id: String) in
+            abs(MarketEconomy.usd(cardID: id, prices: CardPrices.shared) - want.targetUSD)
+        }
+        let fresh = pool.filter { (state.cards[$0.id] ?? 0) == 0 }
+        let picked = (fresh.isEmpty ? pool : fresh).min { distance($0.id) < distance($1.id) }
+        guard let picked else { return nil }
+        // 「처음 얻은 때」는 `collect` 가 적는다. 확정 카드도 같은 길을 지나야
+        // 컬렉션의 최근 획득순 정렬에 들어간다.
+        _ = collect([picked.id])
+        return picked.id
+    }
+
+    /// 그 세트 쿠폰 한 장을 쓴다. 다 쓴 묶음은 목록에서 지운다.
+    ///
+    /// 할인이 가장 센 것부터 쓴다 — 여러 장이 있으면 사용자가 이득인 쪽으로 소모돼야 한다.
+    private func consumeCoupons(setID: String, times: Int) {
+        guard times > 0 else { return }
+        var remaining = times
+        let order = state.coupons.indices
+            .filter { state.coupons[$0].setID == setID && state.coupons[$0].left > 0 }
+            .sorted { state.coupons[$0].value > state.coupons[$1].value }
+        for i in order {
+            guard remaining > 0 else { break }
+            let take = min(remaining, state.coupons[i].left)
+            state.coupons[i].left -= take
+            remaining -= take
+        }
+        state.coupons.removeAll { $0.left <= 0 }
+    }
+
+    /// 팩을 산다. **값을 깎고, 보유량을 늘리고, 쿠폰을 그만큼 쓴다.**
+    ///
+    /// 세 가지를 따로 부르면 한 군데를 잊는다 — 실제로 쿠폰을 안 깎아 영구 할인이 됐다.
+    @discardableResult
+    func buyPacks(setID: String, count: Int, total: Int) -> Bool {
+        guard count > 0, spend(total) else { return false }
+        state.packs[setID, default: 0] += count
+        consumeCoupons(setID: setID, times: count)
+        save()
+        return true
     }
 
     // MARK: 보너스 팩 (한도 달성 보상)
 
-    /// 지급 판정 — 한도 창이 100% 를 새로 넘어선 순간에만 지급한다.
+    /// 창 하나에 기억해 두는 판의 최대 개수. 판은 초기화 시각이 지나면 다시 나타나지 않으므로
+    /// 오래된 것부터 버려도 두 번 지급되지 않는다. 계정 몇 개를 오가도 남을 만큼은 둔다.
+    static let grantMemory = 24
+
+    /// 지급 판정 — 한도 창이 **아직 지급하지 않은 판**에서 100% 에 닿았을 때만 지급한다.
     ///
-    /// - 100% 미만이면 맵에서 제거해 다시 무장한다.
-    /// - 이미 지급한 창은 재지급하지 않는다.
+    /// - 판을 아는 창: 그 판에 이미 준 적이 있으면 건너뛴다. 100% 아래로 내려가도 기록을
+    ///   지우지 않는다 — 계정을 바꿔 0% 가 된 것을 「초기화됐다」로 읽으면 안 된다.
+    /// - 판을 모르는 창: 예전 규칙 그대로 100% 미만이면 다시 무장한다.
     /// - 세트는 주어진 목록에서 무작위로 하나 고른다. 난수 생성기를 주입받아 검증 가능하게 둔다.
     ///
     /// 부수효과(보유량 증가·알림)와 분리했다.
     static func evaluateGrants(
         windows: [BonusWindow],
         grantTier: inout [String: Int],
-        availableSets: [String],
+        grantedInstances: inout [String: [String]],
+        availableSets: [BonusSet],
         using generator: inout some RandomNumberGenerator
     ) -> [PackGrant] {
         guard !availableSets.isEmpty else { return [] }
         var grants: [PackGrant] = []
         for w in windows {
-            guard w.utilization >= 100 else { grantTier[w.key] = nil; continue }
-            guard (grantTier[w.key] ?? 0) < 1 else { continue }
+            guard w.utilization >= 100 else {
+                if w.instance.isEmpty { grantTier[w.key] = nil }
+                continue
+            }
+            if w.instance.isEmpty {
+                guard (grantTier[w.key] ?? 0) < 1 else { continue }
+            } else {
+                var paid = grantedInstances[w.key] ?? []
+                guard !paid.contains(w.instance) else { continue }
+                paid.append(w.instance)
+                if paid.count > grantMemory { paid.removeFirst(paid.count - grantMemory) }
+                grantedInstances[w.key] = paid
+            }
+            // 판을 알든 모르든 옛 표시도 같이 남긴다. 초기화 시각이 응답에서 잠깐 빠지면 같은 창이
+            // 판 없는 창으로 보이는데, 그때 이 표시가 없으면 이미 준 창을 한 번 더 준다.
             grantTier[w.key] = 1
-            // 한도 종류와 무관하게 1개다. 세션 한도가 주간보다 자주 차므로,
+            // 한도 종류와 무관하게 같은 값이다. 세션 한도가 주간보다 자주 차므로,
             // 주간에 가중을 주면 보상이 세션 쪽으로 쏠린다.
-            let setID = availableSets[Int(generator.next(upperBound: UInt64(availableSets.count)))]
+            let payout = bonusPayout(from: availableSets, using: &generator)
             grants.append(PackGrant(windowKey: w.key, windowName: w.name,
-                                    setID: setID, count: PackConfig.bonusPackCount))
+                                    setID: payout.setID, count: payout.count))
         }
         return grants
+    }
+
+    /// 보너스 한 번의 지급 내용 — **예산에 맞춰** 세트와 개수를 고른다.
+    ///
+    /// 예산으로 한 팩도 못 사는 세트는 후보에서 뺀다. 남겨 두면 그 세트가 걸리는 순간
+    /// 예산의 몇십 배가 한 번에 나가고, 그게 「랜덤이라 값이 튄다」는 문제 그 자체다.
+    /// 살 수 있는 세트가 하나도 없으면(예산보다 다 비싸면) 제일 싼 세트로 한 팩을 준다 —
+    /// 보상이 아예 안 나오는 것보다는 낫다.
+    static func bonusPayout(
+        from sets: [BonusSet],
+        using generator: inout some RandomNumberGenerator
+    ) -> (setID: String, count: Int) {
+        let budget = PackConfig.bonusBudget
+        let affordable = sets.filter { $0.price > 0 && $0.price <= budget }
+        if affordable.isEmpty {
+            let cheapest = sets.min { $0.price < $1.price } ?? sets[0]
+            return (cheapest.id, 1)
+        }
+        let pick = affordable[Int(generator.next(upperBound: UInt64(affordable.count)))]
+        return (pick.id, min(PackConfig.bonusPackCap, max(1, budget / pick.price)))
+    }
+
+    /// 판 기록이 생기기 전의 세이브를 이어 받는다.
+    ///
+    /// 옛 세이브에는 「지급했다」는 사실만 있고 어느 판이었는지가 없다. 그대로 두면 업데이트
+    /// 직후 지금 차 있는 창이 미지급으로 보여 한 번 더 지급된다. 지금 관측된 판을 그 자리에
+    /// 적어 두면 새 규칙이 옛 기록을 그대로 물려받는다.
+    private func adoptLegacyGrantMarks(_ windows: [BonusWindow]) {
+        for w in windows where !w.instance.isEmpty {
+            guard state.packGrantedInstances[w.key] == nil else { continue }
+            guard (state.packGrantTier[w.key] ?? 0) >= 1, w.utilization >= 100 else { continue }
+            state.packGrantedInstances[w.key] = [w.instance]
+        }
     }
 
     /// 한도 창 상태로부터 보너스 팩을 지급한다. 매 새로고침 완료 시(한도 로드 후) 호출한다.
@@ -642,29 +918,43 @@ final class WalletStore {
     /// - 한도가 아직 로드되지 않았으면 시드도 지급도 하지 않고 다음 새로고침에 재시도한다.
     @discardableResult
     func grantBonusPacks(from windows: [BonusWindow], limitsReady: Bool,
-                         availableSets: [String]) -> [PackGrant] {
+                         availableSets: [BonusSet]) -> [PackGrant] {
         guard limitsReady, !availableSets.isEmpty else { return [] }
 
         if !state.packGrantSeeded {
-            for w in windows where w.utilization >= 100 { state.packGrantTier[w.key] = 1 }
+            for w in windows where w.utilization >= 100 {
+                if w.instance.isEmpty { state.packGrantTier[w.key] = 1 }
+                else { state.packGrantedInstances[w.key] = [w.instance] }
+            }
             state.packGrantSeeded = true
             save()
             return []
         }
 
+        adoptLegacyGrantMarks(windows)
+
         let before = state.packGrantTier
+        let beforeInstances = state.packGrantedInstances
         var generator = SystemRandomNumberGenerator()
-        let grants = Self.evaluateGrants(windows: windows, grantTier: &state.packGrantTier,
+        // `state` 가 계산 프로퍼티라 두 칸을 동시에 inout 으로 넘길 수 없다. 지역 변수로 꺼냈다 넣는다.
+        var tier = state.packGrantTier
+        var instances = state.packGrantedInstances
+        let grants = Self.evaluateGrants(windows: windows, grantTier: &tier,
+                                         grantedInstances: &instances,
                                          availableSets: availableSets, using: &generator)
+        state.packGrantTier = tier
+        state.packGrantedInstances = instances
         for g in grants {
             state.packs[g.setID, default: 0] += g.count
             lastGrant = g
             AppLog.write("bonus packs granted window=\(g.windowKey) set=\(g.setID) count=\(g.count)")
         }
 
-        // 지급이 없어도 재무장(창이 100% 아래로 내려가 맵에서 제거된 것)은 영속해야 한다.
-        // 안 하면 재시작 시 남아 있는 지급 표시 때문에 다음 100% 도달이 "이미 지급" 으로 오판된다.
-        if !grants.isEmpty || state.packGrantTier != before { save() }
+        // 지급이 없어도 재무장(창이 100% 아래로 내려가 맵에서 제거된 것)과 판 기록은 영속해야
+        // 한다. 안 하면 재시작 시 남은 표시 때문에 다음 도달을 "이미 지급" 으로 오판하거나,
+        // 반대로 이미 준 판을 다시 준다.
+        if !grants.isEmpty || state.packGrantTier != before
+            || state.packGrantedInstances != beforeInstances { save() }
         return grants
     }
 

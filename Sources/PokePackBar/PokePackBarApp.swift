@@ -68,6 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         wallet.claim(WalletStore.apologyGift)
         wallet.claim(WalletStore.patchGift)
         wallet.claim(WalletStore.oripaUpdateGift)
+        wallet.claim(WalletStore.dexUpdateGift)
         updater = UpdateChecker()
         store.localizationLanguage = wallet.language   // 알림 현지화용 미러 시드
         store.onRefresh = { [weak self] in self?.onStoreRefreshed() }   // 한도 로드 후 companion·사탕 지급
@@ -199,8 +200,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    /// 보너스 팩으로 줄 수 있는 세트. 카드 목록은 번들 리소스라 한 번만 읽는다.
-    private static let packSetIDs: [String] = CardIndex.shared?.setIDs ?? []
+    /// 보너스 팩으로 줄 수 있는 세트와 그 정가. 카드 목록은 번들 리소스라 한 번만 읽는다.
+    /// 값은 **정가**다 — 도감 할인을 적용하면 혜택이 많을수록 보너스가 커진다.
+    private static let packSetIDs: [BonusSet] = {
+        guard let index = CardIndex.shared else { return [] }
+        return index.setIDs.map {
+            BonusSet(id: $0, price: PackPricing.basePrice(setID: $0, index: index,
+                                                          prices: CardPrices.shared))
+        }
+    }()
 
     /// 알림 문구에 쓸 세트 이름.
     private static let setNames: [String: String] = {
