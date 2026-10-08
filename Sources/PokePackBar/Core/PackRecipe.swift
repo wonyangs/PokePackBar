@@ -38,8 +38,11 @@ enum PackSlotKind: String, Hashable, Sendable {
     /// Celebrations positions 1–2: regular-set holo cards only.
     case celebrationsHolo
     /// Celebrations' third position: either a base-set holo or one Classic Collection card.
+    /// 30th Celebration's third position works the same way: a Common, an Illustration
+    /// Rare or a Classic Collection card.
     case classicCollection
-    /// Celebrations position 4: the regular set's rare/hit position.
+    /// Celebrations position 4: the regular set's rare/hit position. 30th Celebration's
+    /// fourth position is the same kind of Rare-or-better position.
     case celebrationsRare
     /// A guaranteed Common from an English Radiant Collection subset.
     case radiantCollectionCommon
@@ -199,8 +202,15 @@ struct PackRecipe: Equatable, Sendable {
     }
 
     static func forSet(_ setID: String, era: PackEra) -> PackRecipe {
+        // 30th Celebration: two foil Commons, a Common that an Illustration Rare or a
+        // Classic Collection card can replace, the Rare position (Double Rare, SIR and
+        // Futuristic Rare replace it), and the guaranteed Pikachu Rare. Four
+        // interchangeable foil positions let one pack hold several Double Rares or
+        // no Rare at all, which a real pack never does.
         if setID == "cel30" {
-            return PackRecipe(slots: [PackRecipeSlot(kind: .allFoil, count: 4),
+            return PackRecipe(slots: [PackRecipeSlot(kind: .allFoil, count: 2),
+                                      PackRecipeSlot(kind: .classicCollection, count: 1),
+                                      PackRecipeSlot(kind: .celebrationsRare, count: 1),
                                       PackRecipeSlot(kind: .anniversaryPikachu, count: 1)],
                 contents: PackContents(gameCardCount: 5, energyCardCount: 1, codeCardCount: 1),
                 baseVariant: .standard, specialVariant: nil)

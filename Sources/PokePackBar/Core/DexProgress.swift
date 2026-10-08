@@ -213,19 +213,15 @@ enum DexDifficulty {
         return tierLimits.count + 1
     }
 
-    /// 카드 한 장이 팩 하나에서 나올 확률.
+    /// 카드 한 장이 팩 하나에서 나올 확률(기대 장수).
     ///
-    /// 등급별 기대 장수를 그 등급의 카드 종류 수로 나눈다. 기대 장수는 확률표에서 되돌린다 —
-    /// 확률표는 카드 한 장 기준으로 정규화돼 있으므로 팩 장수를 곱하면 기대 장수가 된다.
+    /// 칸마다 그 카드가 실제로 들어 있는 풀로 나눠 센다(`PackOpening.cardPullRates`).
+    /// 같은 등급이라도 칸이 다르면 확률이 다르다 — 등급 평균으로 나누면 HGSS 의 Prime 이나
+    /// 30주년의 RGB 뮤가 몇십 배 어긋난다.
     static func pullProbability(cardID: String, index: CardIndex,
                                 perks: DexPerks = .none) -> Double {
         guard let entry = index.card(cardID) else { return 0 }
-        let siblings = index.pools[entry.setID]?[entry.tier]?.count ?? 0
-        guard siblings > 0 else { return 0 }
-        let odds = PackOpening.packOdds(setID: entry.setID, index: index, perks: perks)
-        guard let match = odds.first(where: { $0.tier == entry.tier }) else { return 0 }
-        let perPack = Double(PackPricing.cardCount(setID: entry.setID, index: index, perks: perks))
-        return match.probability * perPack / Double(siblings)
+        return PackOpening.cardPullRates(setID: entry.setID, index: index, perks: perks)[cardID] ?? 0
     }
 
     /// 구성원을 모두 모으는 데 필요한 팩 수.
@@ -249,8 +245,9 @@ enum DexDifficulty {
     /// 꼬리에 걸려 값이 수만 팩으로 튄다.
     static func packsForDistinct(setID: String, need: Int, index: CardIndex,
                                  perks: DexPerks = .none) -> Int {
+        let rates = PackOpening.cardPullRates(setID: setID, index: index, perks: perks)
         let probabilities = index.cards(inSet: setID)
-            .map { pullProbability(cardID: $0, index: index, perks: perks) }
+            .map { rates[$0] ?? 0 }
             .filter { $0 > 0 }
         guard !probabilities.isEmpty, need > 0 else { return 0 }
         var low = 1, high = 2_000_000

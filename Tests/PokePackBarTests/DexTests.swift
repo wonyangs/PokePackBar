@@ -161,8 +161,8 @@ final class BundledDexTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(dex.cards.count, 2,
                                         "\(dex.id): 한 장짜리는 조합이 아니다")
         }
-        let packSets = Set(cards.cards.map { $0.id.prefix(while: { $0 != "-" }) })
-            .map(String.init)
+        // 서브셋(sma, swsh9tg, cel30c 같은 별도 번호)은 부모 세트의 팩에서 나온다.
+        let packSets = Set(cards.cards.map(\.setID))
         let covered = Set(themes.map(\.homeSet))
         let missing = packSets.filter { !covered.contains($0) }.sorted()
         XCTAssertTrue(missing.isEmpty, "테마 도감이 없는 세트: \(missing.joined(separator: ", "))")
@@ -1248,7 +1248,15 @@ final class CardRarityTests: XCTestCase {
         // 카드 종류를 접는 칸. RR 은 홀로레어·ex·GX·V, RRR 은 VMAX·VSTAR,
         // SR 은 풀아트 두 표기, UR 은 시크릿과 하이퍼레어(둘 다 금색)다.
         let collapsesTypes: Set<CardTier> = [.doubleRare, .tripleRare, .superRare, .ultraRare]
+        // 30주년의 피카츄 레어와 RGB 뮤는 등급 칸을 따로 두지 않는다. 팩 안의 자리가 이미
+        // 갈라 놓았다 — 피카츄 레어는 다섯째 칸, RGB 뮤는 셋째 칸(`pack-odds.json`)에서만 나오고,
+        // 도감 난이도와 「한 팩에서 나올 확률」도 등급이 아니라 그 카드의 칸으로 센다.
+        let positionedApart: [CardTier: Set<String>] = [
+            .artRare: [l.rarityLabel("Pikachu Rare") ?? ""],
+            .futureUltra: [l.rarityLabel("RBG Rare") ?? ""],
+        ]
         for (tier, labels) in perTier where !collapsesTypes.contains(tier) {
+            let labels = labels.subtracting(positionedApart[tier] ?? [])
             XCTAssertEqual(labels.count, 1,
                            "\(tier.rawValue) 가 서로 다른 등급을 접고 있다 — "
                            + labels.sorted().joined(separator: ", "))

@@ -103,3 +103,66 @@ AR 을 RRR 위에 두므로 순서가 뒤집힌다.
 
 **천장(레어 칸 5연속)도 그대로 둔다.** SV 실측으로는 레어 칸의 79% 가 그냥 레어라 다섯 번
 연속 레어만 나올 확률이 31% 다 — 예전 표(45%)보다 훨씬 자주 걸린다.
+
+## 7. 세트별 실측표 (2026-10)
+
+시대 표는 그 시대의 평균 구조다. 실물은 같은 시대 안에서도 세트마다 다르다. 127세트 전부의
+영문 부스터 봉입률을 다시 조사해(대량 개봉 집계, TCGplayer 인증센터 표본, 박스 단위 YouTube
+집계, 시트 복원) 세트마다 칸 표를 따로 두었다.
+
+- 조사 결과와 출처: `plan/pull-rates/research.json` (세트마다 신뢰도, 표본 크기, 출처 URL)
+- 생성기: `scripts/build_pack_odds.py` (`plan/pull-rates/tables-before.json` 의 옛 표에서 출발)
+- 결과: `Sources/PokePackBar/Resources/pack-odds.json` (`PackOdds` 가 읽는다)
+
+한 세트는 세 가지를 바꿀 수 있다.
+
+| 항목 | 뜻 | 예 |
+|---|---|---|
+| `slots` | 칸 종류별 등급 가중치(만분율). 있으면 그 칸의 시대 표를 대신한다 | SV 의 SAR, ACE SPEC |
+| `pools` | 칸과 등급별로 뽑을 수 있는 카드를 rarity 나 ID 로 좁힌다 | HGSS Prime 은 역홀로 칸에서만 |
+| `finishes` | 칸과 등급별 판형 힌트 | DP 역홀로 칸의 홀로레어는 역홀로 판 |
+
+규칙:
+
+- 한 칸에서만 나오는 등급은 실측한 「팩에 한 장 이상」 값을 그 칸의 확률로 그대로 쓴다.
+- 레어 칸은 R, 역홀로 칸은 C/U/R 이 남는 몫을 채운다(옛 표의 비율 그대로, 실측 비율이 있으면 그것으로).
+- 실측이 없는 등급은 옛 표의 몫을 그대로 둔다.
+- 박스 토퍼와 테마덱 전용 카드는 실물 팩에 없지만 도감을 채울 수 있도록 1,000팩에 한 장으로 남긴다(ex5, ex8, ex9 시크릿, ecard1 기본 에너지).
+
+크게 움직인 것:
+
+| 세트 | 등급 | 옛 | 새 |
+|---|---|---:|---:|
+| Temporal Forces (sv5) | SAR | 1/32 | 1/85 |
+| Temporal Forces (sv5) | 하이퍼레어(UR) | 1/52 | 1/139 |
+| Temporal Forces (sv5) | ACE SPEC | 1/169 (레어 칸) | 1/20 (첫 역홀로 칸) |
+| Mega Evolution (me1) | AR | 1/13 | 1/9 |
+| Forbidden Light (sm6) 등 SM | Prism Star | 1/100 (레어 칸) | 1/8~1/18 (역홀로 칸) |
+| Shining Legends (sm35) | 빛나는 포켓몬 | 1/167 | 1/11 |
+| Cosmic Eclipse (sm12) | 캐릭터 시크릿 | 1/100 (레어 칸) | 1/10 (역홀로 칸) |
+| Vivid Voltage (swsh4) | 어메이징레어 | 1/333 | 1/18 |
+| Evolving Skies (swsh7) | 금색 시크릿 | 1/357 | 1/110 |
+| Evolutions (xy12) | 시크릿 | 1/67 (레어 칸) | 1/8 (언커먼 칸) |
+| Plasma Storm (bw7) 등 | ACE SPEC | 1/167 (레어 칸) | 1/18~1/36 (역홀로 칸) |
+| Neo Destiny (neo4) | 빛나는 포켓몬 | 1/50 | 1/12 |
+| 30th Celebration | 더블레어 | 1/2 | 1/4 |
+| 30th Celebration | Classic Collection | 1/5 | 1/10 |
+| 30th Celebration | RGB 뮤 | 1/417 | 1/3,300 |
+
+**30th Celebration 은 칸 구성을 바꿨다.** 서로 바꿔 쓸 수 있는 포일 네 칸이 아니라 실물대로
+커먼 두 칸, 커먼 대신 일러스트레어나 Classic Collection 이 들어오는 셋째 칸, 레어 대신
+더블레어, SIR, 퓨처레어가 들어오는 넷째 칸, 피카츄 레어 칸이다. 예전에는 한 팩에 더블레어가
+여러 장 나오거나 레어가 한 장도 없는 팩이 있었다. RGB 뮤는 퓨처레어와 같은 등급이라 셋째 칸
+풀에만 두어 따로 1/3,300 을 갖게 했다.
+
+**아직 옮기지 않은 것.** 판형이나 등급 칸이 따로 필요해 이번에는 두지 않았다.
+
+- 홀로레어의 역홀로 판: Legendary Collection, Expedition, EX 1~4, HGSS(Prime 과 같은 칸), Call of Legends(Shiny Legendary 와 같은 칸). 같은 칸, 같은 등급에서 판형이 둘로 갈려 지금 구조로는 하나만 고를 수 있다.
+- e-Card 와 EX 초기: 레어는 매 팩 들어 있고 홀로는 커먼 한 자리를 대신한다. 지금은 레어 칸 하나에서 고른다.
+- Legendary Collection 의 역홀로 칸(모든 팩에 한 장).
+- DP 의 빛나는 포켓몬과 Call of Legends 의 Shiny Legendary 는 카드 목록에서 R, RR 로 접혀 있다. 칸과 확률은 맞췄고(역홀로 칸), 등급 칸은 그대로다.
+- Rotom RT(pl2)와 Arceus AR(pl4)는 역홀로 칸의 R 자리를 쓰므로 두 세트의 일반 역홀로 레어는 빠졌다.
+- 표본이 작은 Double Crisis, Celebrations 는 옛 표를 유지했다. Legendary Treasures, Generations 는 이미 실측과 맞는다.
+
+**규칙 버전.** `pack-odds.json` 의 다이제스트가 서버 규칙 버전에 들어간다. 표를 바꾸면 서버
+데이터(`data/native-rules.json`)도 같은 앱 빌드로 다시 뽑아 함께 배포해야 한다.

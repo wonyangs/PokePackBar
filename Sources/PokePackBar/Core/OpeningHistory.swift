@@ -19,7 +19,7 @@ struct PackSeedGenerator: RandomNumberGenerator {
 }
 
 enum OpeningRules {
-    static let version = "english-2026-09-29-v5-physical-energy-swift6"
+    static let version = "english-2026-10-08-v6-measured-pull-rates"
     static let historyLimit = 1_000
     static func digest(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()

@@ -80,6 +80,8 @@ enum AppResources {
         if let index = CardIndex.loadBundled() {
             do { try FoilGeometry.verify(index: index) }
             catch { return "홀로 이미지 좌표 누락 또는 불일치: \(error)" }
+            do { try PackOdds.verify(index: index) }
+            catch { return "세트별 봉입률 데이터 오류: \(error)" }
         }
         guard ExpansionFoil.entries.count == 852, ExpansionFoil.parallels.count == 140 else {
             return "신규 팩 홀로 재질 목록 누락 또는 원본 이미지 불일치"

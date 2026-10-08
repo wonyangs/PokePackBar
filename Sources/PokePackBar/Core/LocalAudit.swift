@@ -16,8 +16,13 @@ enum LocalAudit {
                 || args.contains("--audit-image-library") || args.contains("--audit-foil-geometry")
                 || args.contains("--audit-confirmed-foil-fixes") || args.contains("--audit-price-snapshot")
                 || args.contains("--audit-korean-names") || args.contains("--audit-foil-optics")
-                || args.contains("--audit-reviewed-foil") || args.contains("--audit-physical-pack-cards") else { return false }
+                || args.contains("--audit-reviewed-foil") || args.contains("--audit-physical-pack-cards")
+                || args.contains("--dex-metrics") else { return false }
         guard let index = CardIndex.shared else { throw Failure(description: "Missing card index") }
+        if args.contains("--dex-metrics") {
+            try DexMetrics.run()
+            return true
+        }
         if args.contains("--export-online-catalogue") {
             let entries = index.cards.map { card in
                 ["id": card.id, "name": card.name, "name_ko": card.displayName(.ko),
@@ -198,11 +203,26 @@ enum LocalAudit {
                 try require(result.cards.filter { index.card($0.id)?.rarity == "Pikachu Rare" }.count == 1,
                             "30th must contain exactly one Pikachu Rare")
                 try require(result.cards.allSatisfy { $0.finish != .normal }, "30th contains a non-foil printing")
+                try require(result.cards.filter { $0.tier.rank > CardTier.rare.rank
+                                && index.card($0.id)?.rarity != "Pikachu Rare" }.count <= 2,
+                            "30th has more than one IR/Classic and one Rare-position hit")
                 seen.formUnion(result.cards.map(\.id))
             }
-            try require(index.cards.filter { $0.setID == "cel30" }.allSatisfy { seen.contains($0.id) },
+            // RGB Mew is about 1 in 3,300 packs, so a sample cannot prove it is reachable.
+            // Every card must instead sit in some position's pool with a positive weight.
+            let recipe = PackRecipe.forSet("cel30", era: .scarletViolet)
+            var reachable = Set<String>()
+            for (slot, table) in zip(recipe.slots, PackConfig.slotTables(setID: "cel30", era: .scarletViolet)) {
+                let slotPool = PackOpening.slotPool(setID: "cel30", slot: slot.kind,
+                                                    pool: index.pools["cel30"] ?? [:], index: index)
+                for entry in table.weights where entry.weight > 0 {
+                    reachable.formUnion(slotPool[entry.tier] ?? [])
+                }
+            }
+            try require(seen.isSubset(of: reachable)
+                        && index.cards.filter { $0.setID == "cel30" }.allSatisfy { reachable.contains($0.id) },
                         "30th checklist has unreachable cards")
-            let megaAttack = PackOpening.slotPool(setID: "me2pt5", slot: .reverseHoloHit,
+            let megaAttack = PackOpening.slotPool(setID: "me2pt5", slot: .rare,
                 pool: index.pools["me2pt5"] ?? [:], index: index)[.megaAttack] ?? []
             try require(megaAttack.count == 7 && PackConfig.slotTables(setID: "me2pt5", era: .scarletViolet)
                 .contains { $0.weights.contains { $0.tier == .megaAttack && $0.weight > 0 } }, "Mega Attack cannot be drawn")

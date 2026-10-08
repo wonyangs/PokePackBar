@@ -59,7 +59,8 @@ enum ServerRulesBridge {
     static var version: String {
         let dexData = AppResources.bundle?.url(forResource: "dex", withExtension: "json")
             .flatMap { try? Data(contentsOf: $0) } ?? Data()
-        let inputs = [OpeningRules.version, OpeningRules.catalogueDigest, OpeningRules.digest(dexData)]
+        let inputs = [OpeningRules.version, OpeningRules.catalogueDigest, OpeningRules.digest(dexData),
+                      PackOdds.digest]
         return "ppb-server-v2/" + OpeningRules.digest(Data(inputs.joined(separator: "/").utf8))
     }
 

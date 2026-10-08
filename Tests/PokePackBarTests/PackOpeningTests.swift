@@ -1411,13 +1411,38 @@ final class PackOddsTests: XCTestCase {
             let tables = PackConfig.slotTables(setID: setID, era: index.era(setID))
             var standardCounts: [CardTier: Double] = [:]
 
+            // Both reverse positions can turn into a Poké Ball / Master Ball mirror of a
+            // C/U/R card; the mirror replaces the slot's ordinary table for that share.
+            var printingValue = 0.0
             for (slot, table) in zip(recipe.slots, tables) {
                 let available = table.weights.filter { !(pool[$0.tier] ?? []).isEmpty }
                 let total = available.reduce(0) { $0 + $1.weight }
                 XCTAssertGreaterThan(total, 0, "\(setID) \(slot.kind)")
+                let mirror = Double(PackRecipe.observedParallelHits(setID: setID, slot: slot.kind) ?? 0)
+                    / Double(PackRecipe.prismaticParallelRolls)
+                let slotPool = PackOpening.slotPool(setID: setID, slot: slot.kind, pool: pool, index: index)
                 for entry in available {
-                    standardCounts[entry.tier, default: 0] += Double(slot.count)
-                        * Double(entry.weight) / Double(total)
+                    let share = Double(slot.count) * Double(entry.weight) / Double(total) * (1 - mirror)
+                    standardCounts[entry.tier, default: 0] += share
+                    let hint = PackOpening.finishHint(setID: setID, slot: slot.kind,
+                                                      tier: entry.tier, era: index.era(setID))
+                    let ids = slotPool[entry.tier] ?? []
+                    let mean = ids.reduce(0.0) { sum, id in
+                        sum + MarketEconomy.usd(PackSlotResult(card: PulledCard(id: id, tier: entry.tier, isNew: false),
+                                                               finishHint: hint).printing(setID: setID, index: index),
+                                                prices: prices)
+                    } / Double(ids.count)
+                    printingValue += share * (1 - chance) * mean
+                }
+                guard mirror > 0 else { continue }
+                let candidates = PackOpening.prismaticParallelCandidates(
+                    setID: setID, pool: pool, masterBallOnly: slot.kind == .reverseHoloHit)
+                let finish: CardFinish = slot.kind == .reverseHoloHit ? .masterBall : .pokeBall
+                for candidate in candidates {
+                    let share = Double(slot.count) * mirror / Double(candidates.count)
+                    standardCounts[candidate.tier, default: 0] += share
+                    printingValue += share * (1 - chance)
+                        * MarketEconomy.usd(cardID: candidate.id, finish: finish, prices: prices)
                 }
             }
 
@@ -1434,14 +1459,20 @@ final class PackOddsTests: XCTestCase {
                                "\(setID) \(tier)")
             }
 
-            let valueFromDisclosedOdds = odds.reduce(0.0) { total, entry in
-                total + entry.value * 10
-                    * MarketEconomy.meanUSD(setID: setID, tier: entry.key,
-                                            index: index, prices: prices)
+            // The God Pack draws nine IRs and one SIR from the set's own pools.
+            for request in PackRecipe.blackBoltWhiteFlareGodPack {
+                let ids = pool[request.tier] ?? []
+                printingValue += chance * ids.reduce(0.0) { sum, id in
+                    sum + MarketEconomy.usd(PackSlotResult(card: PulledCard(id: id, tier: request.tier, isNew: false),
+                                                           finishHint: request.finishHint).printing(setID: setID, index: index),
+                                            prices: prices)
+                } / Double(ids.count)
             }
+            // Pricing splits this into tier averages plus a printing correction. Summing every
+            // printing directly must land on the same number.
             XCTAssertEqual(MarketEconomy.packValueUSD(setID: setID, index: index,
                                                        prices: prices),
-                           valueFromDisclosedOdds, accuracy: 0.000_001, setID)
+                           printingValue, accuracy: 0.000_001, setID)
         }
     }
 
@@ -1481,20 +1512,33 @@ final class PackOddsTests: XCTestCase {
             let pool = index.pools[set.id] ?? [:]
             guard !(pool[.common] ?? []).isEmpty else { continue }   // 특별 세트는 전 칸이 레어 이상
 
+            // 한 등급만 나오는 고정 칸(30주년의 피카츄 레어 칸)은 표 오타가 아니라 구성이다.
+            let recipe = PackRecipe.forSet(set.id, era: index.era(set.id))
+            let cardCount = Double(PackPricing.cardCount(setID: set.id, index: index))
+            var guaranteed: [CardTier: Double] = [:]
+            for (slot, table) in zip(recipe.slots, PackConfig.slotTables(setID: set.id, era: index.era(set.id)))
+            where table.weights.count == 1 {
+                guaranteed[table.weights[0].tier, default: 0] += Double(slot.count) / cardCount
+            }
+
             let common = odds[.common] ?? 0
             let uncommon = odds[.uncommon] ?? 0
             let rareOrBetter = odds
                 .filter { $0.key.rank >= CardTier.rare.rank }
-                .reduce(0) { $0 + $1.value }
+                .reduce(0) { $0 + $1.value - (guaranteed[$1.key] ?? 0) }
             XCTAssertGreaterThan(common, uncommon, "\(set.id): 커먼이 언커먼보다 드물다")
-            XCTAssertGreaterThan(uncommon, rareOrBetter, "\(set.id): 언커먼이 레어 이상보다 드물다")
+            // 30주년 팩에는 언커먼이 없다.
+            if !(pool[.uncommon] ?? []).isEmpty {
+                XCTAssertGreaterThan(uncommon, rareOrBetter, "\(set.id): 언커먼이 레어 이상보다 드물다")
+            }
 
             // 일반 9~10장 팩에서는 레어보다 위 등급이 어느 것도 10%를 넘지 않는다.
             // Double Crisis는 7장 중 한 장이 Holo 이상으로 고정된 미니팩이라 예외다.
             for (tier, p) in odds where tier.rank > CardTier.rare.rank {
                 let ceiling = set.id == "dc1" ? 0.20 : 0.10
-                XCTAssertLessThan(p, ceiling,
-                                  "\(set.id): \(tier.rawValue) 가 \(p) 로 너무 흔하다")
+                let drawn = p - (guaranteed[tier] ?? 0)
+                XCTAssertLessThan(drawn, ceiling,
+                                  "\(set.id): \(tier.rawValue) 가 \(drawn) 로 너무 흔하다")
             }
         }
     }
@@ -1578,17 +1622,21 @@ final class CardSaleTests: XCTestCase {
     /// 낮게 나왔다. 실제로 열고 파는 값은 설계대로다.
     ///
     /// 전 세트를 뽑아 보면 디버그 빌드에서 10분이 넘게 걸린다. 시대마다 판 구성이 다른 세트를
-    /// 골라 잰다(WotC, e카드, EX, XY, 소드실드, 프리즘 병렬, 스칼렛바이올렛, 30주년). 허용
-    /// 오차 3%p 는 5,000팩 표본 오차를 덮는 폭이다. 전 세트가 팔아서 손해인지는
-    /// `testGrindingAPackNeverPaysForItself` 가 따로 지킨다.
+    /// 골라 잰다(WotC, e카드, EX, XY, 소드실드, 프리즘 병렬, 스칼렛바이올렛, 30주년). 전 세트가
+    /// 팔아서 손해인지는 `testGrindingAPackNeverPaysForItself` 가 따로 지킨다.
+    ///
+    /// 허용 오차는 3%p 와 표본 오차 네 배 중 큰 쪽이다. 값이 몇 장에 몰린 세트는 5,000팩으로도
+    /// 표본이 크게 흔들린다 — sv8pt5 는 SIR 한 장이 1,400달러라 시드만 바꿔도 24~37% 가 나온다
+    /// (열 시드 평균 29.9%). 고정 폭으로 두면 시드 하나의 운을 검사하게 된다.
     func testGrindRatioMatchesTheMargin() throws {
         let index = try XCTUnwrap(CardIndex.loadBundled())
         let prices = try XCTUnwrap(CardPrices.loadBundled())
         let want = 1 / MarketEconomy.packMargin
         for setID in ["base1", "ecard1", "ex1", "xy1", "swsh1", "sv8pt5", "sv10", "cel30"] {
             XCTAssertNotNil(index.set(setID), "\(setID) 가 카탈로그에서 빠졌다")
-            let ratio = Self.simulatedSellBackRatio(setID, index: index, prices: prices, packs: 5_000)
-            XCTAssertEqual(ratio, want, accuracy: 0.03, "\(setID) 회수율이 설계와 다르다")
+            let sample = Self.simulatedSellBack(setID, index: index, prices: prices, packs: 5_000)
+            XCTAssertEqual(sample.ratio, want, accuracy: max(0.03, 4 * sample.standardError),
+                           "\(setID) 회수율이 설계와 다르다")
         }
     }
 
@@ -1596,32 +1644,44 @@ final class CardSaleTests: XCTestCase {
     /// 시드를 고정해 매번 같은 값이 나온다.
     static func simulatedSellBackRatio(_ setID: String, index: CardIndex, prices: CardPrices,
                                        packs: Int) -> Double {
+        simulatedSellBack(setID, index: index, prices: prices, packs: packs).ratio
+    }
+
+    /// 비율과 그 표본 오차(팩마다 판 값의 표준오차를 팩값으로 나눈 것).
+    static func simulatedSellBack(_ setID: String, index: CardIndex, prices: CardPrices,
+                                  packs: Int) -> (ratio: Double, standardError: Double) {
         var generator = SeededGenerator(seed: 7)
-        var total = 0.0
+        var total = 0.0, squares = 0.0
         for _ in 0..<packs {
+            var pack = 0.0
             for card in PackOpening.draw(setID: setID, index: index, alreadyOwned: [], using: &generator)
             where !card.isSupplementalEnergy {
-                total += Double(CardSale.price(cardID: card.id, finish: card.finish, prices: prices))
+                pack += Double(CardSale.price(cardID: card.id, finish: card.finish, prices: prices))
             }
+            total += pack
+            squares += pack * pack
         }
-        let price = PackPricing.price(setID: setID, index: index, prices: prices,
-                                      marketPrices: nil, perks: .none)
-        return total / Double(packs) / Double(price)
+        let price = Double(PackPricing.price(setID: setID, index: index, prices: prices,
+                                             marketPrices: nil, perks: .none))
+        let mean = total / Double(packs)
+        let variance = max(0, squares / Double(packs) - mean * mean)
+        return (mean / price, (variance / Double(packs)).squareRoot() / price)
     }
 
     /// 팩 하나를 사서 전부 갈았을 때 돌아오는 비율.
+    ///
+    /// 카드마다 실제로 나오는 칸으로 나눈 기대 장수(`cardPullRates`)에 그 카드의 환급을 곱한다.
+    /// 등급 평균으로 세면 같은 등급 안에서 칸이 다른 카드를 똑같이 나눠 버린다 — 30주년의
+    /// RGB 뮤(4,000달러, 3,300팩에 한 장)가 퓨처레어와 같은 비율로 섞여 환급이 팩값의 69%로 나온다.
     static func sellBackRatio(_ setID: String, index: CardIndex, prices: CardPrices,
                               perks: DexPerks,
                               marketPrices: PackMarketPrices? = PackMarketPrices.shared) -> Double {
-        let cards = Double(PackPricing.cardCount(setID: setID, index: index, perks: perks))
-        let dust = PackOpening.packOdds(setID: setID, index: index, perks: perks)
-            .reduce(0.0) { running, odds in
-                let ids = index.pools[setID]?[odds.tier] ?? []
-                guard !ids.isEmpty else { return running }
-                let mean = ids.reduce(0.0) {
-                    $0 + Double(CardSale.price(cardID: $1, prices: prices, perks: perks))
-                } / Double(ids.count)
-                return running + odds.probability * cards * mean
+        let scale = Double(PackPricing.cardCount(setID: setID, index: index, perks: perks))
+            / Double(PackPricing.cardCount(setID: setID, index: index))
+        let dust = PackOpening.cardPullRates(setID: setID, index: index, perks: perks)
+            .reduce(0.0) { running, entry in
+                running + entry.value * scale
+                    * Double(CardSale.price(cardID: entry.key, prices: prices, perks: perks))
             }
         return dust / Double(PackPricing.price(setID: setID, index: index,
                                                prices: prices, marketPrices: marketPrices,

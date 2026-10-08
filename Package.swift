@@ -25,6 +25,7 @@ let package = Package(
                 .process("Resources/reviewed-foil.json"),
                 .process("Resources/cracked-ice-facets.json"),
                 .process("Resources/catalogue-sources.json"),
+                .process("Resources/pack-odds.json"),
             ],
             linkerSettings: [.linkedLibrary("sqlite3")]
         ),

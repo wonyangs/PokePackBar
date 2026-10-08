@@ -324,6 +324,10 @@ enum PackConfig {
     private static func slotTables(recipe: PackRecipe, setID: String?, era: PackEra)
         -> [(weights: [(tier: CardTier, weight: Int)], count: Int)] {
         recipe.slots.map { slot in
+            // 세트별 실측값이 있으면 시대 표보다 앞선다.
+            if let setID, let measured = PackOdds.weights(setID: setID, slot: slot.kind) {
+                return (weights: measured, count: slot.count)
+            }
             let weights: [(tier: CardTier, weight: Int)]
             switch slot.kind {
             case .energy:
@@ -459,12 +463,10 @@ enum PackConfig {
         (.blackWhiteRare, 10), (.megaAttack, 10), (.megaUltraRare, 10), (.futureUltra, 10),
     ]
 
-    /// Official composition: five foil cards, including exactly one Pikachu
-    /// Rare, plus a foil Energy. The remaining sheet ratios are unpublished;
-    /// these conservative simulator weights are not empirical pull-rate claims.
+    /// 30th Celebration positions 1–2 are foil Commons. Positions 3 and 4 and their
+    /// measured rates live in `pack-odds.json` like every other measured set.
     static let anniversaryFoilWeights: [(tier: CardTier, weight: Int)] = [
-        (.common, 4500), (.rare, 3000), (.doubleRare, 1400),
-        (.characterRare, 600), (.artRare, 300), (.specialArtRare, 190), (.futureUltra, 10),
+        (.common, 10_000),
     ]
 
     /// 레어 이상 칸 수. 도감 혜택으로 늘어나지 않는다 — 팩 장수를 바꾸는 혜택은 없앴다.
@@ -895,6 +897,16 @@ enum PackOpening {
         pool: [CardTier: [String]],
         index: CardIndex? = nil
     ) -> [CardTier: [String]] {
+        PackOdds.restrict(physicalSlotPool(setID: setID, slot: slot, pool: pool, index: index),
+                          setID: setID, slot: slot, index: index)
+    }
+
+    private static func physicalSlotPool(
+        setID: String,
+        slot: PackSlotKind,
+        pool: [CardTier: [String]],
+        index: CardIndex?
+    ) -> [CardTier: [String]] {
         if setID == "cel30", let index {
             return pool.mapValues { ids in
                 ids.filter { id in
@@ -1002,6 +1014,7 @@ enum PackOpening {
     ) -> Bool {
         usesConstrainedSlotPool(setID: setID)
             || usesEXReverseRareHoloPool(setID: setID, slot: slot)
+            || PackOdds.poolRules(setID: setID, slot: slot) != nil
     }
 
     private static func usesEXReverseRareHoloPool(
@@ -1080,6 +1093,9 @@ enum PackOpening {
 
     static func finishHint(setID: String, slot: PackSlotKind, tier: CardTier,
                            era: PackEra) -> PackFinishHint {
+        if let measured = PackOdds.finishHint(setID: setID, slot: slot, tier: tier) {
+            return measured
+        }
         switch slot {
         case .energy, .common, .uncommon:
             return .normal
@@ -1223,6 +1239,90 @@ enum PackOpening {
             .sorted { $0.tier.rank > $1.tier.rank }
     }
 
+    /// 카드 한 장이 팩 하나에 들어 있는 기대 장수.
+    ///
+    /// `packOdds` 는 등급 단위 공시라 같은 등급의 카드를 똑같이 나눠 갖는다고 본다. 세트별
+    /// 실측표는 같은 등급 안에서도 칸을 가른다 — HGSS 의 Prime 은 역홀로 칸에서 여섯 팩에 한
+    /// 장, 30주년의 RGB 뮤는 3,300팩에 한 장이다. 도감 난이도와 「한 팩에서 나올 확률」은
+    /// 카드 단위라, 칸마다 실제로 뽑히는 풀로 나눠 센다.
+    static func cardPullRates(setID: String, index: CardIndex,
+                              perks: DexPerks = .none) -> [String: Double] {
+        let pool = index.pools[setID] ?? [:]
+        guard !pool.isEmpty else { return [:] }
+        let era = index.era(setID)
+        let recipe = PackRecipe.forSet(setID, era: era)
+        var rates: [String: Double] = [:]
+
+        func spread(_ weights: [(tier: CardTier, weight: Int)], slots: Double,
+                    availablePool: [CardTier: [String]]) {
+            let available = weights.filter { !(availablePool[$0.tier] ?? []).isEmpty }
+            let total = available.reduce(0) { $0 + $1.weight }
+            guard total > 0, slots > 0 else { return }
+            for entry in available {
+                let ids = availablePool[entry.tier] ?? []
+                let each = Double(entry.weight) / Double(total) * slots / Double(ids.count)
+                for id in ids { rates[id, default: 0] += each }
+            }
+        }
+
+        let tables = PackConfig.slotTables(setID: setID, era: era)
+        for (slot, table) in zip(recipe.slots, tables) {
+            let slots = Double(slot.count) * recipe.standardShare(for: slot.kind)
+            let availablePool = slotPool(setID: setID, slot: slot.kind, pool: pool, index: index)
+            let weights = slot.kind == .radiantCollectionHigh
+                ? table.weights
+                : PackConfig.weights(table.weights, perks: perks)
+            if let hits = PackRecipe.observedParallelHits(setID: setID, slot: slot.kind) {
+                let candidates = prismaticParallelCandidates(
+                    setID: setID, pool: pool, masterBallOnly: slot.kind == .reverseHoloHit)
+                if !candidates.isEmpty {
+                    let chance = Double(hits) / Double(PackRecipe.prismaticParallelRolls)
+                    spread(weights, slots: slots * (1 - chance), availablePool: availablePool)
+                    for candidate in candidates {
+                        rates[candidate.id, default: 0] += slots * chance / Double(candidates.count)
+                    }
+                    continue
+                }
+            }
+            spread(weights, slots: slots, availablePool: availablePool)
+        }
+
+        let specialChance = recipe.specialVariant.map {
+            1.0 / Double($0.estimatedSimulatorOneIn)
+        } ?? 0
+        func add(_ request: PackCardRequest, share: Double) {
+            if let id = request.exactCardID, index.card(id)?.setID == setID {
+                rates[id, default: 0] += share
+                return
+            }
+            guard let tier = request.tier.fallbackChain.first(where: { !(pool[$0] ?? []).isEmpty }),
+                  let ids = pool[tier] else { return }
+            for id in ids { rates[id, default: 0] += share / Double(ids.count) }
+        }
+        switch recipe.specialVariant?.variant {
+        case .scarletViolet151Demigod:
+            for request in PackRecipe.scarletViolet151Lines.flatMap({ $0 }) {
+                add(request, share: specialChance / Double(PackRecipe.scarletViolet151Lines.count))
+            }
+        case .prismaticEvolutionsGod:
+            for request in PackRecipe.prismaticEvolutionsGodPack {
+                add(request, share: specialChance)
+            }
+            add(PackCardRequest(tier: .specialArtRare), share: specialChance * 3)
+        case .blackBoltWhiteFlareGod:
+            for request in PackRecipe.blackBoltWhiteFlareGodPack {
+                add(request, share: specialChance)
+            }
+        case .ascendedHeroesGod:
+            for request in PackRecipe.ascendedHeroesGodPack {
+                add(request, share: specialChance)
+            }
+        case .standard, .celebrations, .prismaticEvolutionsDemigod, nil:
+            break
+        }
+        return rates
+    }
+
     /// 그 시대 팩의 칸 표. 뽑기·기대 구성·공시가 모두 이 하나를 본다 —
     /// 세 곳에 따로 적으면 표시된 확률과 실제 결과가 갈라진다.
     static func standardSlotTables(era: PackEra, perks: DexPerks)
@@ -1266,10 +1366,13 @@ enum PackOpening {
     /// 히트 슬롯만의 등급 분포. 뽑기 내부와 상세 표시가 같은 값을 쓰도록 남겨 둔다.
     static func hitOdds(setID: String, index: CardIndex) -> [(tier: CardTier, probability: Double)] {
         let pool = index.pools[setID] ?? [:]
-        let recipe = PackRecipe.forSet(setID, era: index.era(setID))
+        let era = index.era(setID)
+        let recipe = PackRecipe.forSet(setID, era: era)
+        let rareSlot = zip(recipe.slots, PackConfig.slotTables(setID: setID, era: era))
+            .first { $0.0.kind == .rare }?.1.weights
         let weights = recipe.baseVariant == .celebrations
             ? PackConfig.specialWeights
-            : PackConfig.rareWeights(index.era(setID))
+            : rareSlot ?? PackConfig.rareWeights(era)
         let available = weights.filter { !(pool[$0.tier] ?? []).isEmpty }
         let total = available.reduce(0) { $0 + $1.weight }
         guard total > 0 else { return [] }

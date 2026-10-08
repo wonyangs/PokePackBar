@@ -87,14 +87,14 @@ final class CardSubsetTests: XCTestCase {
         }
 
         XCTAssertEqual(perPack("sm115", .shiny), 0.212, accuracy: 0.0001)
-        XCTAssertEqual(perPack("sm115", .shinyUltra), 0.1462, accuracy: 0.0001)
-        XCTAssertEqual(perPack("swsh45", .shiny), 0.25, accuracy: 0.0001)
+        XCTAssertEqual(perPack("sm115", .shinyUltra), 0.1222, accuracy: 0.0001)
+        XCTAssertEqual(perPack("swsh45", .shiny), 0.2273, accuracy: 0.0001)
         XCTAssertEqual(perPack("swsh9", .characterRare), 0.1806, accuracy: 0.0001)
         XCTAssertEqual(perPack("swsh10", .characterRare), 0.1258, accuracy: 0.0001)
         XCTAssertEqual(perPack("swsh11", .characterRare), 0.1231, accuracy: 0.0001)
         XCTAssertEqual(perPack("swsh12", .characterRare), 0.1223, accuracy: 0.0001)
-        XCTAssertEqual(perPack("swsh12pt5", .artRare), 0.222, accuracy: 0.0001)
-        XCTAssertEqual(perPack("swsh12pt5", .specialArtRare), 0.127, accuracy: 0.0001)
+        XCTAssertEqual(perPack("swsh12pt5", .artRare), 0.224, accuracy: 0.0001)
+        XCTAssertEqual(perPack("swsh12pt5", .specialArtRare), 0.128, accuracy: 0.0001)
         XCTAssertEqual(perPack("cel25", .characterRare), 0.40, accuracy: 0.0001)
     }
 
