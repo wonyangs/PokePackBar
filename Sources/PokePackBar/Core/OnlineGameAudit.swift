@@ -216,7 +216,13 @@ enum OnlineGameAudit {
         try LocalAudit.require(first.reservedPrintings.isEmpty, "Completed trade retained reservation")
         let binderChecked = try await binderAndCounter(first: first, buyer: buyer, friend: profile.string("public_id"),
                                                        read: read, mutate: mutate)
-        let listing = try await mutate(buyer, "market/listings", ["action": "listing_create", "printing": offered, "quantity": 1, "unit_tokens": 123])
+        // Counter-offers may consume the original offered spare. Choose from the
+        // current authoritative stock, not the pre-trade fixture inventory.
+        let listingStock = try await read(buyer, "inventory?limit=100")["items"] as? [[String: Any]] ?? []
+        guard let listingPrinting = fixtureListingPrinting(stock: listingStock, preferred: offered) else {
+            throw LocalAudit.Failure(description: "No remaining spare for marketplace fixture")
+        }
+        let listing = try await mutate(buyer, "market/listings", ["action": "listing_create", "printing": listingPrinting, "quantity": 1, "unit_tokens": 123])
         let listingID = (listing["result"] as? [String: Any])?.string("id") ?? ""
         await first.synchronize()
         let body = try JSONSerialization.data(withJSONObject: ["action": "listing_buy", "target_id": listingID,
@@ -234,5 +240,10 @@ enum OnlineGameAudit {
         try LocalAudit.require(final.int("marketSpentTokens") == 123, "Marketplace debit duplicated")
         let binderNote = binderChecked ? "trade binder, counter-offer" : "trade binder and counter-offer skipped (server without them)"
         print("PASS native commerce: friend approval, printing reservations, trade acceptance, \(binderNote), marketplace purchase, durable receipt replay, no double debit")
+    }
+
+    static func fixtureListingPrinting(stock: [[String: Any]], preferred: String) -> String? {
+        let available = stock.filter { $0.int("available") >= 1 }
+        return (available.first { $0.string("printing") == preferred } ?? available.first)?.string("printing")
     }
 }

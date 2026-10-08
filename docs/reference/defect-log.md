@@ -793,3 +793,20 @@ read_when:
   Cosmos circles/legacy diffraction bars, exact factory emboss plates and reference-limited
   new treatments. The five-iteration visual budget stops without claiming
   those issues were resolved. No masks, artwork, prices, pack logic or save schema changed.
+
+### Post-counter-offer marketplace audit fixture (0.15.0)
+
+- Root cause: the commerce audit cached an offered printing before trading,
+  then listed it after a counter-offer could transfer its last spare back. A
+  random opening sometimes supplied extra copies, hiding the invalid fixture.
+- Existing tests verified trade/counter-offer behaviour separately, not the
+  subsequent listing's available quantity. The runtime correctly rejected the
+  fixture with `not_enough_duplicate_printings`; no wallet bug was found.
+- The audit now refetches authoritative inventory after counter-offers and
+  chooses a printing with `available >= 1`. Other audit selections were swept:
+  trade and counter-offer inputs already check fresh available counts.
+- Regression: `OnlineAuditFixtureTests` covers an exhausted original printing,
+  an available preferred printing and no remaining spare. Package online audits
+  exercise the actual ordered trade/counter-offer/listing/replay flow.
+  Reintroducing the stale preferred-printing selection makes the regression
+  fail; after reverting it, all seven targeted fixture/release-note tests pass.

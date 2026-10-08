@@ -73,6 +73,22 @@ brew upgrade --cask poke-pack-bar
 ![계정 연결 화면](docs/reference/screenshots/account-connection.png)
 ![대량 개봉 작업 화면](docs/reference/screenshots/online-jobs.png)
 
+## 0.15.0
+
+팩 윗부분을 밀어 뜯는 연출, 팩 검색과 키보드 조작을 추가했다. 누적 개봉 수로
+트레이너 레벨이 올라가며 팩·쿠폰·칭호를 받을 수 있다. 로테이션 마켓은 매일
+한국 시간 오전 9시에 8장을 갱신한다. 친구의 교환 가능한 카드에서 제안하고
+역제안으로 답할 수 있다.
+
+운영 서버는 이메일과 비밀번호로 공개 가입할 수 있다. 연결 코드는 기존 계정이나
+운영자가 미리 만든 계정을 연결할 때만 사용한다. 이메일 인증은 아직 지원하지 않는다.
+
+세트별 실측 봉입률과 도감 보상도 갱신했다. 서버와 규칙 버전이 바뀌므로
+온라인 사용자는 0.15.0으로 업데이트해야 한다. 기존 재화·카드·수령한 보상은 유지한다.
+
+![팩 뜯기 화면](docs/reference/screenshots/pack-tear-015-ko.png)
+![트레이너 레벨 화면](docs/reference/screenshots/trainer-level-015-ko.png)
+
 ## 0.14.0
 
 가입 화면에서 초대 코드와 기존 계정 연결의 용도를 설명하고, 붙여 넣은 코드의

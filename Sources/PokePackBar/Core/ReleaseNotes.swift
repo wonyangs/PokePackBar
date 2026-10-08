@@ -56,6 +56,32 @@ extension L {
 
     var releaseNotes: [ReleaseNote] {
         [
+            ReleaseNote(version: "0.15.0", lines: [
+                t("팩 뜯기 연출, 팩 검색과 키보드 조작을 추가했습니다.",
+                  "Added pack tearing, pack search and keyboard controls.",
+                  "パック開封演出、パック検索、キーボード操作を追加しました。",
+                  "Añadimos apertura de sobres, búsqueda y controles de teclado.",
+                  "Ajout de l’ouverture des boosters, de la recherche et des commandes clavier.",
+                  "Adicionamos abertura de pacotes, busca e controles de teclado."),
+                t("누적 개봉 수에 따른 트레이너 레벨·보상·칭호와 매일 바뀌는 8장 마켓을 추가했습니다.",
+                  "Added trainer levels, rewards and titles based on lifetime openings, plus an eight-card daily market.",
+                  "累計開封数によるトレーナーレベル、報酬、称号と、毎日更新される8枚のマーケットを追加しました。",
+                  "Añadimos niveles, recompensas y títulos por sobres abiertos, y un mercado diario de ocho cartas.",
+                  "Ajout de niveaux, récompenses et titres selon les ouvertures, et d’un marché quotidien de huit cartes.",
+                  "Adicionamos níveis, recompensas e títulos por pacotes abertos, e um mercado diário de oito cartas."),
+                t("친구가 교환할 수 있는 카드에서 제안하고 역제안으로 답할 수 있습니다.",
+                  "Choose tradeable cards from a friend’s binder and answer with counter-offers.",
+                  "フレンドの交換可能カードから提案し、対案で返信できます。",
+                  "Elige cartas intercambiables de tus amigos y responde con contraofertas.",
+                  "Choisissez les cartes échangeables d’un ami et répondez par une contre-offre.",
+                  "Escolha cartas disponíveis dos amigos e responda com contrapropostas."),
+                t("세트별 실측 봉입률과 도감 보상을 갱신했습니다. 온라인 플레이에는 앱 업데이트가 필요합니다.",
+                  "Updated measured set-specific pull rates and dex rewards. Update the app to continue online play.",
+                  "セットごとの実測封入率と図鑑報酬を更新しました。オンラインプレイにはアプリ更新が必要です。",
+                  "Actualizamos tasas medidas por colección y recompensas. Actualiza la app para jugar en línea.",
+                  "Mise à jour des taux mesurés et des récompenses du Pokédex. Mettez l’app à jour pour jouer en ligne.",
+                  "Atualizamos taxas medidas por coleção e recompensas. Atualize o app para jogar online.")
+            ]),
             ReleaseNote(version: "0.14.0", lines: [
                 t("가입과 기존 계정 연결을 구분해 안내합니다. 초대 코드는 선택 사항이며, 붙여 넣은 코드 앞뒤의 공백을 제거합니다. 초대제 서버에는 필요한 코드를 안내합니다.",
                   "Clarified sign-up versus existing-account linking. Invitation codes are optional, pasted whitespace is trimmed, and invite-only servers show actionable code guidance.",
