@@ -9,7 +9,18 @@ BUILD_DIR="build"
 # 원본과 겹치면 로그인 항목·Keychain ACL·LaunchServices 상태가 섞인다.
 # 공개 배포 전에 본인 도메인으로 바꾼다.
 BUNDLE_ID="dev.local.pokepackbar"
-APP="$BUILD_DIR/$APP_NAME.app"
+CHANNEL="stable"
+DATA_NAME=""
+# PPB_APP_VARIANT=dev 는 정식 앱 옆에 함께 띄우는 개발용 앱을 만든다. 번들 ID 가 달라 같은 앱
+# 두 번 실행 막기에 걸리지 않고, 로그인 계정(앱 설정)과 세이브, 로그를 따로 쓴다. 업데이트 확인은
+# 꺼진다. 실행 파일 이름은 같아서 아래 설치 단계는 경로로 프로세스를 찾는다.
+if [[ "${PPB_APP_VARIANT:-}" == "dev" ]]; then
+    BUNDLE_ID="dev.local.pokepackbar.dev"
+    CHANNEL="dev"
+    DATA_NAME="PokePackBar Dev"
+fi
+DISPLAY_NAME="${DATA_NAME:-$APP_NAME}"
+APP="$BUILD_DIR/$DISPLAY_NAME.app"
 
 echo "==> swift build -c release"
 python3 -m unittest discover -s scripts -p 'test_update_printing_prices.py'
@@ -59,12 +70,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
-    <key>CFBundleName</key><string>$APP_NAME</string>
+    <key>CFBundleName</key><string>$DISPLAY_NAME</string>
     <key>CFBundleExecutable</key><string>$APP_NAME</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
     <key>CFBundleVersion</key><string>$VERSION</string>
-    <key>PPBBuildChannel</key><string>stable</string>
+    <key>PPBBuildChannel</key><string>$CHANNEL</string>${DATA_NAME:+
+    <key>PPBDataName</key><string>$DATA_NAME</string>}
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>LSUIElement</key><true/>
@@ -85,7 +97,7 @@ cat > "$APP/Contents/Library/LaunchAgents/$BUNDLE_ID.login.plist" <<AGENT
     <key>Label</key><string>$BUNDLE_ID.login</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Applications/$APP_NAME.app/Contents/MacOS/$APP_NAME</string>
+        <string>/Applications/$DISPLAY_NAME.app/Contents/MacOS/$APP_NAME</string>
     </array>
     <key>RunAtLoad</key><true/>
     <key>KeepAlive</key>
@@ -191,8 +203,9 @@ if [[ "${PPB_SKIP_INSTALL:-0}" == "1" ]]; then
 fi
 
 echo "==> 기존 인스턴스 종료 + /Applications 설치"
-pkill -x "$APP_NAME" 2>/dev/null || true
-rm -rf "/Applications/$APP_NAME.app"
+# 실행 파일 이름은 정식 앱과 개발용 앱이 같다. 이름으로 찾으면 다른 쪽까지 끈다.
+pkill -f "/Applications/$DISPLAY_NAME.app/Contents/MacOS/$APP_NAME" 2>/dev/null || true
+rm -rf "/Applications/$DISPLAY_NAME.app"
 cp -R "$APP" /Applications/
 
-echo "완료: open /Applications/$APP_NAME.app"
+echo "완료: open \"/Applications/$DISPLAY_NAME.app\""

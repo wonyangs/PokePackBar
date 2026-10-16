@@ -20,9 +20,7 @@ final class PriceSnapshotStore: @unchecked Sendable {
     var usesImportedSnapshot: Bool { lock.withLock { snapshot != nil } }
 
     init(url: URL? = nil) {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PokePackBar")
-        self.url = url ?? dir.appendingPathComponent("price-snapshot.json")
+        self.url = url ?? AppEnv.supportDirectory.appendingPathComponent("price-snapshot.json")
         // Online previews and the server evaluator must use the same bundled
         // prices. Never inherit the host user's private imported snapshot.
         let environment = ProcessInfo.processInfo.environment

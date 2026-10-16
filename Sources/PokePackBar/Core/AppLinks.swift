@@ -11,7 +11,14 @@ import Foundation
 enum AppLinks {
     /// Official Homebrew/GitHub release channel.
     static let isCustomBuild = false
-    static let updateChannel = "stable"
+    static var updateChannel: String { isDevApp ? "dev" : "stable" }
+
+    /// 정식 앱 옆에 함께 띄우는 개발용 앱인가(`PPB_APP_VARIANT=dev ./scripts/build-app.sh`).
+    /// 이 앱은 업데이트를 확인하지 않는다. brew 업그레이드는 정식 앱을 바꾸므로, 개발용 앱에서
+    /// 업데이트를 누르면 엉뚱한 앱이 바뀐다.
+    static var isDevApp: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "PPBBuildChannel") as? String == "dev"
+    }
 
     /// GitHub 저장소 `소유자/이름`. 릴리스 확인과 설정의 저장소 링크가 이 값을 쓴다.
     static let githubRepo: String? = "wonyangs/PokePackBar"
@@ -39,5 +46,5 @@ enum AppLinks {
     }
 
     /// 업데이트 확인이 가능한 상태인가. 저장소가 정해져야 켜진다.
-    static var updatesConfigured: Bool { !isCustomBuild && githubRepo != nil }
+    static var updatesConfigured: Bool { !isCustomBuild && !isDevApp && githubRepo != nil }
 }

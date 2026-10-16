@@ -39,9 +39,37 @@ import SwiftUI
              "quantity": bought ? 3 : 5, "unit_tokens": 2_400_000, "version": 0, "expires_at": now + 5 * 3600,
              "rotation": true, "bought": bought]
         }
-        let listings = [row.merging(["status": "active"]) { _, new in new },
+        // 사람이 올린 글에는 내가 보낸 가격 제안이 걸려 있다.
+        let offered = OnlineText.tokens(won: 1_100) ?? 1
+        var playerListing = row.merging(["status": "active", "mine": false]) { _, new in new }
+        playerListing["unit_tokens"] = OnlineText.tokens(won: 1_500) ?? 1200
+        playerListing["my_offer"] = ["id": UUID().uuidString, "version": 0, "quantity": 1, "unit_tokens": offered,
+                                     "expires_at": now + 40 * 3600]
+        let listings = [playerListing,
                         rotation("sv8pt5-1#normal", bought: false), rotation("me2pt5-295#gold", bought: true)]
-        model.documents = ["profile": ["profile": profile], "trades": ["items": [row]], "listings": ["items": listings],
+        // 돈을 얹은 교환: 카드에 3만 원을 더해 더 좋은 카드를 달라는 제안.
+        var moneyTrade = row
+        moneyTrade["id"] = UUID().uuidString
+        moneyTrade["nickname"] = "얹어 주는 친구"
+        moneyTrade["offered_tokens"] = OnlineText.tokens(won: 30_000) ?? 0
+        // 내 판매에 온 가격 제안 둘과 내가 보낸 제안 셋(기다리는 중, 수락됨, 거절됨).
+        func offer(_ name: String, won: Int, status: String, listing: String) -> [String: Any] {
+            ["id": UUID().uuidString, "version": 0, "listing_id": listing, "printing": "\(card)#holo",
+             "listing_unit_tokens": OnlineText.tokens(won: 1_500) ?? 1, "quantity": 1,
+             "unit_tokens": OnlineText.tokens(won: won) ?? 1, "status": status, "expires_at": now + 30 * 3600,
+             "created_at": now - 3600, "nickname": name]
+        }
+        var mine = playerListing
+        mine["mine"] = true
+        mine["id"] = UUID().uuidString
+        mine.removeValue(forKey: "my_offer")
+        let received = [offer("흥정하는 친구", won: 1_200, status: "pending", listing: mine.string("id")),
+                        offer("싸게 사고픈 친구", won: 800, status: "pending", listing: mine.string("id"))]
+        let sent = [offer("판매자 친구", won: 1_100, status: "pending", listing: "l1"),
+                    offer("판매자 친구", won: 1_300, status: "accepted", listing: "l2"),
+                    offer("깐깐한 판매자", won: 900, status: "rejected", listing: "l3")]
+        model.documents = ["profile": ["profile": profile], "trades": ["items": [row, moneyTrade]], "listings": ["items": listings],
+                           "offersReceived": ["items": received], "offersSent": ["items": sent],
                            "notifications": ["items": notes, "order": "desc"], "friends": ["items": friends]]
         model.data = ["totals": ["opened": 1200, "purchased": 1200, "new": 180, "duplicates": 11820], "collection_usd": 3141.59,
                       "variants": ["standard": 1199, "god": 1], "variant_rates": ["god": 1.0 / 1200]]
@@ -75,6 +103,14 @@ import SwiftUI
         try await capture("market-from-alert", width: 980)
         model.focus(on: "")
         model.search = ""
+        // 내 판매에 온 가격 제안, 내가 보낸 제안. 화면이 새로 그려질 때 들어갈 칸을 정해 둔다.
+        let shownListings = model.documents["listings"]
+        model.documents["listings"] = ["items": [mine]]
+        model.opensMyListings = true
+        try await capture("market-mine-offers", width: 980)
+        model.documents["listings"] = shownListings
+        model.opensSentOffers = true
+        try await capture("market-sent-offers", width: 980)
         func capturePicker(_ name: String, _ view: some View) async throws {
             let picker = NSHostingController(rootView: view.background(Color(NSColor.windowBackgroundColor)))
             let pickerSize = picker.view.fittingSize
@@ -101,6 +137,12 @@ import SwiftUI
             return OnlineStock(key: key, cardID: entry.id, finish: .holo, available: offset + 1,
                                referenceWon: offset == 4 ? nil : OnlineText.referenceWon(key))
         }
+        // 판매 글 창: 남의 글에 가격 제안, 남의 글 바로 사기, 내 글, 이미 한 장 산 봇 매물. 모양은 같고 할 일만 다르다.
+        try await capturePicker("buy-offer", BuySheet(model: model, item: playerListing, startsOffering: true)
+            .frame(width: 560))
+        try await capturePicker("listing-buy", BuySheet(model: model, item: playerListing).frame(width: 560))
+        try await capturePicker("listing-mine", BuySheet(model: model, item: mine).frame(width: 560))
+        try await capturePicker("listing-bought", BuySheet(model: model, item: listings[2]).frame(width: 560))
         try await capturePicker("trade-picker", OnlineStockPicker(
             wallet: wallet, title: OnlineText.l.addCardsToGive, actionTitle: OnlineText.l.addAction,
             source: pickable) { _, _ in })

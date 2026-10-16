@@ -188,8 +188,7 @@ final class WalletStore {
         if !override.isEmpty {
             dir = URL(fileURLWithPath: override, isDirectory: true)
         } else {
-            dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("PokePackBar")
+            dir = AppEnv.supportDirectory
         }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("game-state.json")

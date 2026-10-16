@@ -504,8 +504,15 @@ struct OnlineSettingsView: View {
                     await remote.synchronize()
                     message = OnlineText.l.signedInSynced
                 } else {
-                    message = OnlineText.l.signedInRestart
-                    needsRestart = true
+                    // 다른 계정(새로 가입한 계정 포함)이나 처음 연결이다. 지갑과 온라인 창은 기동할 때
+                    // 계정이 정해져서, 다시 시작하기 전까지는 로그아웃한 계정의 카드가 그대로 보였다.
+                    // 실행 중에 갈아 끼우면 친구, 마켓, 알림 화면에 이전 계정 것이 남을 수 있어
+                    // 바로 다시 시작하고 온라인 창을 연다.
+                    message = OnlineText.l.signedInSwitching
+                    if !AppRelauncher.relaunch(openingOnline: true) {
+                        message = OnlineText.l.signedInRestart
+                        needsRestart = true
+                    }
                 }
             } catch { message = OnlineText.message(for: error) }
         }

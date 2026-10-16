@@ -21,6 +21,7 @@ let package = Package(
                 .process("Resources/foil-subject-masks.json"),
                 .process("Resources/physical-foil-marks.json"),
                 .copy("Resources/foil-marks"),
+                .copy("Resources/card-back.webp"),
                 .process("Resources/expansion-foil.json"),
                 .process("Resources/reviewed-foil.json"),
                 .process("Resources/cracked-ice-facets.json"),

@@ -382,7 +382,7 @@ struct SettingsView: View {
     private func updateGroup(_ store: UsageStore) -> some View {
         @Bindable var store = store
         settingsSection(l.updateSectionTitle) {
-            if AppLinks.isCustomBuild {
+            if AppLinks.isCustomBuild || AppLinks.isDevApp {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(l.customBuild).font(Typography.bodySemibold)
                     Text(l.customUpdateNote).font(Typography.label).foregroundStyle(.secondary)

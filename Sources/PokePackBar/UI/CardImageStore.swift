@@ -18,6 +18,8 @@ actor CardImageStore {
     /// 격자가 스크롤될 때 같은 카드가 반복 요청되는 경로가 실제로 있다.
     private var inFlight: [String: Task<Data?, Never>] = [:]
 
+    /// 정식 앱과 개발용 앱(`AppEnv.dataName`)이 함께 쓴다. 같은 카드는 같은 파일이고 원자적으로
+    /// 쓰며 지우지 않으니, 나눌 이유 없이 내려받기만 두 번 하게 된다.
     static let cacheDir: URL = {
         let d = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             // v2 separates the managed-CDN variants from legacy Supabase files.

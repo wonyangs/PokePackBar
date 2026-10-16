@@ -15,15 +15,18 @@ struct OnlineMarketView: View {
     @State private var selling: OnlineStock?
     @State private var sellQuery = ""
     @State private var preview: PrintingSelection?
+    /// 수락하려는 받은 가격 제안. 되돌릴 수 없는 판매라 한 번 더 묻는다.
+    @State private var acceptingOffer: [String: Any]?
 
     enum Mode: String, CaseIterable, Identifiable {
-        case buy, sell, mine
+        case buy, sell, mine, offers
         var id: String { rawValue }
         @MainActor var title: String {
             switch self {
             case .buy: OnlineText.l.marketBuy
             case .sell: OnlineText.l.marketSell
             case .mine: OnlineText.l.mySales
+            case .offers: OnlineText.l.sentOffers
             }
         }
     }
@@ -37,6 +40,7 @@ struct OnlineMarketView: View {
             .onChange(of: mode) {
                 model.offset = 0
                 model.ownListings = mode == .mine
+                model.sentOffers = mode == .offers
                 if mode != .sell { Task { await model.refresh(full: false) } }
             }
 
@@ -44,16 +48,22 @@ struct OnlineMarketView: View {
             case .buy: buyView
             case .sell: sellView
             case .mine: mineView
+            case .offers: offersView
             }
         }
         .onAppear {
             enter()
             model.ownListings = mode == .mine
+            model.sentOffers = mode == .offers
         }
         // 마켓 탭이 이미 열려 있을 때 알림을 누른 경우.
         .onChange(of: model.opensMyListings) { enter() }
         .onChange(of: model.opensMarketBuy) { enter() }
         .onChange(of: model.opensMarketSell) { enter() }
+        .onChange(of: model.opensSentOffers) { enter() }
+        .sheet(item: Binding(get: { acceptingOffer.map(ListingBox.init) }, set: { acceptingOffer = $0?.item })) { box in
+            acceptOfferSheet(box.item)
+        }
         .sheet(item: Binding(get: { buying.map(ListingBox.init) }, set: { buying = $0?.item })) { box in
             BuySheet(model: model, item: box.item)
         }
@@ -70,6 +80,9 @@ struct OnlineMarketView: View {
         } else if model.opensMarketBuy {
             model.opensMarketBuy = false
             mode = .buy
+        } else if model.opensSentOffers {
+            model.opensSentOffers = false
+            mode = .offers
         } else if let cardID = model.opensMarketSell {
             model.opensMarketSell = nil
             mode = .sell
@@ -118,9 +131,8 @@ struct OnlineMarketView: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 128), spacing: 16, alignment: .top)], alignment: .leading, spacing: 18) {
                         ForEach(listings, id: \.onlineID) { item in
                             let printing = CardPrintingKey(storageKey: item.string("printing"))
-                            // 내 판매와 이미 한 장 산 로테이션 카드는 살 수 없으니 카드만 보여 준다.
-                            let viewOnly = item.bool("mine") || item.bool("bought")
-                            Button { viewOnly ? (preview = PrintingSelection(id: item.string("printing"))) : (buying = item) } label: {
+                            // 내 판매도, 이미 한 장 산 봇 매물도 같은 판매 글 창을 연다. 할 수 있는 일만 다르다.
+                            Button { buying = item } label: {
                                 OnlineCardTile(cardID: printing.cardID, finish: printing.finish.rawValue,
                                                badge: Self.badge(item)) {
                                     Text(OnlineText.won(tokens: item.int("unit_tokens")))
@@ -131,6 +143,10 @@ struct OnlineMarketView: View {
                                         .font(Typography.caption).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
                                     Text("\(Self.seller(item)), \(OnlineText.l.cardsCount(item.int("quantity")))")
                                         .font(Typography.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    if let offer = item["my_offer"] as? [String: Any] {
+                                        Text(OnlineText.l.myOfferShort(OnlineText.won(tokens: offer.int("unit_tokens"))))
+                                            .font(Typography.caption).foregroundStyle(Color.accentColor).lineLimit(1)
+                                    }
                                     // 컬렉션에 한 장도 없는 카드. 판매자 표시(봇 매물 등)와 따로 한 줄을 쓴다.
                                     if !item.bool("mine"), model.wallet.cardCount(printing.cardID) == 0 {
                                         OnlineBadge(text: OnlineText.l.missingBadge, color: .accentColor)
@@ -288,7 +304,9 @@ struct OnlineMarketView: View {
     private func myListing(_ item: [String: Any]) -> some View {
         let printing = CardPrintingKey(storageKey: item.string("printing"))
         let status = OnlineText.listingStatus(item.string("status"))
-        return HStack(spacing: 14) {
+        let offers = model.items("offersReceived").filter { $0.string("listing_id") == item.string("id") }
+        return VStack(alignment: .leading, spacing: 10) {
+        HStack(spacing: 14) {
             CardImageView(cardID: printing.cardID, width: 54)
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 8) {
@@ -310,6 +328,110 @@ struct OnlineMarketView: View {
                 .disabled(!model.canWrite)
             }
         }
+        // 이 판매 글에 온 가격 제안. 판매가 대비 몇 %인지 함께 보고 수락하거나 거절한다.
+        if !offers.isEmpty {
+            Divider()
+            Text(OnlineText.l.offersReceived(offers.count)).font(Typography.labelSemibold)
+            ForEach(offers, id: \.onlineID) { offer in
+                HStack(spacing: 8) {
+                    Text(OnlineText.l.offerRow(offer.string("nickname"), quantity: offer.int("quantity"),
+                                               price: OnlineText.won(tokens: offer.int("unit_tokens")),
+                                               percent: offer.int("unit_tokens") * 100 / max(1, item.int("unit_tokens"))))
+                        .font(Typography.label).monospacedDigit()
+                    Spacer()
+                    Text(OnlineText.remaining(until: offer.int("expires_at")))
+                        .font(Typography.caption).foregroundStyle(.secondary)
+                    Button(OnlineText.l.declineAction) {
+                        Task { await model.mutate("market/offers", ["action": "offer_reject", "target_id": offer.string("id"), "target_version": offer.int("version")]) }
+                    }
+                    Button(OnlineText.l.acceptAction) { acceptingOffer = offer }.buttonStyle(.borderedProminent)
+                }
+                .disabled(!model.canWrite)
+                .onlineFocusRing(model.focusID == offer.string("id"), cornerRadius: 6, outset: 3)
+            }
+        }
+        }
+        .padding(10)
+        .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    /// 받은 가격 제안을 수락하기 전에 한 번 더 묻는다. 수락하면 바로 팔려 되돌릴 수 없다.
+    private func acceptOfferSheet(_ offer: [String: Any]) -> some View {
+        let printing = CardPrintingKey(storageKey: offer.string("printing"))
+        let unit = offer.int("unit_tokens"), quantity = offer.int("quantity")
+        return OnlineSheet(title: OnlineText.l.acceptOfferTitle, actionTitle: OnlineText.l.acceptAction,
+                           actionDisabled: !model.canWrite,
+                           note: OnlineText.l.acceptOfferNote(quantity: quantity, price: OnlineText.won(tokens: unit),
+                                                              total: OnlineText.won(tokens: unit * quantity)),
+                           action: {
+                               let values: [String: Any] = ["action": "offer_accept", "target_id": offer.string("id"), "target_version": offer.int("version")]
+                               Task { await model.mutate("market/offers", values) }
+                           }) {
+            HStack(alignment: .top, spacing: 14) {
+                CardImageView(cardID: printing.cardID, width: 90)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(OnlineText.cardName(printing.cardID)).font(Typography.title)
+                    Text(OnlineText.l.offerRow(offer.string("nickname"), quantity: quantity, price: OnlineText.won(tokens: unit),
+                                               percent: unit * 100 / max(1, offer.int("listing_unit_tokens"))))
+                        .font(Typography.label).foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+        }
+    }
+
+    // MARK: 보낸 제안
+
+    private var offersView: some View {
+        let offers = model.items("offersSent")
+        return ScrollViewReader { scroller in
+            ScrollView {
+                if offers.isEmpty {
+                    OnlineEmptyState(icon: "tag", title: OnlineText.l.noSentOffers, message: OnlineText.l.noSentOffersHint)
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(offers, id: \.onlineID) { offer in
+                            sentOffer(offer)
+                                .onlineFocusRing(model.focusID == offer.string("id"))
+                                .id(offer.onlineID)
+                        }
+                    }
+                    OnlinePagination(model: model, key: "offersSent")
+                }
+            }
+            .revealsOnlineFocus(model, in: offers, with: scroller)
+        }
+    }
+
+    private func sentOffer(_ item: [String: Any]) -> some View {
+        let printing = CardPrintingKey(storageKey: item.string("printing"))
+        let status = OnlineText.offerStatus(item.string("status"))
+        let pending = item.string("status") == "pending"
+        return HStack(spacing: 14) {
+            CardImageView(cardID: printing.cardID, width: 54)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 8) {
+                    Text(OnlineText.cardName(printing.cardID)).font(Typography.bodySemibold)
+                    OnlineBadge(text: status.text, color: status.color)
+                }
+                Text(OnlineText.l.sentOfferLine(price: OnlineText.won(tokens: item.int("unit_tokens")),
+                                                asking: OnlineText.won(tokens: item.int("listing_unit_tokens")),
+                                                count: OnlineText.l.cardsCount(item.int("quantity"))))
+                    .font(Typography.label).foregroundStyle(.secondary).monospacedDigit()
+                Text(OnlineText.l.soldBy(finish: OnlineText.l.cardFinishName(printing.finish), seller: item.string("nickname")))
+                    .font(Typography.caption).foregroundStyle(.secondary)
+                if pending {
+                    Text(OnlineText.remaining(until: item.int("expires_at")))
+                        .font(Typography.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            if pending {
+                Button(OnlineText.l.cancelOffer) {
+                    Task { await model.mutate("market/offers", ["action": "offer_cancel", "target_id": item.string("id")]) }
+                }
+                .disabled(!model.canWrite)
+            }
+        }
         .padding(10)
         .background(Color.secondary.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
     }
@@ -324,55 +446,165 @@ private struct ListingBox: Identifiable {
 }
 
 @MainActor
-private struct BuySheet: View {
+struct BuySheet: View {
     @Bindable var model: OnlineHubModel
     let item: [String: Any]
     @State private var quantity = 1
+    /// 가격 제안으로 보내는지. 봇 매물은 하루 동안 정해진 값에만 팔아 바로 사기만 있다.
+    @State private var offering: Bool
+
+    /// 이 판매 글로 할 수 있는 일. 남의 글은 사거나 제안하고, 내 글은 내리고,
+    /// 이미 한 장 산 봇 매물은 보기만 한다. 창의 모양은 셋 다 같다.
+    private enum Role { case buyer, seller, viewer }
+    private var role: Role { item.bool("mine") ? .seller : item.bool("bought") ? .viewer : .buyer }
+    @State private var offerWon = 0
+
+    /// `startsOffering` 은 레이아웃 감사가 제안 화면을 찍을 때 쓴다.
+    init(model: OnlineHubModel, item: [String: Any], startsOffering: Bool = false) {
+        self.model = model
+        self.item = item
+        _offering = State(initialValue: startsOffering)
+    }
+
+    private var unit: Int { item.int("unit_tokens") }
+    private var rotation: Bool { item.bool("rotation") }
+    private var askingWon: Int { MarketEconomy.won(tokens: unit) }
+    private var myOffer: [String: Any]? { item["my_offer"] as? [String: Any] }
+    /// 보낼 제안의 장당 토큰. 서버와 같은 규칙으로 판매가보다 낮고 절반 이상일 때만 값이 있다.
+    private var offerTokens: Int? {
+        guard let tokens = OnlineText.tokens(won: offerWon), tokens < unit, tokens * 2 >= unit else { return nil }
+        return tokens
+    }
+    /// 보낼 수 있는 범위(원): 판매가의 절반을 100원 칸으로 올린 값부터 판매가보다 한 칸 낮은 값까지.
+    private var offerRange: (low: Int, high: Int) {
+        let step = MarketEconomy.wonStep
+        return (low: ((askingWon + 1) / 2 + step - 1) / step * step, high: askingWon - step)
+    }
+    /// 판매가의 몇 %로 맞추는 칩. 범위 밖이면 범위 끝으로 붙인다.
+    private func chipWon(_ percent: Int) -> Int {
+        let step = MarketEconomy.wonStep
+        return min(max(askingWon * percent / 100 / step * step, offerRange.low), offerRange.high)
+    }
 
     var body: some View {
         let printing = CardPrintingKey(storageKey: item.string("printing"))
-        let unit = item.int("unit_tokens")
-        let rotation = item.bool("rotation")
         let affordable = unit > 0 ? model.wallet.availableTokens / unit : 0
         // 로테이션 카드는 계정마다 한 장이다. 수량을 고를 수 없다.
-        let maximum = rotation ? 1 : max(1, min(item.int("quantity"), 1000, affordable))
-        let total = unit * quantity
+        let maximum = rotation ? 1 : max(1, min(item.int("quantity"), 1000, offering ? 1000 : affordable))
+        let total = (offering ? offerTokens ?? 0 : unit) * quantity
         let canAfford = total <= model.wallet.availableTokens
-        OnlineSheet(title: OnlineText.l.buyCardTitle, actionTitle: OnlineText.l.buyFor(OnlineText.won(tokens: total)),
-                    actionDisabled: !model.canWrite || !canAfford || affordable < 1,
-                    note: rotation ? OnlineText.l.rotationBuyNote : OnlineText.l.buyNote,
+        let blocked = offering ? offerTokens == nil || !canAfford : !canAfford || affordable < 1
+        let role = self.role
+        let buying = role == .buyer
+        OnlineSheet(title: !buying ? OnlineText.l.listingDetailTitle
+                           : offering ? OnlineText.l.makeOfferTitle : OnlineText.l.buyCardTitle,
+                    actionTitle: role == .seller ? OnlineText.l.takeDownListing
+                                 : offering ? OnlineText.l.sendOffer(OnlineText.won(tokens: offerTokens ?? 0))
+                                 : OnlineText.l.buyFor(OnlineText.won(tokens: total)),
+                    actionDisabled: !model.canWrite || (buying && blocked),
+                    note: !buying ? nil : offering ? OnlineText.l.offerNote : rotation ? OnlineText.l.rotationBuyNote : OnlineText.l.buyNote,
+                    showsAction: role != .viewer,
                     action: {
                         // 보낼 값은 누르는 순간 정한다. Task 본문은 시트가 닫힌 뒤에 돈다.
-                        let values: [String: Any] = ["action": "listing_buy", "target_id": item.string("id"), "target_version": item.int("version"), "quantity": quantity, "unit_tokens": unit]
-                        Task { await model.mutate("market/listings", values) }
+                        if role == .seller {
+                            let values: [String: Any] = ["action": "listing_cancel", "target_id": item.string("id"), "target_version": item.int("version")]
+                            Task { await model.mutate("market/listings", values) }
+                        } else if offering, let offerTokens {
+                            let values: [String: Any] = ["action": "offer_create", "target_id": item.string("id"), "quantity": quantity, "unit_tokens": offerTokens]
+                            Task { await model.mutate("market/offers", values) }
+                        } else {
+                            let values: [String: Any] = ["action": "listing_buy", "target_id": item.string("id"), "target_version": item.int("version"), "quantity": quantity, "unit_tokens": unit]
+                            Task { await model.mutate("market/listings", values) }
+                        }
                     }) {
-            HStack(alignment: .top, spacing: 18) {
-                CardImageView(cardID: printing.cardID, hires: true, width: 150)
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(OnlineText.cardName(printing.cardID)).font(Typography.title)
-                    Text(OnlineText.l.soldBy(finish: OnlineText.l.cardFinishName(printing.finish), seller: OnlineMarketView.seller(item)))
-                        .font(Typography.label).foregroundStyle(.secondary)
-                    Text(OnlineText.l.perCard(OnlineText.won(tokens: unit))).font(Typography.bodySemibold).monospacedDigit()
-                    // 이미 가진 카드인지 사기 전에 본다.
-                    let owned = model.wallet.cardCount(printing.cardID)
-                    Text(owned == 0 ? OnlineText.l.notOwnedYet : OnlineText.l.copiesOwned(owned))
-                        .font(Typography.label).monospacedDigit()
-                        .foregroundStyle(owned == 0 ? Color.accentColor : Color.secondary)
-                    if let reference = OnlineText.referenceWon(item.string("printing")) {
-                        Text(OnlineText.l.referencePrice(OnlineText.wonText(reference)))
-                            .font(Typography.label).foregroundStyle(.secondary).monospacedDigit()
+            VStack(alignment: .leading, spacing: 14) {
+                if buying, !rotation {
+                    Picker("", selection: $offering) {
+                        Text(OnlineText.l.buyNow).tag(false)
+                        Text(OnlineText.l.makeOffer).tag(true)
                     }
-                    if rotation {
-                        Text(OnlineText.remaining(until: item.int("expires_at")))
+                    .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+                HStack(alignment: .top, spacing: 18) {
+                    // 마우스로 기울이고 좌우로 끌어 뒷면까지 돌려 본다. 내 글이든 남의 글이든 같다.
+                    OnlinePrintingArt(printing: item.string("printing"), width: 180)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(OnlineText.cardName(printing.cardID)).font(Typography.title)
+                        // 어느 팩에서 나오고 얼마나 드문지. 사지 않고 팩을 열어 노릴지 정할 수 있다.
+                        if let index = CardIndex.shared,
+                           let source = CardSource.of(cardID: printing.cardID, index: index,
+                                                      perks: model.wallet.openingPerks) {
+                            CardSourceLine(source: source, l: OnlineText.l)
+                        }
+                        Text(OnlineText.l.soldBy(finish: OnlineText.l.cardFinishName(printing.finish), seller: OnlineMarketView.seller(item)))
                             .font(Typography.label).foregroundStyle(.secondary)
-                    } else {
-                        OnlineQuantity(value: $quantity, range: 1...maximum)
+                        Text(OnlineText.l.perCard(OnlineText.won(tokens: unit))).font(Typography.bodySemibold).monospacedDigit()
+                        // 이미 가진 카드인지 사기 전에 본다.
+                        let owned = model.wallet.cardCount(printing.cardID)
+                        Text(owned == 0 ? OnlineText.l.notOwnedYet : OnlineText.l.copiesOwned(owned))
+                            .font(Typography.label).monospacedDigit()
+                            .foregroundStyle(owned == 0 ? Color.accentColor : Color.secondary)
+                        if let reference = OnlineText.referenceWon(item.string("printing")) {
+                            Text(OnlineText.l.referencePrice(OnlineText.wonText(reference)))
+                                .font(Typography.label).foregroundStyle(.secondary).monospacedDigit()
+                        }
+                        switch role {
+                        case .seller:
+                            Text(OnlineText.l.myListingLine(finish: OnlineText.l.cardFinishName(printing.finish),
+                                                            unit: OnlineText.won(tokens: unit), left: item.int("quantity")))
+                                .font(Typography.label).foregroundStyle(.secondary).monospacedDigit()
+                            Text(OnlineText.remaining(until: item.int("expires_at")))
+                                .font(Typography.label).foregroundStyle(.secondary)
+                        case .viewer:
+                            Text(OnlineText.l.rotationBought).font(Typography.labelSemibold)
+                            Text(OnlineText.remaining(until: item.int("expires_at")))
+                                .font(Typography.label).foregroundStyle(.secondary)
+                        case .buyer:
+                            if offering { offerFields }
+                            if rotation {
+                                Text(OnlineText.remaining(until: item.int("expires_at")))
+                                    .font(Typography.label).foregroundStyle(.secondary)
+                            } else {
+                                OnlineQuantity(value: $quantity, range: 1...maximum)
+                            }
+                            Text(!canAfford || (!offering && affordable < 1) ? OnlineText.l.notEnoughBalance
+                                 : OnlineText.l.balanceAfter(OnlineText.won(tokens: max(0, model.wallet.availableTokens - total))))
+                                .font(Typography.label).foregroundStyle(!canAfford ? Color.orange : Color.secondary)
+                                .monospacedDigit()
+                        }
                     }
-                    Text(affordable < 1 ? OnlineText.l.notEnoughBalance : OnlineText.l.balanceAfter(OnlineText.won(tokens: max(0, model.wallet.availableTokens - total))))
-                        .font(Typography.label).foregroundStyle(affordable < 1 ? Color.orange : Color.secondary)
-                        .monospacedDigit()
                 }
             }
+        }
+        .onAppear {
+            offerWon = myOffer.map { MarketEconomy.won(tokens: $0.int("unit_tokens")) } ?? chipWon(90)
+        }
+    }
+
+    /// 제안할 장당 가격. 판매가의 몇 %인지 칩으로 고르거나 직접 적는다.
+    @ViewBuilder
+    private var offerFields: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let myOffer {
+                Text(OnlineText.l.myOffer(OnlineText.won(tokens: myOffer.int("unit_tokens"))))
+                    .font(Typography.label).foregroundStyle(Color.accentColor)
+            }
+            Text(OnlineText.l.pricePerCard).font(Typography.labelSemibold)
+            HStack(spacing: 6) {
+                TextField(OnlineText.l.priceLabel, value: $offerWon, format: .number)
+                    .textFieldStyle(.roundedBorder).frame(width: 120).monospacedDigit()
+                Text(OnlineText.l.wonUnit)
+            }
+            HStack(spacing: 6) {
+                // 칩은 숫자만 적는다. 「판매가의」를 붙이면 좁은 창에서 잘린다. 뜻은 도움말에 둔다.
+                ForEach([90, 80, 70], id: \.self) { percent in
+                    Button("\(percent)%") { offerWon = chipWon(percent) }
+                        .buttonStyle(.bordered).font(Typography.button).monospacedDigit()
+                        .help(OnlineText.l.percentOfPrice(percent))
+                }
+            }
+            Text(OnlineText.l.offerRange(min: OnlineText.wonText(offerRange.low), max: OnlineText.wonText(offerRange.high)))
+                .font(Typography.caption).foregroundStyle(offerTokens == nil ? Color.red : Color.secondary)
         }
     }
 }
@@ -397,7 +629,7 @@ private struct SellSheet: View {
                         Task { await model.mutate("market/listings", values) }
                     }) {
             HStack(alignment: .top, spacing: 18) {
-                CardImageView(cardID: stock.cardID, hires: true, width: 150)
+                OnlinePrintingArt(printing: stock.key, width: 180)
                 VStack(alignment: .leading, spacing: 12) {
                     Text(OnlineText.cardName(stock.cardID)).font(Typography.title)
                     Text(OnlineText.l.sellableLine(finish: OnlineText.l.cardFinishName(stock.finish), available: stock.available))
@@ -456,14 +688,25 @@ struct OnlineTradingView: View {
     /// 받고 싶은 카드는 고른 친구의 교환 바인더에서 담는다. 친구를 바꾸면 비우되, 초안이나
     /// 역제안이 친구와 카드를 함께 채울 때는 비우지 않는다.
     @State private var keepRequestOnFriendChange = false
+    /// 교환에 얹는 돈(원). 카드 시세 차이를 돈으로 메운다. 한쪽에만 넣을 수 있다.
+    @State private var giveWon = 0
+    @State private var getWon = 0
+
+    private var giveTokens: Int { giveWon > 0 ? OnlineText.tokens(won: giveWon) ?? 0 : 0 }
+    private var getTokens: Int { getWon > 0 ? OnlineText.tokens(won: getWon) ?? 0 : 0 }
 
     private var friends: [[String: Any]] { model.items("friends").filter { $0.string("status") == "accepted" } }
 
     /// 왜 보낼 수 없는지를 한 문장으로. 버튼만 꺼 두면 무엇을 고쳐야 하는지 모른다.
     private var blocker: String? {
         if friend.isEmpty { return OnlineText.l.tradePickFriend }
-        if offered.isEmpty { return OnlineText.l.tradeAddOffer }
-        if requested.isEmpty { return OnlineText.l.tradeAddRequest }
+        if giveWon > 0, getWon > 0 { return OnlineText.l.tradeMoneyOneSide }
+        if (giveWon > 0 && giveTokens == 0) || (getWon > 0 && getTokens == 0) { return OnlineText.l.tradeMoneyInvalid }
+        if offered.isEmpty, requested.isEmpty { return OnlineText.l.tradeNeedsCard }
+        if offered.isEmpty, giveTokens == 0 { return OnlineText.l.tradeAddOffer }
+        if requested.isEmpty, getTokens == 0 { return OnlineText.l.tradeAddRequest }
+        // 돈은 묶어 두지 않는다. 보낼 때와 상대가 수락할 때 잔액을 확인한다.
+        if giveTokens > model.wallet.availableTokens { return OnlineText.l.notEnoughBalance }
         if offered.count > 20 || requested.count > 20 { return OnlineText.l.tradeKindLimit }
         if offered.values.reduce(0, +) > 1000 || requested.values.reduce(0, +) > 1000 { return OnlineText.l.tradeCountLimit }
         if !Set(offered.keys).isDisjoint(with: requested.keys) { return OnlineText.l.tradeSameCard }
@@ -497,13 +740,15 @@ struct OnlineTradingView: View {
                             }
                             .fixedSize()
                             .disabled(countering != nil)
-                            tray(OnlineText.l.cardsIGive, lines: $offered) { pickingOffer = true }
+                            tray(OnlineText.l.cardsIGive, lines: $offered, money: $giveWon,
+                                 moneyTitle: OnlineText.l.moneyToGive) { pickingOffer = true }
                             // 바로 아래에 담을 카드가 놓이면 빈 칸을 높게 비워 둘 까닭이 없다.
-                            tray(OnlineText.l.cardsIWant, lines: $requested, canAdd: !friend.isEmpty,
+                            tray(OnlineText.l.cardsIWant, lines: $requested, money: $getWon,
+                                 moneyTitle: OnlineText.l.moneyToGet, canAdd: !friend.isEmpty,
                                  emptyHeight: missingFromFriend.isEmpty ? 60 : 0,
                                  add: { pickingMissingOnly = false; pickingRequest = true }) { missingCards }
-                            if !offered.isEmpty, !requested.isEmpty {
-                                Text(OnlineText.valueBalance(give: offered, get: requested))
+                            if !offered.isEmpty || giveWon > 0, !requested.isEmpty || getWon > 0 {
+                                Text(OnlineText.valueBalance(give: offered, get: requested, giveWon: giveWon, getWon: getWon))
                                     .font(Typography.label).foregroundStyle(.secondary)
                             }
                             HStack {
@@ -591,21 +836,27 @@ struct OnlineTradingView: View {
                             // 그 안에서 바구니를 읽으면 이미 비운 빈 바구니가 나가 서버가
                             // both_sides_required 로 거절했다. 바구니는 성공했을 때만 비운다.
                             var values: [String: Any] = ["action": "trade_create", "target_id": friend, "offered": lines(offered), "requested": lines(requested)]
+                            // 돈은 넣었을 때만 보낸다. 돈을 모르는 서버는 모르는 값이 있으면 요청을
+                            // 통째로 거절해서, 0 을 보내면 돈 없는 교환까지 막힌다.
+                            if giveTokens > 0 { values["offered_tokens"] = giveTokens }
+                            if getTokens > 0 { values["requested_tokens"] = getTokens }
                             if let countering {
                                 values.merge(["action": "trade_counter", "target_id": countering.string("id"),
                                               "target_version": countering.int("version")]) { _, new in new }
                             }
                             Task {
-                                if await model.mutate("trades", values) { offered = [:]; requested = [:]; countering = nil }
+                                if await model.mutate("trades", values) { offered = [:]; requested = [:]; giveWon = 0; getWon = 0; countering = nil }
                             }
                         }) {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(OnlineText.l.toFriend(friendName(friend))).font(Typography.bodySemibold)
                     Text(OnlineText.l.cardsIGive).font(Typography.labelSemibold)
                     OnlineCardStrip(lines: offered)
+                    moneyLine(giveTokens)
                     Text(OnlineText.l.cardsIGet).font(Typography.labelSemibold)
                     OnlineCardStrip(lines: requested)
-                    Text(OnlineText.valueBalance(give: offered, get: requested))
+                    moneyLine(getTokens)
+                    Text(OnlineText.valueBalance(give: offered, get: requested, giveWon: giveWon, getWon: getWon))
                         .font(Typography.label).foregroundStyle(.secondary)
                 }
             }
@@ -620,10 +871,14 @@ struct OnlineTradingView: View {
                     Text(OnlineText.l.tradeWith(item.string("nickname"))).font(Typography.bodySemibold)
                     Text(OnlineText.l.cardsIGive).font(Typography.labelSemibold)
                     OnlineCardStrip(lines: item["requested"] as? [String: Int] ?? [:])
+                    moneyLine(item.int("requested_tokens"))
                     Text(OnlineText.l.cardsIGet).font(Typography.labelSemibold)
                     OnlineCardStrip(lines: item["offered"] as? [String: Int] ?? [:])
+                    moneyLine(item.int("offered_tokens"))
                     Text(OnlineText.valueBalance(give: item["requested"] as? [String: Int] ?? [:],
-                                                 get: item["offered"] as? [String: Int] ?? [:]))
+                                                 get: item["offered"] as? [String: Int] ?? [:],
+                                                 giveWon: MarketEconomy.won(tokens: item.int("requested_tokens")),
+                                                 getWon: MarketEconomy.won(tokens: item.int("offered_tokens"))))
                         .font(Typography.label).foregroundStyle(.secondary)
                 }
             }
@@ -631,13 +886,14 @@ struct OnlineTradingView: View {
         .sheet(item: $preview) { OnlinePrintingDetail(printing: $0.id) }
     }
 
-    private func tray(_ title: String, lines: Binding<[String: Int]>, canAdd: Bool = true,
-                      add: @escaping () -> Void) -> some View {
-        tray(title, lines: lines, canAdd: canAdd, add: add) { EmptyView() }
+    private func tray(_ title: String, lines: Binding<[String: Int]>, money: Binding<Int>, moneyTitle: String,
+                      canAdd: Bool = true, add: @escaping () -> Void) -> some View {
+        tray(title, lines: lines, money: money, moneyTitle: moneyTitle, canAdd: canAdd, add: add) { EmptyView() }
     }
 
     /// `footer` 는 칸 아래에 붙는 것. 받고 싶은 카드 칸이 「내게 없는 카드」를 여기에 둔다.
-    private func tray<Footer: View>(_ title: String, lines: Binding<[String: Int]>, canAdd: Bool = true,
+    private func tray<Footer: View>(_ title: String, lines: Binding<[String: Int]>, money: Binding<Int>,
+                                    moneyTitle: String, canAdd: Bool = true,
                                     emptyHeight: CGFloat = 60, add: @escaping () -> Void,
                                     @ViewBuilder footer: () -> Footer) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -656,6 +912,14 @@ struct OnlineTradingView: View {
                 OnlineCardStrip(lines: lines.wrappedValue,
                                 onRemove: { lines.wrappedValue[$0] = nil },
                                 onOpen: { preview = PrintingSelection(id: $0) })
+            }
+            // 카드 시세 차이를 돈으로 메운다. 0 이면 돈은 오가지 않는다.
+            HStack(spacing: 6) {
+                Image(systemName: "wonsign.circle").foregroundStyle(.secondary)
+                Text(moneyTitle).font(Typography.label)
+                TextField("0", value: money, format: .number)
+                    .textFieldStyle(.roundedBorder).frame(width: 120).monospacedDigit()
+                Text(OnlineText.l.wonUnit).font(Typography.label)
             }
             footer()
         }
@@ -774,11 +1038,13 @@ struct OnlineTradingView: View {
                     Text(sideCaption(OnlineText.l.cardsIGive, incoming ? iGive : theyGive))
                         .font(Typography.caption).foregroundStyle(.secondary)
                     OnlineCardStrip(lines: incoming ? iGive : theyGive, width: 52, onOpen: { preview = PrintingSelection(id: $0) })
+                    moneyLine(incoming ? item.int("requested_tokens") : item.int("offered_tokens"))
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(sideCaption(OnlineText.l.cardsIGet, incoming ? theyGive : iGive))
                         .font(Typography.caption).foregroundStyle(.secondary)
                     OnlineCardStrip(lines: incoming ? theyGive : iGive, width: 52, onOpen: { preview = PrintingSelection(id: $0) })
+                    moneyLine(incoming ? item.int("offered_tokens") : item.int("requested_tokens"))
                 }
             }
             if item.string("status") == "pending" {
@@ -807,6 +1073,15 @@ struct OnlineTradingView: View {
     private func lines(_ values: [String: Int]) -> [[String: Any]] { values.keys.sorted().map { ["printing": $0, "quantity": values[$0] ?? 0] } }
     private func command(_ action: String, _ item: [String: Any]) -> [String: Any] { ["action": action, "target_id": item.string("id"), "target_version": item.int("version")] }
     private func act(_ action: String, _ item: [String: Any]) { Task { await model.mutate("trades", command(action, item)) } }
+    /// 교환에 얹은 돈 한 줄. 없으면 아무것도 그리지 않는다.
+    @ViewBuilder
+    private func moneyLine(_ tokens: Int) -> some View {
+        if tokens > 0 {
+            Label(OnlineText.l.moneyLine(OnlineText.won(tokens: tokens)), systemImage: "wonsign.circle")
+                .font(Typography.label).monospacedDigit()
+        }
+    }
+
     /// 한쪽 카드 줄의 제목에 시세 합계를 붙인다.
     private func sideCaption(_ title: String, _ lines: [String: Int]) -> String {
         let total = OnlineText.referenceTotal(lines)
@@ -821,6 +1096,9 @@ struct OnlineTradingView: View {
         friend = other
         offered = item["requested"] as? [String: Int] ?? [:]
         requested = item["offered"] as? [String: Int] ?? [:]
+        // 상대가 달라던 돈은 내가 줄 돈, 상대가 얹어 준 돈은 내가 받을 돈이다.
+        giveWon = MarketEconomy.won(tokens: item.int("requested_tokens"))
+        getWon = MarketEconomy.won(tokens: item.int("offered_tokens"))
         countering = item
     }
 
@@ -828,6 +1106,8 @@ struct OnlineTradingView: View {
         countering = nil
         offered = [:]
         requested = [:]
+        giveWon = 0
+        getWon = 0
     }
 
     private func loadDraft(_ item: [String: Any]) {
@@ -843,6 +1123,7 @@ struct OnlineTradingView: View {
             return result
         }
         offered = basket("offered"); requested = basket("requested").filter { offered[$0.key] == nil }
+        giveWon = 0; getWon = 0
     }
 }
 

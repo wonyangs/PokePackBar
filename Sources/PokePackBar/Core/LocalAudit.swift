@@ -433,7 +433,7 @@ enum LocalAudit {
                         && Set(ascended.cards.map(\.id)).count == 10,
                         "Ascended Heroes God Pack composition")
         }
-        if AppLinks.isCustomBuild {
+        if AppLinks.isCustomBuild || AppLinks.isDevApp {
             try require(!AppLinks.updatesConfigured, "Custom build allows upstream updates")
         } else {
             try require(AppLinks.updatesConfigured, "Stable build cannot check for updates")

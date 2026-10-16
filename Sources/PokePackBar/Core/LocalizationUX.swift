@@ -173,6 +173,59 @@ extension L {
                      "Algo cambió mientras tanto. Actualiza e inténtalo de nuevo.",
                      "Quelque chose a changé entre-temps. Actualisez et réessayez.",
                      "Algo mudou nesse meio tempo. Atualize e tente de novo.")
+        case "money_on_both_sides":
+            return tradeMoneyOneSide
+        case "cards_required":
+            return tradeNeedsCard
+        case "offered_tokens_unavailable":
+            return t("제안한 쪽의 잔액이 모자라 교환할 수 없어요.",
+                     "The other side no longer has the money they offered.",
+                     "提案した側の残高が足りず交換できません。",
+                     "La otra parte ya no tiene el dinero que ofreció.",
+                     "L’autre partie n’a plus l’argent proposé.",
+                     "A outra parte não tem mais o dinheiro oferecido.")
+        case "offer_not_below_price":
+            return t("판매가보다 낮은 값만 제안할 수 있어요. 그 값이면 바로 사 주세요.",
+                     "Offer less than the asking price, or just buy it.",
+                     "販売価格より低い値段だけ提案できます。その値段ならそのまま買ってください。",
+                     "Ofrece menos que el precio o cómprala directamente.",
+                     "Proposez moins que le prix demandé, ou achetez directement.",
+                     "Ofereça menos que o preço pedido ou compre direto.")
+        case "offer_too_low":
+            return t("판매가의 절반 이상만 제안할 수 있어요.",
+                     "Offers must be at least half the asking price.",
+                     "販売価格の半分以上で提案してください。",
+                     "La oferta debe ser al menos la mitad del precio.",
+                     "L’offre doit valoir au moins la moitié du prix.",
+                     "A oferta deve ser pelo menos metade do preço.")
+        case "offer_not_accepted":
+            return t("봇 매물은 정해진 값에만 팔아요.",
+                     "Bot listings sell at a fixed price.",
+                     "ボット出品は決まった価格でのみ販売します。",
+                     "Las ventas de bot tienen precio fijo.",
+                     "Les ventes du bot sont à prix fixe.",
+                     "As vendas do bot têm preço fixo.")
+        case "offer_not_allowed":
+            return t("이 판매 글에는 제안할 수 없어요.",
+                     "You can’t make an offer on this listing.",
+                     "この出品には提案できません。",
+                     "No puedes ofertar en esta venta.",
+                     "Vous ne pouvez pas faire d’offre sur cette vente.",
+                     "Você não pode fazer oferta nesta venda.")
+        case "buyer_cannot_pay":
+            return t("구매자의 잔액이 모자라 수락할 수 없어요.",
+                     "The buyer no longer has enough money.",
+                     "購入者の残高が足りず承認できません。",
+                     "El comprador ya no tiene dinero suficiente.",
+                     "L’acheteur n’a plus assez d’argent.",
+                     "O comprador não tem mais dinheiro suficiente.")
+        case "offer_unavailable", "offer_not_found", "offer_quantity_unavailable":
+            return t("이미 닫혔거나 더는 채울 수 없는 제안이에요.",
+                     "This offer has closed or can no longer be filled.",
+                     "この提案はすでに閉じたか、応じられなくなりました。",
+                     "Esta oferta ya se cerró o no se puede cumplir.",
+                     "Cette offre est close ou ne peut plus être remplie.",
+                     "Esta oferta foi encerrada ou não pode mais ser atendida.")
         case "rotation_limit_reached":
             return t("봇 매물은 계정마다 한 장씩만 살 수 있어요.",
                      "Each account can buy one copy of a bot listing.",

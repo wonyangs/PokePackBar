@@ -109,9 +109,9 @@ enum OnlineText {
                              won: priced ? wonText(total.won) : nil, unpriced: total.unpriced)
     }
 
-    /// 주고받는 양쪽 시세를 한 문장으로 비교한다.
-    static func valueBalance(give: [String: Int], get: [String: Int]) -> String {
-        let gave = referenceTotal(give).won, got = referenceTotal(get).won
+    /// 주고받는 양쪽 시세를 한 문장으로 비교한다. 교환에 얹은 돈(원)도 그쪽 값에 더한다.
+    static func valueBalance(give: [String: Int], get: [String: Int], giveWon: Int = 0, getWon: Int = 0) -> String {
+        let gave = referenceTotal(give).won + giveWon, got = referenceTotal(get).won + getWon
         return l.valueBalance(give: wonText(gave), get: wonText(got), difference: got - gave, gap: wonText(abs(got - gave)))
     }
 
@@ -137,6 +137,11 @@ enum OnlineText {
         }
     }
 
+    /// 가격 제안의 상태. 교환과 같은 말을 쓰되, 수락은 「교환 완료」가 아니라 「수락됨」이다.
+    static func offerStatus(_ raw: String) -> (text: String, color: Color) {
+        raw == "accepted" ? (OnlineText.l.offerAccepted, .green) : tradeStatus(raw)
+    }
+
     static func notification(_ kind: String) -> (text: String, icon: String) {
         switch kind {
         case "trade_request": return (OnlineText.l.noteTradeRequest, "arrow.left.arrow.right")
@@ -149,6 +154,10 @@ enum OnlineText {
         case "listing_bought": return (OnlineText.l.noteListingBought, "bag")
         case "listing_expired": return (OnlineText.l.noteListingExpired, "clock")
         case "wishlist_listing": return (OnlineText.l.noteWishlistListing, "star")
+        case "offer_received": return (OnlineText.l.noteOfferReceived, "tag")
+        case "offer_accepted": return (OnlineText.l.noteOfferAccepted, "checkmark.circle")
+        case "offer_rejected": return (OnlineText.l.noteOfferRejected, "hand.raised")
+        case "offer_expired": return (OnlineText.l.noteOfferExpired, "clock")
         case "friend_request": return (OnlineText.l.noteFriendRequest, "person.badge.plus")
         case "friend_accept", "friend_accepted": return (OnlineText.l.noteFriendAccepted, "person.2")
         case "friend_reject", "friend_rejected": return (OnlineText.l.noteFriendRejected, "person.badge.minus")
@@ -188,7 +197,17 @@ enum OnlineText {
             case "listing_bought": return l.noteListingBoughtCard(card)
             case "listing_expired": return l.noteListingExpiredCard(card)
             case "wishlist_listing" where !price.isEmpty: return l.noteWishlistListingCard(card, price: price)
+            case "offer_expired": return l.noteOfferExpiredCard(card)
             default: break
+            }
+            // 가격 제안은 상대 이름과 카드가 함께 있어야 문장이 된다.
+            if let name = nickname, !name.isEmpty {
+                switch kind {
+                case "offer_received" where !price.isEmpty: return l.noteOfferReceivedCard(name, card: card, price: price)
+                case "offer_accepted" where !price.isEmpty: return l.noteOfferAcceptedCard(name, card: card, price: price)
+                case "offer_rejected": return l.noteOfferRejectedCard(name, card: card)
+                default: break
+                }
             }
         }
         return notification(kind).text
@@ -218,7 +237,7 @@ enum OnlineText {
     static func destination(_ kind: String) -> OnlineHubModel.Tab? {
         if kind.hasPrefix("trade_") { return .trades }
         if kind.hasPrefix("friend_") { return .social }
-        if kind.hasPrefix("listing_") || kind == "wishlist_listing" { return .market }
+        if kind.hasPrefix("listing_") || kind.hasPrefix("offer_") || kind == "wishlist_listing" { return .market }
         return nil
     }
 
@@ -412,6 +431,8 @@ struct OnlineSheet<Content: View>: View {
     let actionTitle: String
     var actionDisabled = false
     var note: String? = nil
+    /// 보기만 하는 창은 실행 버튼 없이 닫기만 둔다.
+    var showsAction = true
     let action: () -> Void
     @ViewBuilder var content: Content
     @Environment(\.dismiss) private var dismiss
@@ -425,12 +446,14 @@ struct OnlineSheet<Content: View>: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack {
-                Button(OnlineText.l.cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(showsAction ? OnlineText.l.cancel : OnlineText.l.close) { dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(actionTitle) { dismiss(); action() }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(actionDisabled)
+                if showsAction {
+                    Button(actionTitle) { dismiss(); action() }
+                        .buttonStyle(.borderedProminent)
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(actionDisabled)
+                }
             }
         }
         .padding(24)

@@ -28,6 +28,21 @@ enum AppEnv {
         ProcessInfo.processInfo.environment[name]
     }
 
+    /// 세이브, 캐시, 로그 파일에 붙는 이름. 정식 앱은 「PokePackBar」다. 정식 앱 옆에 함께 띄우는
+    /// 개발용 앱(`PPB_APP_VARIANT=dev ./scripts/build-app.sh`)은 Info.plist 의 `PPBDataName` 으로
+    /// 다른 이름을 받는다. 같은 이름을 쓰면 세이브를 번갈아 덮어쓰고, 서로의 실행 표시를 보고
+    /// 지난 실행이 비정상 종료됐다고 오해한다.
+    static let dataName: String = {
+        let name = Bundle.main.object(forInfoDictionaryKey: "PPBDataName") as? String ?? ""
+        return name.isEmpty ? "PokePackBar" : name
+    }()
+
+    /// Application Support 아래 이 앱의 폴더.
+    static var supportDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent(dataName, isDirectory: true)
+    }
+
     static var canUseNotifications: Bool {
         guard isBundledApp, let bundleID = Bundle.main.bundleIdentifier else { return false }
         return NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) != nil

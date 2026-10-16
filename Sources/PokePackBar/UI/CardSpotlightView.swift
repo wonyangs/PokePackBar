@@ -44,12 +44,15 @@ struct CardSpotlightView: View {
     /// 판매 줄의 실제 높이. 언어에 따라 두 버튼(바로 팔기, 마켓에 팔기)이 한 줄이나 두 줄이 되고,
     /// 확인 단계에는 안내 줄이 붙는다. 어림값으로 두면 카드가 덜 줄어 마지막 버튼이 화면 밖으로 밀린다.
     @State private var saleControlsHeight: CGFloat = 27
+    /// 출처 팩과 뽑힐 확률. 세트 전체를 훑어 세므로 카드가 바뀔 때만 다시 구한다.
+    @State private var source: CardSource?
 
     var body: some View {
         GeometryReader { geometry in
             // The shop has an extra picker above this view. Measure its real
             // height instead of assuming that every caller gets the whole tab.
-            let informationHeight: CGFloat = ownedCount > 1 ? 182 : 160
+            // 뽑힐 확률 줄은 거의 모든 카드에 있어 늘 자리를 잡는다. 마켓 줄은 온라인일 때만.
+            let informationHeight: CGFloat = (ownedCount > 1 ? 182 : 160) + 21 + (wallet.isOnline ? 21 : 0)
             let dexHeight: CGFloat = relatedDexes.shown.isEmpty ? 0 : 42
             let saleHeight: CGFloat = wallet.spareCount(cardID) == 0 ? 0 : saleControlsHeight + 9
             let cardWidth = min(230, max(150,
@@ -62,12 +65,14 @@ struct CardSpotlightView: View {
         }
         .onAppear {
             selectedFinish = finish ?? wallet.bestOwnedFinish(cardID: cardID)
+            source = findSource()
             withAnimation(.spring(response: 0.34, dampingFraction: 0.75)) { landed = true }
         }
         .onChange(of: cardID) {
             confirmingSale = false
             lastRefund = nil
             selectedFinish = finish ?? wallet.bestOwnedFinish(cardID: cardID)
+            source = findSource()
         }
     }
 
@@ -85,15 +90,16 @@ struct CardSpotlightView: View {
 
             // 마우스를 올리면 기울고 광택이 흐른다 — 확대 화면에서만 준다.
             // 격자에서는 크기가 작아 각도가 읽히지 않고, 지나가는 커서마다 반응하면 산만하다.
+            // 좌우로 끌면 뒷면까지 돌려 볼 수 있고, 두 번 누르면 앞면으로 돌아온다.
             Group {
                 if let displayedFinish {
                     HolographicCardView(cardID: cardID, tier: tier,
                                         finish: displayedFinish, setID: setID,
                                         originalRarity: rarity, width: cardWidth,
-                                        dimmed: ownedCount == 0, preloaded: preloaded)
+                                        dimmed: ownedCount == 0, preloaded: preloaded, spinnable: true)
                 } else {
                     HolographicCardView(cardID: cardID, tier: tier, width: cardWidth,
-                                        dimmed: ownedCount == 0, preloaded: preloaded)
+                                        dimmed: ownedCount == 0, preloaded: preloaded, spinnable: true)
                 }
             }
                 // 상세 화면은 개봉 연출이 아니라 들여다보는 자리다. 후광은 절반만.
@@ -225,18 +231,28 @@ struct CardSpotlightView: View {
         .contentShape(Rectangle())
     }
 
+    private func findSource() -> CardSource? {
+        CardIndex.shared.flatMap { CardSource.of(cardID: cardID, index: $0, perks: wallet.openingPerks) }
+    }
+
     /// 이 카드가 실제 시장에서 얼마인가. 갖고 있으면 장수만큼의 값도 함께 보여 준다.
     ///
     /// 등급 배지만으로는 알 수 없는 것을 말해 준다 — 같은 SAR 이라도 리자몽과 나머지는
     /// 스무 배 넘게 차이가 나고, 1999년 세트의 커먼이 최신 세트의 SR 보다 비싸기도 하다.
+    ///
+    /// 아래에 출처 팩에서 뽑힐 확률과, 온라인이면 마켓 판매 글을 붙인다. 출처 팩 이름만으로는
+    /// 그 팩을 몇 개나 사야 하는지 알 수 없고, 사는 것보다 마켓이 빠를 수도 있다.
     @ViewBuilder
     private func priceRow(_ l: L) -> some View {
-        if let prices = CardPrices.shared,
-           let unit = displayedFinish.flatMap({ prices.price(cardID: cardID, finish: $0) })
-                ?? prices.price(cardID) {
-            // 값 정보는 라벨을 붙인 작은 표로 둔다. 가운뎃점으로만 이어 붙인 줄은 시세, 보유 총액,
-            // 시세의 출처가 한눈에 구분되지 않았다. 줄 수는 예전과 같아 카드 크기 계산은 그대로다.
-            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 3) {
+        let prices = CardPrices.shared
+        let price = prices.flatMap { prices in
+            (displayedFinish.flatMap({ prices.price(cardID: cardID, finish: $0) }) ?? prices.price(cardID))
+                .map { (prices, $0) }
+        }
+        // 값 정보는 라벨을 붙인 작은 표로 둔다. 가운뎃점으로만 이어 붙인 줄은 시세, 보유 총액,
+        // 시세의 출처가 한눈에 구분되지 않았다.
+        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 3) {
+            if case let (prices, unit)? = price {
                 // 개별 가격은 자르지 않는다. 중복 보유 총액은 별도 행을 쓴다.
                 GridRow {
                     infoLabel(l.marketPrice)
@@ -267,6 +283,21 @@ struct CardSpotlightView: View {
                 GridRow {
                     infoLabel(l.priceBasis)
                     priceBasisLabel(l, prices).lineLimit(1).minimumScaleFactor(0.8)
+                }
+            }
+            if let source, let chance = source.chanceText(l) {
+                GridRow {
+                    infoLabel(l.pullChanceLabel)
+                    Text(chance)
+                        .font(Typography.bodySemibold).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                        .help(source.perPack < 1 ? l.dexPullChance(DexFormat.percent(source.perPack)) : "")
+                }
+            }
+            if wallet.isOnline {
+                GridRow {
+                    infoLabel(l.cardListingsLabel)
+                    CardMarketRow(wallet: wallet, cardID: cardID)
                 }
             }
         }

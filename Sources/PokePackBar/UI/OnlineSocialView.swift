@@ -728,8 +728,9 @@ struct OnlinePrintingArt: View {
     var body: some View {
         let key = CardPrintingKey(storageKey: printing)
         if let card = CardIndex.shared?.card(key.cardID) {
+            // 온라인 창에서 카드를 크게 보는 자리는 모두 이것을 쓴다. 기울이고 끌어서 돌려 본다.
             HolographicCardView(cardID: card.id, tier: card.tier, finish: key.finish, setID: card.setID,
-                                originalRarity: card.rarity, width: width)
+                                originalRarity: card.rarity, width: width, spinnable: true)
         } else { Image(systemName: "rectangle.portrait").frame(width: width, height: width / 0.717) }
     }
 }

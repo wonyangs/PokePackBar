@@ -180,6 +180,15 @@ struct TiltVector: Equatable {
     }
 }
 
+extension View {
+    /// 마우스 기울기만큼 카드 몸체를 기울인다. 앞면과 그 뒤의 등급 빛이 같은 각도로 기울어야
+    /// 둘이 어긋나지 않아, 한 곳에서 정한다.
+    func holoTilt(_ tilt: TiltVector, spec: FoilSpec) -> some View {
+        rotation3DEffect(.degrees(tilt.magnitude * HoloProfile.of(spec).tilt),
+                         axis: tilt.axis, perspective: 0.55)
+    }
+}
+
 /// Pure interaction policy so reduced-motion behavior can be verified without
 /// mounting a SwiftUI view.
 enum HoloInteraction {
@@ -204,18 +213,26 @@ struct HolographicCardView: View {
     var width: CGFloat
     var dimmed: Bool
     var preloaded: NSImage?
+    /// 끌어서 돌려 볼 수 있는지. 들여다보는 자리(카드 상세, 온라인 카드 창)에서만 켠다.
+    /// 팩 개봉 화면은 밀어서 뜯기와 끌어서 엿보기가 이미 드래그를 쓴다.
+    var spinnable: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.valueAwareGlow) private var valueAwareGlow
     @State private var pointerTilt = TiltVector.zero
     @State private var pendingPointerTilt: TiltVector?
     @State private var hoverUpdateScheduled = false
+    @State private var spin = CardSpin.rest
+    /// 끌기를 시작할 때의 자세. 끄는 중이 아니면 nil 이다.
+    @State private var dragOrigin: CardSpin?
+    @State private var clicks = CardClickClock()
 
     private var height: CGFloat { (width / 0.717).rounded() }
 
     /// Source-compatible initializer for existing callers. Finish metadata is
     /// recovered from the bundled card index when possible.
     init(cardID: String, tier: CardTier, width: CGFloat = 200,
-         dimmed: Bool = false, preloaded: NSImage? = nil) {
+         dimmed: Bool = false, preloaded: NSImage? = nil, spinnable: Bool = false) {
         self.cardID = cardID
         self.tier = tier
         self.explicitFinish = nil
@@ -224,12 +241,14 @@ struct HolographicCardView: View {
         self.width = width
         self.dimmed = dimmed
         self.preloaded = preloaded
+        self.spinnable = spinnable
     }
 
     /// Printing-aware initializer for pulled variants.
     init(cardID: String, tier: CardTier, finish: CardFinish,
          setID: String? = nil, originalRarity: String? = nil,
-         width: CGFloat = 200, dimmed: Bool = false, preloaded: NSImage? = nil) {
+         width: CGFloat = 200, dimmed: Bool = false, preloaded: NSImage? = nil,
+         spinnable: Bool = false) {
         self.cardID = cardID
         self.tier = tier
         self.explicitFinish = finish
@@ -238,6 +257,7 @@ struct HolographicCardView: View {
         self.width = width
         self.dimmed = dimmed
         self.preloaded = preloaded
+        self.spinnable = spinnable
     }
 
     var body: some View {
@@ -245,13 +265,37 @@ struct HolographicCardView: View {
         let tilt = HoloInteraction.effectiveTilt(
             pointer: pointerTilt, reduceMotion: reduceMotion)
 
-        HoloCardBody(cardID: cardID, tier: tier, finish: resolved.finish,
-                     spec: resolved.spec, width: width, height: height,
-                     dimmed: dimmed, preloaded: preloaded,
-                     visualKind: CardIndex.shared?.card(cardID)?.visualKind,
-                     tilt: tilt)
+        let visualKind = CardIndex.shared?.card(cardID)?.visualKind
+        Group {
+            if spinnable {
+                // 등급 빛과 그림자는 무대가 그린다. 앞면 안에 두면 카드와 함께 눌려 옆으로 설 때
+                // 두꺼운 띠처럼 보였다.
+                CardSpinStage(spin: spin, pointerTilt: dragOrigin == nil ? tilt : .zero,
+                              width: width, height: height,
+                              glow: { pose in
+                                  if !dimmed {
+                                      TierGlow(tier: tier, width: width,
+                                               valueCard: valueAwareGlow
+                                                  ? PulledCard(id: cardID, tier: tier, isNew: false, finish: resolved.finish)
+                                                  : nil)
+                                          .holoTilt(pose, spec: resolved.spec)
+                                  }
+                              }) { light, pose in
+                    HoloCardBody(cardID: cardID, tier: tier, finish: resolved.finish,
+                                 spec: resolved.spec, width: width, height: height,
+                                 dimmed: dimmed, preloaded: preloaded,
+                                 visualKind: visualKind, tilt: light, pose: pose, onSlab: true)
+                }
+            } else {
+                HoloCardBody(cardID: cardID, tier: tier, finish: resolved.finish,
+                             spec: resolved.spec, width: width, height: height,
+                             dimmed: dimmed, preloaded: preloaded,
+                             visualKind: visualKind, tilt: tilt)
+            }
+        }
             .frame(width: width, height: height)
             .contentShape(Rectangle())
+            .gesture(spinGesture, including: spinnable ? .all : .subviews)
             .onContinuousHover(coordinateSpace: .local) { phase in
                 guard !reduceMotion else {
                     pointerTilt = .zero
@@ -271,6 +315,8 @@ struct HolographicCardView: View {
             .onChange(of: cardID) {
                 pendingPointerTilt = nil
                 pointerTilt = .zero
+                dragOrigin = nil
+                spin = .rest
             }
             .onChange(of: reduceMotion) {
                 if reduceMotion {
@@ -278,6 +324,71 @@ struct HolographicCardView: View {
                     pointerTilt = .zero
                 }
             }
+    }
+
+    /// 끄는 대로 돌고, 놓으면 던진 속도만큼 더 돌다가 가까운 앞면이나 뒷면에 멈춘다.
+    /// 동작 줄이기를 켰으면 관성 없이 놓은 자리에서 가까운 면으로 바로 선다.
+    ///
+    /// 두 번 누르면 가장 가까운 앞면으로 돌아온다. 두 번 누르기를 따로 붙이면 macOS 가 그 판정을
+    /// 기다리느라 끌기가 늦게 잡혀, 같은 제스처 안에서 「거의 움직이지 않고 뗀 것」을 클릭으로 센다.
+    private var spinGesture: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let origin: CardSpin
+                if let dragOrigin {
+                    origin = dragOrigin
+                } else {
+                    // 3pt 넘게 움직여야 끌기로 본다. 그 전에는 클릭일 수 있다.
+                    guard hypot(value.translation.width, value.translation.height) >= 3 else { return }
+                    origin = spin
+                }
+                follow(from: origin, to: origin.turned(by: value.translation, width: width))
+            }
+            .onEnded { value in
+                guard let origin = dragOrigin else {
+                    let now = Date()
+                    if let last = clicks.lastClick, now.timeIntervalSince(last) < NSEvent.doubleClickInterval {
+                        clicks.lastClick = nil
+                        settle(at: spin.front)
+                    } else {
+                        clicks.lastClick = now
+                    }
+                    return
+                }
+                let thrown = reduceMotion ? value.translation : value.predictedEndTranslation
+                settle(at: origin.turned(by: thrown, width: width).settled)
+            }
+    }
+
+    /// 끌기를 끝내는 것(`dragOrigin`)도 같은 애니메이션 안에서 바꾼다. 그래야 마우스 기울기가
+    /// 카드가 정면으로 돌아오는 만큼 스며들고, 놓는 순간 튀지 않는다.
+    private func settle(at target: CardSpin) {
+        if reduceMotion {
+            dragOrigin = nil
+            spin = target
+        } else {
+            withAnimation(.spring(response: 0.6, dampingFraction: 0.82)) {
+                dragOrigin = nil
+                spin = target
+            }
+        }
+    }
+
+    /// 끄는 동안은 짧은 스프링이 손을 따라간다. 마우스 이벤트는 화면 주사율과 어긋나게 들어와서,
+    /// 받은 값을 그대로 넣거나 타이머로 모아 넣으면 어떤 프레임은 건너뛰고 어떤 프레임은 크게 뛴다.
+    /// 스프링은 매 프레임 그 사이를 메우고, 새 값이 오면 속도를 이어 받아 목표만 바꾼다.
+    /// 이벤트가 한 프레임에 여럿 와도 그리는 것은 프레임마다 한 번이다. 끌기 시작(`dragOrigin`)도
+    /// 같은 스프링 안에서 바꿔, 마우스 기울기가 한 번에 빠지지 않고 스르르 풀린다.
+    private func follow(from origin: CardSpin, to next: CardSpin) {
+        if reduceMotion {
+            dragOrigin = origin
+            spin = next
+        } else {
+            withAnimation(.interactiveSpring(response: 0.14, dampingFraction: 0.86)) {
+                dragOrigin = origin
+                spin = next
+            }
+        }
     }
 
     /// 연속 hover 이벤트마다 0.12초 애니메이션을 새로 쌓으면 수십 개의 Canvas·mask가 같은 프레임에
@@ -326,6 +437,8 @@ enum HoloVisualDiagnostics {
         let sweep: Bool
         var geometry: Bool = false
         var visibility: Bool = false
+        /// 끌어서 돌린 자세들(앞면, 옆으로 서기 직전과 직후, 뒷면, 위아래 기울기).
+        var spin: Bool = false
     }
 
     enum Failure: LocalizedError {
@@ -337,7 +450,7 @@ enum HoloVisualDiagnostics {
         var errorDescription: String? {
             switch self {
             case .malformedArguments:
-                "Usage: --render-holo-preview <card-id> <output-directory> [finish] [--compact] [--actual-size] [--flat-card] [--sweep]"
+                "Usage: --render-holo-preview <card-id> <output-directory> [finish] [--compact] [--actual-size] [--flat-card] [--sweep] [--spin]"
             case .unknownCard(let cardID):
                 "Not in the card index: \(cardID)"
             case .missingImage(let cardID):
@@ -382,7 +495,8 @@ enum HoloVisualDiagnostics {
                        flatCard: options.contains("--flat-card"),
                        sweep: options.contains("--sweep"),
                        geometry: options.contains("--geometry"),
-                       visibility: options.contains("--visibility"))
+                       visibility: options.contains("--visibility"),
+                       spin: options.contains("--spin"))
     }
 
     static func render(_ request: Request) async throws -> [URL] {
@@ -419,6 +533,48 @@ enum HoloVisualDiagnostics {
         let cardWidth: CGFloat = request.actualSize ? 240 : 420
         let cardHeight = (cardWidth / 0.717).rounded()
         var files: [URL] = []
+        if request.spin {
+            // 멈춘 카드에 마우스를 올린 자세도 함께 본다. 돌리는 카드의 등급 빛이 앞면과 따로
+            // 놀면 이 자세에서 가장자리에 선이 드러난다.
+            let spins: [(String, CardSpin, TiltVector)] = [
+                ("spin-000", .rest, .zero), ("spin-030", CardSpin(yaw: 30, pitch: 0), .zero),
+                ("spin-085", CardSpin(yaw: 85, pitch: 0), .zero), ("spin-095", CardSpin(yaw: 95, pitch: 0), .zero),
+                ("spin-150", CardSpin(yaw: 150, pitch: 0), .zero), ("spin-180", CardSpin(yaw: 180, pitch: 0), .zero),
+                ("spin-pitch-down", CardSpin(yaw: 0, pitch: 30), .zero),
+                ("spin-pitch-back", CardSpin(yaw: 180, pitch: -30), .zero),
+                ("spin-hover-right", .rest, TiltVector(nx: 0.88, ny: -0.02)),
+                ("spin-hover-diagonal", .rest, TiltVector(nx: 0.68, ny: -0.68)),
+            ]
+            for (name, spin, pointer) in spins {
+                let view = ZStack {
+                    Color(red: 0.055, green: 0.06, blue: 0.075)
+                    CardSpinStage(spin: spin, pointerTilt: pointer, width: cardWidth, height: cardHeight,
+                                  glow: { pose in
+                                      TierGlow(tier: card.tier, width: cardWidth, startBloomed: true)
+                                          .holoTilt(pose, spec: resolved.spec)
+                                  }) { light, pose in
+                        HoloCardBody(cardID: card.id, tier: card.tier,
+                                     finish: resolved.finish, spec: resolved.spec,
+                                     width: cardWidth, height: cardHeight,
+                                     dimmed: false, preloaded: image,
+                                     visualKind: card.visualKind, tilt: light, pose: pose, onSlab: true)
+                    }
+                    .frame(width: cardWidth, height: cardHeight)
+                }
+                .frame(width: cardWidth + 120, height: cardHeight + 120)
+                let renderer = ImageRenderer(content: view)
+                renderer.scale = 2
+                guard let rendered = renderer.nsImage, let tiff = rendered.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: tiff),
+                      let png = bitmap.representation(using: .png, properties: [:]) else {
+                    throw Failure.renderingFailed(name)
+                }
+                let file = request.outputDirectory.appendingPathComponent("\(card.id)-\(name).png")
+                try png.write(to: file, options: .atomic)
+                files.append(file)
+            }
+            return files
+        }
         let selectedPoses: [Pose]
         if request.visibility {
             selectedPoses = [poses[0],
@@ -497,6 +653,11 @@ struct HoloCardBody: View, @MainActor Animatable {
     let visualKind: CardVisualKind?
     var tilt: TiltVector
     var flatCard: Bool = false
+    /// 몸체를 기울일 기울기. 없으면 `tilt` 를 쓴다. 돌리는 카드는 빛만 크게 옮기고 몸체는
+    /// 두께 상자와 같은 판에 둬야 해서 따로 받는다.
+    var pose: TiltVector? = nil
+    /// 두께 있는 카드(`CardSpinStage`)의 앞면으로 그린다. 등급 빛과 그림자는 무대가 그린다.
+    var onSlab: Bool = false
 
     nonisolated var animatableData: AnimatablePair<Double, Double> {
         get { AnimatablePair(tilt.nx, tilt.ny) }
@@ -511,11 +672,12 @@ struct HoloCardBody: View, @MainActor Animatable {
             nx: tilt.nx, ny: tilt.ny, tilt: profile.tilt)
         let band = HoloOptics.bandPosition(
             nx: tilt.nx, ny: tilt.ny, tilt: profile.tilt)
+        let posed = pose ?? tilt
 
         ZStack {
             // 아직 없는 카드는 빛나지 않는다. 회색 카드 뒤에서 등급 빛만 켜져 있으면
             // 도감을 훑을 때 백라이트처럼 보이고, 빛이 「뽑았다」는 신호로 읽히지 않는다.
-            if !dimmed {
+            if !dimmed && !onSlab {
                 TierGlow(tier: tier, width: width,
                          valueCard: valueAwareGlow
                             ? PulledCard(id: cardID, tier: tier, isNew: false, finish: finish) : nil)
@@ -533,12 +695,11 @@ struct HoloCardBody: View, @MainActor Animatable {
                     })
                 })
                 .compositingGroup()
-                .shadow(color: .black.opacity(0.3), radius: width * 0.045,
-                        x: flatCard ? 0 : -tilt.nx * width * 0.018,
-                        y: width * 0.022 - (flatCard ? 0 : tilt.ny * width * 0.012))
+                .shadow(color: onSlab ? .clear : .black.opacity(0.3), radius: width * 0.045,
+                        x: flatCard ? 0 : -posed.nx * width * 0.018,
+                        y: width * 0.022 - (flatCard ? 0 : posed.ny * width * 0.012))
         }
-        .rotation3DEffect(.degrees(flatCard ? 0 : tilt.magnitude * profile.tilt),
-                          axis: tilt.axis, perspective: 0.55)
+        .holoTilt(flatCard ? .zero : posed, spec: spec)
     }
 
     @ViewBuilder
