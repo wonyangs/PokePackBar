@@ -11,6 +11,27 @@ read_when:
 
 # 결함 대응 축적 규칙
 
+### 2026-10-23 — Keep automatic server-session storage out of Keychain
+
+- The local signing certificate and designated requirement stayed stable, but
+  the legacy item's partition approvals were cdhash-specific: the actual saved
+  hashes matched 0.21, 0.22 and 0.23 independently. Each new binary needed approval.
+- `LAContext.interactionNotAllowed` did not establish zero access. Earlier token
+  loader injections bypassed real storage and could not detect startup prompts.
+- With user approval, use unencrypted owner-only session files (0700 directory,
+  0600 files), keyed by server/account/device. Never persist passwords. This is
+  weaker than Keychain against other processes running as the same macOS user.
+- Automatic load/save/remove never query Keychain. Only explicit legacy import
+  may read it. Missing/corrupt files fail locally; logout does not resurrect an
+  old item. Keep the old item untouched for rollback and server revocation intact.
+- Storage tests cover permissions, update/reload, identity isolation, damaged
+  data, failed writes and explicit/failed import. Injecting an invalid Keychain
+  query into ordinary file loading makes the zero-query regression fail.
+- Native HTTP audits now load actual isolated credential files, including stale
+  expiry metadata and authoritative server rejection after revocation.
+- Sweep: account-window automatic reads use the same file store; only the import
+  button/CLI use the legacy reader. Usage-provider Keychain controls stay separate.
+
 ### 2026-10-23 — Restart transient banners by presentation identity
 
 - Replacing a visible reward/online celebration updated its content while a

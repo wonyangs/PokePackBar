@@ -20,8 +20,10 @@ enum OnlineGameAudit {
         let configuration = RemoteGameConfiguration(baseURL: url, accountID: account, deviceID: login.device_id)
         let staleMetadata = ServerCredential(access_token: login.access_token, account_id: account,
             device_id: login.device_id, email: email, expires_at: 0)
+        let credentials = root.appendingPathComponent("session-files")
+        try ServerCredentialStore.save(staleMetadata, configuration: configuration, root: credentials)
         let stored = RemoteGameSession(configuration: configuration, localRoot: root.appendingPathComponent("stored-expiry"),
-            credentialLoader: { staleMetadata })
+            credentialLoader: { try ServerCredentialStore.load(configuration, root: credentials) })
         await stored.synchronize()
         try LocalAudit.require(stored.ready, "Stored expiry prevented server session validation")
         _ = try await stored.api("v1/state")
@@ -104,7 +106,7 @@ enum OnlineGameAudit {
             try LocalAudit.require(error.status == 401 && stored.authenticationExpired,
                                    "Server rejection did not invalidate stored session")
         }
-        print("PASS stored session: stale expiry survives first load and cache; HTTP 401 remains authoritative; isolated credential loader, no personal Keychain access")
+        print("PASS stored session: real local file loads stale expiry through first load and cache; HTTP 401 remains authoritative; isolated files, no personal Keychain access")
         await second.synchronize()
         try LocalAudit.require(!second.ready, "Logout-all left another device authenticated")
         print("PASS online API: email/password, UUID-only rejection, two devices, collection delta, purchase/open, lost-response restart, logout/re-login replay without redraw, revision conflict, logout-all; isolated account and wallet; no personal Keychain access")

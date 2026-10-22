@@ -20,6 +20,7 @@ struct OnlineSettingsView: View {
     @State private var linking = false
     @State private var busy = false
     @State private var credential: ServerCredential?
+    @State private var offersLegacyImport = false
     @State private var message: String?
     /// 계정 창의 탭.
     enum AccountTab: String, CaseIterable, Sendable { case profile, connection, security, devices, server }
@@ -48,6 +49,7 @@ struct OnlineSettingsView: View {
         auditing = auditSection != nil
         if let initialSection { _section = State(initialValue: initialSection) }
         if let auditSection {
+            _offersLegacyImport = State(initialValue: auditSection == .connection)
             if auditSection == .profile {
                 _savedNickname = State(initialValue: "Layout Trainer")
                 _nicknameDraft = State(initialValue: "Layout Trainer")
@@ -296,6 +298,15 @@ struct OnlineSettingsView: View {
             }
             Text(OnlineText.l.sameEmailNote)
                 .font(Typography.label).foregroundStyle(.secondary)
+            Text(OnlineText.l.localSessionNote)
+                .font(Typography.label).foregroundStyle(.secondary)
+            if offersLegacyImport && !registering {
+                Divider()
+                Button(OnlineText.l.importLegacySignIn) { importLegacySignIn() }
+                    .disabled(actionsDisabled)
+                Text(OnlineText.l.importLegacySignInNote)
+                    .font(Typography.label).foregroundStyle(.secondary)
+            }
             }
             .padding(6)
         }
@@ -568,10 +579,46 @@ struct OnlineSettingsView: View {
         guard let account = UUID(uuidString: UserDefaults.standard.string(forKey: "ppb.server.account") ?? ""),
               let url = try? validatedURL() else { return }
         let config = RemoteGameConfiguration(baseURL: url, accountID: account, deviceID: ServerAuthentication.deviceID())
-        // 키체인 접근 허용 창이 뜨면 답할 때까지 멈추므로 메인 스레드 밖에서 읽는다.
+        // Opening this form reads only the local session file.
         Task {
             let saved = await Task.detached(priority: .userInitiated) { try? ServerCredentialStore.load(config) }.value
             if let saved { credential = saved; email = saved.email }
+            offersLegacyImport = saved == nil
+        }
+    }
+
+    private func importLegacySignIn() {
+        guard !actionsDisabled,
+              let account = UUID(uuidString: UserDefaults.standard.string(forKey: "ppb.server.account") ?? ""),
+              let url = try? validatedURL() else { return }
+        let config = RemoteGameConfiguration(baseURL: url, accountID: account, deviceID: ServerAuthentication.deviceID())
+        if unconfirmed, wallet.remote?.configuration.storageKey != config.storageKey {
+            message = OnlineText.l.signInToPendingAccount
+            return
+        }
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                // This explicit button is the only remaining server-session Keychain read.
+                guard let saved = try await Task.detached(priority: .userInitiated, operation: {
+                    try ServerCredentialStore.importLegacy(config)
+                }).value else {
+                    message = OnlineText.l.credentialUnreadable
+                    return
+                }
+                credential = saved
+                email = saved.email
+                offersLegacyImport = false
+                if let remote = wallet.remote, remote.configuration.storageKey == config.storageKey {
+                    remote.forgetCredential()
+                    await remote.synchronize()
+                    message = remote.error ?? OnlineText.l.signedInSynced
+                } else {
+                    message = OnlineText.l.signedInRestart
+                    needsRestart = true
+                }
+            } catch { message = OnlineText.message(for: error) }
         }
     }
 

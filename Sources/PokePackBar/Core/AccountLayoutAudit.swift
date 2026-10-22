@@ -48,6 +48,8 @@ import SwiftUI
                     .preferredColorScheme(width == 760 ? .light : .dark)), size: NSSize(width: width, height: 560))
             }
         }
+        try await capture("account-import", view: AnyView(OnlineSettingsView(wallet: wallet, auditSection: .connection)
+            .padding(24).preferredColorScheme(.light)), size: NSSize(width: 760, height: 800))
         try await capture("account-recover", view: AnyView(OnlineSettingsView(wallet: wallet, auditSection: .security).padding(24)),
                           size: NSSize(width: 560, height: 500))
         try JSONSerialization.data(withJSONObject: measurements, options: [.prettyPrinted, .sortedKeys])
@@ -61,7 +63,7 @@ import SwiftUI
             window.close()
             try LocalAudit.require(window.contentView == nil, "Hidden account form retained")
         }
-        print("PASS account layout: 4 compact settings sections, 11 native states, light/dark, close/reopen and form disposal; isolated fixtures, no login")
+        print("PASS account layout: 4 compact settings sections, 12 native states including session import, light/dark, close/reopen and form disposal; isolated fixtures, no login")
     }
 }
 

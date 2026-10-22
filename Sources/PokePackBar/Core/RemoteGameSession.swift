@@ -515,9 +515,7 @@ final class RemoteGameSession {
     /// 계정 창에서 같은 계정으로 다시 로그인했을 때 새 로그인 정보를 읽게 한다.
     func forgetCredential() { cachedCredential = nil }
 
-    /// 키체인은 세션마다 한 번, 메인 스레드 밖에서 읽는다. 앱 서명이 바뀐 뒤(업데이트 등) 첫 읽기는
-    /// macOS 의 접근 허용 창에 답할 때까지 멈추는데, 메인 스레드에서 읽으면 그동안 메뉴바 아이콘조차
-    /// 그리지 못해 앱이 실행되지 않은 것처럼 보였다(v0.12.0 업데이트 직후 실제로 겪음).
+    /// Read the local session file once, off the main actor. Startup never reads Keychain.
     ///
     /// 저장된 만료 시각으로 토큰을 버리지 않는다. 서버가 쓰는 동안 세션을 늘려 주므로 끝났는지는
     /// 서버가 401 로 알려 준다. 예전에는 로그인할 때 받은 7일이 지나면 서버에 묻지도 않고

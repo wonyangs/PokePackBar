@@ -1,5 +1,4 @@
 import Foundation
-import LocalAuthentication
 import Security
 
 enum ServerPasswordPolicy {
@@ -18,7 +17,7 @@ struct ServerLoginFailure: LocalizedError {
 }
 
 /// Login passwords are transient form input. Only the server's revocable
-/// session is persisted, in this app's own non-synchronizing Keychain item.
+/// session is persisted in this app's owner-only local file.
 struct ServerCredential: Codable, Sendable {
     let access_token: String
     let account_id: UUID
@@ -28,59 +27,85 @@ struct ServerCredential: Codable, Sendable {
 }
 
 enum ServerCredentialStore {
-    private static let service = "dev.local.pokepackbar.server-session"
+    static var directory: URL { AppEnv.supportDirectory.appendingPathComponent("server-credentials", isDirectory: true) }
 
-    private static func query(_ configuration: RemoteGameConfiguration) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword,
-         kSecAttrService as String: service,
-         kSecAttrAccount as String: configuration.storageKey,
-         kSecAttrSynchronizable as String: false]
+    static func fileURL(_ configuration: RemoteGameConfiguration, root: URL = directory) -> URL {
+        root.appendingPathComponent(configuration.storageKey + ".json")
     }
 
-    static func load(_ configuration: RemoteGameConfiguration) throws -> ServerCredential? {
-        var fields = query(configuration)
-        fields[kSecReturnData as String] = true
-        fields[kSecMatchLimit as String] = kSecMatchLimitOne
-        // Background synchronization must never trigger a Keychain prompt.
-        let context = LAContext()
-        context.interactionNotAllowed = true
-        fields[kSecUseAuthenticationContext as String] = context
-        var result: CFTypeRef?
-        let status = SecItemCopyMatching(fields as CFDictionary, &result)
-        if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let data = result as? Data else {
+    /// Automatic startup/account reads use files only, including missing or damaged files.
+    static func load(_ configuration: RemoteGameConfiguration, root: URL = directory) throws -> ServerCredential? {
+        let data: Data
+        do { data = try Data(contentsOf: fileURL(configuration, root: root)) }
+        catch CocoaError.fileReadNoSuchFile { return nil }
+        catch { throw ServerLoginFailure(message: L.current.credentialUnreadable) }
+        guard let credential = try? JSONDecoder().decode(ServerCredential.self, from: data) else {
             throw ServerLoginFailure(message: L.current.credentialUnreadable)
         }
-        let credential = try JSONDecoder().decode(ServerCredential.self, from: data)
-        guard credential.account_id == configuration.accountID,
-              credential.device_id == configuration.deviceID else {
-            throw ServerLoginFailure(message: L.current.credentialMismatch)
-        }
+        try validate(credential, configuration: configuration)
         return credential
     }
 
-    static func save(_ credential: ServerCredential, configuration: RemoteGameConfiguration) throws {
-        let data = try JSONEncoder().encode(credential)
-        let fields = query(configuration)
-        let status = SecItemUpdate(fields as CFDictionary, [kSecValueData as String: data] as CFDictionary)
-        if status == errSecSuccess { return }
-        guard status == errSecItemNotFound else {
-            throw ServerLoginFailure(message: L.current.keychainUpdateFailed(status))
-        }
-        var added = fields
-        added[kSecValueData as String] = data
-        added[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        let created = SecItemAdd(added as CFDictionary, nil)
-        guard created == errSecSuccess else {
-            throw ServerLoginFailure(message: L.current.keychainSaveFailed(created))
+    private static func validate(_ credential: ServerCredential, configuration: RemoteGameConfiguration) throws {
+        guard credential.account_id == configuration.accountID,
+              credential.device_id == configuration.deviceID, !credential.access_token.isEmpty else {
+            throw ServerLoginFailure(message: L.current.credentialMismatch)
         }
     }
 
-    static func remove(_ configuration: RemoteGameConfiguration) throws {
-        let status = SecItemDelete(query(configuration) as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw ServerLoginFailure(message: L.current.keychainDeleteFailed(status))
+    static func save(_ credential: ServerCredential, configuration: RemoteGameConfiguration, root: URL = directory) throws {
+        try validate(credential, configuration: configuration)
+        let data = try JSONEncoder().encode(credential)
+        let files = FileManager.default
+        do {
+            // The private directory also protects the temporary atomic-write file.
+            try files.createDirectory(at: root, withIntermediateDirectories: true,
+                                      attributes: [.posixPermissions: 0o700])
+            try files.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+            let url = fileURL(configuration, root: root)
+            try data.write(to: url, options: .atomic)
+            try files.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        } catch {
+            throw ServerLoginFailure(message: L.current.credentialSaveFailed)
         }
+    }
+
+    static func remove(_ configuration: RemoteGameConfiguration, root: URL = directory) throws {
+        do { try FileManager.default.removeItem(at: fileURL(configuration, root: root)) }
+        catch CocoaError.fileNoSuchFile { return }
+        catch { throw ServerLoginFailure(message: L.current.credentialDeleteFailed) }
+    }
+
+    /// Called only by the explicit import action. Preserve the old item for rollback;
+    /// ordinary loading/logout never consults it or resurrects it as a fallback.
+    static func importLegacy(_ configuration: RemoteGameConfiguration, root: URL = directory,
+        read: (RemoteGameConfiguration) throws -> ServerCredential? = LegacyServerCredentialStore.load
+    ) throws -> ServerCredential? {
+        if let saved = try load(configuration, root: root) { return saved }
+        guard let legacy = try read(configuration) else { return nil }
+        try save(legacy, configuration: configuration, root: root)
+        return legacy
+    }
+}
+
+private enum LegacyServerCredentialStore {
+    static func load(_ configuration: RemoteGameConfiguration) throws -> ServerCredential? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "dev.local.pokepackbar.server-session",
+            kSecAttrAccount as String: configuration.storageKey,
+            kSecAttrSynchronizable as String: false,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: CFTypeRef?
+        let status = KeychainReader.copyMatching(query, &result)
+        if status == errSecItemNotFound { return nil }
+        guard status == errSecSuccess, let data = result as? Data,
+              let credential = try? JSONDecoder().decode(ServerCredential.self, from: data) else {
+            throw ServerLoginFailure(message: L.current.credentialUnreadable)
+        }
+        return credential
     }
 }
 

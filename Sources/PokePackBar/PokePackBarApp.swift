@@ -176,6 +176,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
 
+        // Explicit one-time migration, before ordinary app startup. Never print credentials.
+        if CommandLine.arguments.contains("--import-server-session") {
+            NSApp.setActivationPolicy(.accessory)
+            Task { @MainActor in
+                do {
+                    guard let config = RemoteGameConfiguration.load() else {
+                        throw ServerLoginFailure(message: L.current.credentialUnreadable)
+                    }
+                    let imported = try await Task.detached(priority: .userInitiated) {
+                        try ServerCredentialStore.importLegacy(config)
+                    }.value
+                    guard imported != nil else {
+                        throw ServerLoginFailure(message: L.current.credentialUnreadable)
+                    }
+                    print("PASS server session imported to local file; no credential values printed")
+                    exit(0)
+                } catch {
+                    FileHandle.standardError.write(Data("Session import failed: \(error.localizedDescription)\n".utf8))
+                    exit(1)
+                }
+            }
+            return
+        }
+
         // 조립된 .app 이 리소스를 실제로 여는지 확인하고 끝내는 모드. build-app.sh 가 쓴다.
         //
         // 파일이 있는지 스크립트가 확인하는 것만으로는 부족하다. 앱이 보는 위치와
