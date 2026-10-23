@@ -290,6 +290,13 @@ struct CardSpotlightView: View {
                                 .font(.system(size: 13)).foregroundStyle(.tertiary)
                                 .accessibilityLabel(Text(priceBasisText(l, prices)))
                         }
+                        // 기록은 작은 창으로 띄운다. 여기 펼치면 카드가 밀려 작아진다.
+                        if wallet.showsPriceHistory {
+                            let series = PriceHistoryRequest.card(cardID, finish: displayedFinish, prices: prices)
+                            PriceHistoryButton(wallet: wallet, title: name,
+                                               subtitle: displayedFinish.map { l.cardFinishName($0, cardID: cardID) },
+                                               kind: series.kind, item: series.item)
+                        }
                     }
                     .lineLimit(1).minimumScaleFactor(0.75)
                     .help(priceBasisText(l, prices) + "\n"

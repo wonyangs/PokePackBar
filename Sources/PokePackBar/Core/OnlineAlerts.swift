@@ -153,7 +153,7 @@ final class OnlineAlerts {
         return all
     }
 
-    private static func post(_ announcements: [Announcement]) {
+    static func post(_ announcements: [Announcement]) {
         // `UNUserNotificationCenter.current()` 는 번들이 등록되지 않았으면 예외로 앱을 죽인다.
         guard AppEnv.canUseNotifications else { return }
         for announcement in announcements {

@@ -550,11 +550,18 @@ private struct PackDetailView: View {
                 Spacer(minLength: 0)
             }
 
-            Text(pricingSource(l))
-                .font(Typography.caption)
-                .foregroundStyle(.tertiary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .top, spacing: 6) {
+                Text(pricingSource(l))
+                    .font(Typography.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                // 봉입팩 시장가의 기록. 상점 값은 이 값과 기대값 하한 중 큰 쪽이다.
+                if wallet.showsPriceHistory {
+                    PriceHistoryButton(wallet: wallet, title: set.name, subtitle: l.sealedMarket,
+                                       kind: "pack", item: set.id)
+                }
+            }
 
             summaryRows(l)
             ScrollView { oddsTable(l) }

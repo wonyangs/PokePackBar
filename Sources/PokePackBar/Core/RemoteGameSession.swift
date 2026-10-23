@@ -138,6 +138,8 @@ final class RemoteGameSession {
     @ObservationIgnored private var reportedTokens = 0
     @ObservationIgnored private var acceptedSnapshot = false
     @ObservationIgnored private var lastSnapshot: Snapshot?
+    /// 「오늘의 시세」. 통계 탭과 내 카드 시세 알림이 함께 읽는다.
+    @ObservationIgnored let priceNews: PriceNews
     /// 기동할 때 캐시해 둔 시세를 백그라운드에서 검증하는 작업. 첫 동기화는 이것을 기다린다.
     @ObservationIgnored private var cachedPrices: Task<Void, Never>?
     /// 계정 상태 캐시 파일을 순서대로 쓰는 큐. 1.3MB 상태를 저장하는 데 70ms 가 걸려 명령마다
@@ -162,6 +164,7 @@ final class RemoteGameSession {
         self.tokenProvider = tokenProvider
         self.credentialLoader = credentialLoader ?? { try ServerCredentialStore.load(configuration) }
         directory = localRoot.appendingPathComponent("online-\(configuration.storageKey)", isDirectory: true)
+        priceNews = PriceNews(storageKey: configuration.storageKey)
         collector = WalletStore(fileURL: directory.appendingPathComponent("device-collection.json"))
         hasPending = FileManager.default.fileExists(atPath: directory.appendingPathComponent("pending.json").path)
         hasOnlinePending = FileManager.default.fileExists(atPath: directory.appendingPathComponent("online-pending.json").path)
@@ -299,6 +302,11 @@ final class RemoteGameSession {
         } catch let failure as Failure where failure.status == 404 {
             summaryUnsupported = true
         } catch {}
+    }
+
+    /// 오늘의 시세를 새로 읽을 때가 됐으면 읽는다. 실패해도 동기화는 실패로 치지 않는다.
+    func refreshPriceNews(maxAge: TimeInterval = PriceNews.staleAfter) async {
+        await priceNews.refresh(version: priceVersion, maxAge: maxAge) { path in try await self.api(path) }
     }
 
     func execute(_ command: ServerRulesBridge.Command, expectedTokens: Int? = nil) async -> ServerRulesBridge.Result? {
