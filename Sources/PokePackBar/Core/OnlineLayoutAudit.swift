@@ -4,6 +4,7 @@ import SwiftUI
 /// Native production views, temporary fixtures only. Does not log in or poll.
 @MainActor enum OnlineLayoutAudit {
     static func run(output: URL) async throws {
+        WindowPresentation.quiet = true
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let wallet = WalletStore(fileURL: output.appendingPathComponent("fixture.json"))
         wallet.setLanguage(LayoutAuditOptions.language)
@@ -179,6 +180,9 @@ import SwiftUI
         NSApp.windows.first(where: { $0.title == OnlineText.l.onlineWindowTitle })?.close()
         OnlineWindow.shared.show(wallet: wallet)
         try LocalAudit.require(NSApp.windows.contains(where: { $0.title == OnlineText.l.onlineWindowTitle && $0.isVisible }), "Online window did not reopen")
+        try LocalAudit.require(NSApp.windows.filter { $0.title == OnlineText.l.onlineWindowTitle && $0.isVisible }
+            .allSatisfy { $0.alphaValue == 0 && $0.ignoresMouseEvents } && !NSApp.isActive,
+            "The audit put the online window on screen")
         NSApp.windows.first(where: { $0.title == OnlineText.l.onlineWindowTitle })?.close()
         print("PASS online native layout: six sections at 740×540 and 980×720, arrivals from alerts, trade card picker, cards missing from a friend, logout cache clearing, close/reopen")
     }
