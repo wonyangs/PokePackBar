@@ -10,19 +10,19 @@
    "perks": [
     {
      "kind": "tokenGain",
-     "value": 0.0049
+     "value": 0.0047
     },
     {
      "kind": "packDiscount",
-     "value": 0.003
+     "value": 0.0029
     },
     {
      "kind": "dustBonus",
-     "value": 0.0031
+     "value": 0.0029
     },
     {
      "kind": "hitOdds",
-     "value": 0.004
+     "value": 0.0038
     }
    ]
   },
@@ -35,19 +35,19 @@
    "perks": [
     {
      "kind": "tokenGain",
-     "value": 0.0099
+     "value": 0.007
     },
     {
      "kind": "packDiscount",
-     "value": 0.0061
+     "value": 0.0043
     },
     {
      "kind": "dustBonus",
-     "value": 0.0062
+     "value": 0.0044
     },
     {
      "kind": "hitOdds",
-     "value": 0.0081
+     "value": 0.0058
     }
    ]
   },
@@ -60,19 +60,19 @@
    "perks": [
     {
      "kind": "tokenGain",
-     "value": 0.0148
-    },
-    {
-     "kind": "packDiscount",
-     "value": 0.0092
-    },
-    {
-     "kind": "dustBonus",
      "value": 0.0094
     },
     {
+     "kind": "packDiscount",
+     "value": 0.0058
+    },
+    {
+     "kind": "dustBonus",
+     "value": 0.0059
+    },
+    {
      "kind": "hitOdds",
-     "value": 0.0122
+     "value": 0.0077
     }
    ]
   },
@@ -85,19 +85,19 @@
    "perks": [
     {
      "kind": "tokenGain",
-     "value": 0.0198
+     "value": 0.0117
     },
     {
      "kind": "packDiscount",
-     "value": 0.0123
+     "value": 0.0073
     },
     {
      "kind": "dustBonus",
-     "value": 0.0125
+     "value": 0.0074
     },
     {
      "kind": "hitOdds",
-     "value": 0.0163
+     "value": 0.0097
     }
    ]
   },
@@ -110,19 +110,69 @@
    "perks": [
     {
      "kind": "tokenGain",
-     "value": 0.0247
+     "value": 0.0141
     },
     {
      "kind": "packDiscount",
-     "value": 0.0154
+     "value": 0.0087
     },
     {
      "kind": "dustBonus",
-     "value": 0.0157
+     "value": 0.0089
     },
     {
      "kind": "hitOdds",
-     "value": 0.0204
+     "value": 0.0116
+    }
+   ]
+  },
+  {
+   "completed": 225,
+   "title": {
+    "ko": "조합 연구가",
+    "en": "Combo Scholar"
+   },
+   "perks": [
+    {
+     "kind": "tokenGain",
+     "value": 0.0165
+    },
+    {
+     "kind": "packDiscount",
+     "value": 0.0102
+    },
+    {
+     "kind": "dustBonus",
+     "value": 0.0104
+    },
+    {
+     "kind": "hitOdds",
+     "value": 0.0136
+    }
+   ]
+  },
+  {
+   "completed": 275,
+   "title": {
+    "ko": "끝판을 넘보는 자",
+    "en": "Endgame Seeker"
+   },
+   "perks": [
+    {
+     "kind": "tokenGain",
+     "value": 0.0188
+    },
+    {
+     "kind": "packDiscount",
+     "value": 0.0117
+    },
+    {
+     "kind": "dustBonus",
+     "value": 0.0119
+    },
+    {
+     "kind": "hitOdds",
+     "value": 0.0155
     }
    ]
   },
@@ -135,19 +185,19 @@
    "perks": [
     {
      "kind": "tokenGain",
-     "value": 0.0297
+     "value": 0.0212
     },
     {
      "kind": "packDiscount",
-     "value": 0.0185
+     "value": 0.0131
     },
     {
      "kind": "dustBonus",
-     "value": 0.0188
+     "value": 0.0134
     },
     {
      "kind": "hitOdds",
-     "value": 0.0245
+     "value": 0.0174
     }
    ]
   }
@@ -10038,13 +10088,8 @@
    "valueUSD": 0.96,
    "hardPacks": 12,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0005
-     }
-    ],
+    "packs": 1,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10074,13 +10119,8 @@
    "valueUSD": 0.38,
    "hardPacks": 19,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 1,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10114,12 +10154,7 @@
    "hardPacks": 34,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0006
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -10154,13 +10189,8 @@
    "valueUSD": 0.57,
    "hardPacks": 57,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0006
-     }
-    ],
+    "packs": 3,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10190,13 +10220,8 @@
    "valueUSD": 0.35,
    "hardPacks": 55,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 3,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10227,13 +10252,8 @@
    "valueUSD": 0.52,
    "hardPacks": 61,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 4,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10263,13 +10283,8 @@
    "valueUSD": 0.47,
    "hardPacks": 64,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 4,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10301,13 +10316,8 @@
    "valueUSD": 0.82,
    "hardPacks": 49,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0006
-     }
-    ],
+    "packs": 3,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10337,13 +10347,8 @@
    "valueUSD": 0.77,
    "hardPacks": 43,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0005
-     }
-    ],
+    "packs": 2,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10374,13 +10379,8 @@
    "valueUSD": 0.57,
    "hardPacks": 97,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0006
-     }
-    ],
+    "packs": 6,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10410,13 +10410,8 @@
    "valueUSD": 0.44,
    "hardPacks": 49,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0005
-     }
-    ],
+    "packs": 3,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10447,13 +10442,8 @@
    "valueUSD": 0.73,
    "hardPacks": 52,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 3,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10483,13 +10473,8 @@
    "valueUSD": 0.91,
    "hardPacks": 244,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 9,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10520,13 +10505,8 @@
    "valueUSD": 0.69,
    "hardPacks": 226,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 9,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10556,13 +10536,8 @@
    "valueUSD": 0.54,
    "hardPacks": 240,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 9,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10592,13 +10567,8 @@
    "valueUSD": 1.75,
    "hardPacks": 9,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 1,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10628,13 +10598,8 @@
    "valueUSD": 4.74,
    "hardPacks": 120,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0006
-     }
-    ],
+    "packs": 6,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10671,13 +10636,8 @@
    "valueUSD": 7.81,
    "hardPacks": 216,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 13,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10710,13 +10670,8 @@
    "valueUSD": 10.35,
    "hardPacks": 194,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 11,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10747,13 +10702,8 @@
    "valueUSD": 4.42,
    "hardPacks": 34,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0007
-     }
-    ],
+    "packs": 2,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10784,13 +10734,8 @@
    "valueUSD": 1.89,
    "hardPacks": 299,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0008
-     }
-    ],
+    "packs": 12,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10820,13 +10765,8 @@
    "valueUSD": 1,
    "hardPacks": 37,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0006
-     }
-    ],
+    "packs": 2,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10857,13 +10797,8 @@
    "valueUSD": 1.6,
    "hardPacks": 258,
    "reward": {
-    "packs": 3,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0007
-     }
-    ],
+    "packs": 11,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10899,13 +10834,8 @@
    "valueUSD": 1.42,
    "hardPacks": 85,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0005
-     }
-    ],
+    "packs": 6,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10935,13 +10865,8 @@
    "valueUSD": 2.13,
    "hardPacks": 287,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 14,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -10971,13 +10896,8 @@
    "valueUSD": 6.14,
    "hardPacks": 355,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0007
-     }
-    ],
+    "packs": 11,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11007,13 +10927,8 @@
    "valueUSD": 0.92,
    "hardPacks": 66,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0006
-     }
-    ],
+    "packs": 4,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11045,13 +10960,8 @@
    "valueUSD": 0.71,
    "hardPacks": 49,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 3,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11082,13 +10992,8 @@
    "valueUSD": 3.33,
    "hardPacks": 467,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11125,13 +11030,8 @@
    "valueUSD": 11.48,
    "hardPacks": 285,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11164,13 +11064,8 @@
    "valueUSD": 5.49,
    "hardPacks": 360,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0008
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11201,13 +11096,8 @@
    "valueUSD": 5.71,
    "hardPacks": 300,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0007
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11238,13 +11128,8 @@
    "valueUSD": 12.45,
    "hardPacks": 155,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0006
-     }
-    ],
+    "packs": 5,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11273,13 +11158,8 @@
    "valueUSD": 4.83,
    "hardPacks": 245,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0007
-     }
-    ],
+    "packs": 10,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11310,13 +11190,8 @@
    "valueUSD": 4.6,
    "hardPacks": 286,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0007
-     }
-    ],
+    "packs": 14,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11347,13 +11222,8 @@
    "valueUSD": 1.76,
    "hardPacks": 312,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 14,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11383,13 +11253,8 @@
    "valueUSD": 5.82,
    "hardPacks": 872,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11422,13 +11287,8 @@
    "valueUSD": 1.4,
    "hardPacks": 296,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 13,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11459,13 +11319,8 @@
    "valueUSD": 4.88,
    "hardPacks": 411,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11496,12 +11351,7 @@
    "hardPacks": 200,
    "reward": {
     "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0007
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11530,13 +11380,8 @@
    "valueUSD": 2.56,
    "hardPacks": 257,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 9,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11567,13 +11412,8 @@
    "valueUSD": 10.27,
    "hardPacks": 401,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11602,13 +11442,8 @@
    "valueUSD": 8.98,
    "hardPacks": 1692,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0015
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11638,13 +11473,8 @@
    "valueUSD": 4.45,
    "hardPacks": 437,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11675,13 +11505,8 @@
    "valueUSD": 4.43,
    "hardPacks": 498,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0008
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11717,13 +11542,8 @@
    "valueUSD": 1.88,
    "hardPacks": 328,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11753,13 +11573,8 @@
    "valueUSD": 0.52,
    "hardPacks": 55,
    "reward": {
-    "packs": 2,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 3,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -11793,12 +11608,7 @@
    "hardPacks": 114,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0006
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -11835,12 +11645,7 @@
    "hardPacks": 160,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0042
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -11876,12 +11681,7 @@
    "hardPacks": 118,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0017
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -11917,12 +11717,7 @@
    "hardPacks": 139,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -11959,12 +11754,7 @@
    "hardPacks": 123,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -12001,12 +11791,7 @@
    "hardPacks": 186,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -12041,12 +11826,7 @@
    "hardPacks": 70,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 18658023,
     "coupons": [
      {
@@ -12082,12 +11862,7 @@
    "hardPacks": 203,
    "reward": {
     "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0007
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12118,13 +11893,8 @@
    "valueUSD": 29.16,
    "hardPacks": 69,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0006
-     }
-    ],
+    "packs": 1,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12153,13 +11923,8 @@
    "valueUSD": 38.04,
    "hardPacks": 3452,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12189,13 +11954,8 @@
    "valueUSD": 27.79,
    "hardPacks": 243,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0006
-     }
-    ],
+    "packs": 4,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12225,13 +11985,8 @@
    "valueUSD": 41.57,
    "hardPacks": 2425,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12260,13 +12015,8 @@
    "valueUSD": 51.28,
    "hardPacks": 1793,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12298,12 +12048,7 @@
    "hardPacks": 339,
    "reward": {
     "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12333,13 +12078,8 @@
    "valueUSD": 87.04,
    "hardPacks": 518,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 9,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12374,13 +12114,8 @@
    "valueUSD": 35.05,
    "hardPacks": 655,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12410,13 +12145,8 @@
    "valueUSD": 22.03,
    "hardPacks": 465,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 12,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12447,12 +12177,7 @@
    "hardPacks": 221,
    "reward": {
     "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12487,13 +12212,8 @@
    "valueUSD": 24.61,
    "hardPacks": 1062,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0018
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12523,13 +12243,8 @@
    "valueUSD": 44.73,
    "hardPacks": 2468,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12558,13 +12273,8 @@
    "valueUSD": 55.05,
    "hardPacks": 1357,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12595,13 +12305,8 @@
    "valueUSD": 19.96,
    "hardPacks": 668,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12633,13 +12338,8 @@
    "valueUSD": 20.7,
    "hardPacks": 579,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0008
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12670,13 +12370,8 @@
    "valueUSD": 19.65,
    "hardPacks": 455,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0008
-     }
-    ],
+    "packs": 14,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12705,13 +12400,8 @@
    "valueUSD": 54.06,
    "hardPacks": 224,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 6,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12740,13 +12430,8 @@
    "valueUSD": 67.68,
    "hardPacks": 603,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 14,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12777,12 +12462,7 @@
    "hardPacks": 273,
    "reward": {
     "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12813,12 +12493,7 @@
    "hardPacks": 258,
    "reward": {
     "packs": 10,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -12850,21 +12525,16 @@
    "hardPacks": 318,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 1
+      "count": 10
      }
     ],
     "card": {
-     "targetUSD": 412.4592,
+     "targetUSD": 833.0058,
      "tierFloor": "SAR"
     }
    },
@@ -12895,21 +12565,16 @@
    "hardPacks": 318,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 1
+      "count": 10
      }
     ],
     "card": {
-     "targetUSD": 431.9111,
+     "targetUSD": 833.0058,
      "tierFloor": "SAR"
     }
    },
@@ -12940,21 +12605,16 @@
    "hardPacks": 160,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 16
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 513.6853,
+     "targetUSD": 567.9442,
      "tierFloor": "BWR"
     }
    },
@@ -12986,12 +12646,7 @@
    "hardPacks": 133,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -13029,14 +12684,14 @@
    "hardPacks": 106,
    "reward": {
     "packs": 4,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "hitOdds",
-      "value": 0.0009
+      "value": 0.5,
+      "count": 11
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
      "targetUSD": 970.1004,
      "tierFloor": "SH"
@@ -13067,17 +12722,12 @@
    "hardPacks": 217,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 10
+      "count": 20
      }
     ],
     "card": {
@@ -13111,17 +12761,12 @@
    "hardPacks": 486,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 14
+      "count": 20
      }
     ],
     "card": {
@@ -13154,21 +12799,16 @@
    "hardPacks": 624,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0045
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 15
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 1107.8643,
+     "targetUSD": 1795.819,
      "tierFloor": "BWR"
     }
    },
@@ -13198,21 +12838,16 @@
    "hardPacks": 665,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0076
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 18
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 2056.293,
+     "targetUSD": 8348.0586,
      "tierFloor": "BWR"
     }
    },
@@ -13242,17 +12877,12 @@
    "hardPacks": 200,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 16
+      "count": 20
      }
     ],
     "card": {
@@ -13287,21 +12917,16 @@
    "hardPacks": 155,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 16
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 253.042,
+     "targetUSD": 308.8732,
      "tierFloor": "BWR"
     }
    },
@@ -13331,21 +12956,16 @@
    "hardPacks": 188,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0019
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 16
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 720.4287,
+     "targetUSD": 864.4379,
      "tierFloor": "BWR"
     }
    },
@@ -13375,12 +12995,7 @@
    "hardPacks": 23,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -13419,12 +13034,7 @@
    "hardPacks": 134,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -13433,7 +13043,7 @@
      }
     ],
     "card": {
-     "targetUSD": 464.2644,
+     "targetUSD": 2553.6215,
      "tierFloor": "BWR"
     }
    },
@@ -13464,21 +13074,16 @@
    "hardPacks": 203,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0026
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 18
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 295.4395,
+     "targetUSD": 983.13,
      "tierFloor": "BWR"
     }
    },
@@ -13510,19 +13115,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.0054
+      "kind": "dustBonus",
+      "value": 0.006
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 18
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 662.8443,
+     "targetUSD": 1446.3844,
      "tierFloor": "BWR"
     }
    },
@@ -13552,17 +13157,12 @@
    "hardPacks": 204,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 15
+      "count": 20
      }
     ],
     "card": {
@@ -13596,12 +13196,7 @@
    "hardPacks": 142,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -13610,7 +13205,7 @@
      }
     ],
     "card": {
-     "targetUSD": 297.6477,
+     "targetUSD": 614.0531,
      "tierFloor": "BWR"
     }
    },
@@ -13639,12 +13234,7 @@
    "hardPacks": 157,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -13653,7 +13243,7 @@
      }
     ],
     "card": {
-     "targetUSD": 302.8181,
+     "targetUSD": 375.9462,
      "tierFloor": "BWR"
     }
    },
@@ -13683,12 +13273,7 @@
    "hardPacks": 131,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -13726,17 +13311,12 @@
    "hardPacks": 186,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 14
+      "count": 19
      }
     ],
     "card": {
@@ -13769,21 +13349,16 @@
    "hardPacks": 322,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0034
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 17
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 194.1846,
+     "targetUSD": 1181.1555,
      "tierFloor": "BWR"
     }
    },
@@ -13812,12 +13387,7 @@
    "hardPacks": 165,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0026
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -13826,7 +13396,7 @@
      }
     ],
     "card": {
-     "targetUSD": 905.3419,
+     "targetUSD": 1100.8349,
      "tierFloor": "BWR"
     }
    },
@@ -13855,12 +13425,7 @@
    "hardPacks": 146,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -13898,16 +13463,16 @@
    "hardPacks": 2486,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "tokenGain",
-      "value": 0.0034
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 546.32,
+     "targetUSD": 1604.8698,
      "tierFloor": "SH"
     }
    },
@@ -13936,16 +13501,16 @@
    "hardPacks": 2233,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "dustBonus",
-      "value": 0.0018
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 613.1356,
+     "targetUSD": 1695.1972,
      "tierFloor": "SH"
     }
    },
@@ -13974,14 +13539,14 @@
    "hardPacks": 217,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "hitOdds",
-      "value": 0.0009
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
      "targetUSD": 446.2405,
      "tierFloor": "MUR"
@@ -14012,16 +13577,16 @@
    "hardPacks": 2771,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "dustBonus",
-      "value": 0.0018
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 552.2958,
+     "targetUSD": 2043.9361,
      "tierFloor": "SH"
     }
    },
@@ -14051,16 +13616,16 @@
    "hardPacks": 230,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "packDiscount",
-      "value": 0.0009
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 94.7138,
+     "targetUSD": 285.0506,
      "tierFloor": "BWR"
     }
    },
@@ -14090,17 +13655,12 @@
    "hardPacks": 582,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0019
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 11
+      "count": 20
      }
     ],
     "card": {
@@ -14133,16 +13693,16 @@
    "hardPacks": 2902,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "dustBonus",
-      "value": 0.0018
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 491.7215,
+     "targetUSD": 1708.8306,
      "tierFloor": "SH"
     }
    },
@@ -14173,16 +13733,16 @@
    "hardPacks": 2398,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "dustBonus",
-      "value": 0.0009
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 153.108,
+     "targetUSD": 300.5816,
      "tierFloor": "SAR"
     }
    },
@@ -14212,16 +13772,16 @@
    "hardPacks": 1076,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "dustBonus",
-      "value": 0.0009
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 103.9689,
+     "targetUSD": 151.7113,
      "tierFloor": "SAR"
     }
    },
@@ -14250,15 +13810,18 @@
    "hardPacks": 753,
    "reward": {
     "packs": 0,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "tokenGain",
-      "value": 0.0006
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
-    "card": null
+    "card": {
+     "targetUSD": 133.9777,
+     "tierFloor": "BWR"
+    }
    },
    "milestones": []
   },
@@ -14285,16 +13848,16 @@
    "hardPacks": 2274,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "dustBonus",
-      "value": 0.0009
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 43.5164,
+     "targetUSD": 231.2288,
      "tierFloor": "SAR"
     }
    },
@@ -14329,16 +13892,16 @@
    "hardPacks": 1160,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 249.2164,
+     "targetUSD": 741.6683,
      "tierFloor": "SAR"
     }
    },
@@ -14367,16 +13930,16 @@
    "hardPacks": 657,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "hitOdds",
-      "value": 0.0009
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 228.4548,
+     "targetUSD": 286.2081,
      "tierFloor": "MUR"
     }
    },
@@ -14405,14 +13968,14 @@
    "hardPacks": 848,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "hitOdds",
-      "value": 0.0036
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
      "targetUSD": 1426.0042,
      "tierFloor": "SH"
@@ -14443,15 +14006,18 @@
    "hardPacks": 611,
    "reward": {
     "packs": 0,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
-    "card": null
+    "card": {
+     "targetUSD": 478.3007,
+     "tierFloor": "BWR"
+    }
    },
    "milestones": []
   },
@@ -14478,16 +14044,16 @@
    "hardPacks": 808,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
-     "targetUSD": 334.7764,
+     "targetUSD": 515.8234,
      "tierFloor": "MUR"
     }
    },
@@ -14516,14 +14082,14 @@
    "hardPacks": 444,
    "reward": {
     "packs": 5,
-    "perks": [
+    "perks": [],
+    "tokens": 0,
+    "coupons": [
      {
-      "kind": "packDiscount",
-      "value": 0.0009
+      "value": 0.5,
+      "count": 20
      }
     ],
-    "tokens": 0,
-    "coupons": [],
     "card": {
      "targetUSD": 332.6393,
      "tierFloor": "SH"
@@ -14560,14 +14126,14 @@
     "perks": [
      {
       "kind": "packDiscount",
-      "value": 0.0009
+      "value": 0.006
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 13
+      "count": 18
      }
     ],
     "card": {
@@ -14603,13 +14169,21 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "kind": "packDiscount",
+      "value": 0.0058
      }
     ],
     "tokens": 0,
-    "coupons": [],
-    "card": null
+    "coupons": [
+     {
+      "value": 0.5,
+      "count": 8
+     }
+    ],
+    "card": {
+     "targetUSD": 511.9535,
+     "tierFloor": "BWR"
+    }
    },
    "milestones": []
   },
@@ -14653,14 +14227,14 @@
     "perks": [
      {
       "kind": "packDiscount",
-      "value": 0.0027
+      "value": 0.0062
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 13
+      "count": 20
      }
     ],
     "card": {
@@ -14697,11 +14271,16 @@
     "perks": [
      {
       "kind": "tokenGain",
-      "value": 0.0026
+      "value": 0.0206
      }
     ],
     "tokens": 0,
-    "coupons": [],
+    "coupons": [
+     {
+      "value": 0.5,
+      "count": 20
+     }
+    ],
     "card": {
      "targetUSD": 1922.5662,
      "tierFloor": "SH"
@@ -14736,19 +14315,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0009
+      "kind": "hitOdds",
+      "value": 0.0077
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 17
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 364.0812,
+     "targetUSD": 515.6481,
      "tierFloor": "BWR"
     }
    },
@@ -14778,21 +14357,16 @@
    "hardPacks": 170,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 37.3207,
+     "targetUSD": 713.4157,
      "tierFloor": "BWR"
     }
    },
@@ -14824,12 +14398,17 @@
     "packs": 5,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0018
+      "kind": "tokenGain",
+      "value": 0.0212
      }
     ],
     "tokens": 0,
-    "coupons": [],
+    "coupons": [
+     {
+      "value": 0.5,
+      "count": 20
+     }
+    ],
     "card": {
      "targetUSD": 2740.3467,
      "tierFloor": "BWR"
@@ -14863,19 +14442,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0059
+      "kind": "packDiscount",
+      "value": 0.0061
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 16
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 1042.7082,
+     "targetUSD": 1652.2204,
      "tierFloor": "BWR"
     }
    },
@@ -14907,15 +14486,15 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0027
+      "kind": "dustBonus",
+      "value": 0.006
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 12
+      "count": 20
      }
     ],
     "card": {
@@ -14950,15 +14529,15 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0027
+      "kind": "hitOdds",
+      "value": 0.0081
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 12
+      "count": 20
      }
     ],
     "card": {
@@ -14993,19 +14572,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0009
+      "kind": "tokenGain",
+      "value": 0.021
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 15
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 838.8901,
+     "targetUSD": 1016.4222,
      "tierFloor": "BWR"
     }
    },
@@ -15036,8 +14615,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0009
+      "kind": "tokenGain",
+      "value": 0.0191
      }
     ],
     "tokens": 23351740,
@@ -15080,15 +14659,15 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.0018
+      "kind": "packDiscount",
+      "value": 0.0057
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 16
+      "count": 17
      }
     ],
     "card": {
@@ -15123,8 +14702,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.0009
+      "kind": "packDiscount",
+      "value": 0.0056
      }
     ],
     "tokens": 0,
@@ -15166,19 +14745,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0066
+      "kind": "dustBonus",
+      "value": 0.006
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 340.928,
+     "targetUSD": 1701.8719,
      "tierFloor": "BWR"
     }
    },
@@ -15211,19 +14790,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0051
+      "kind": "packDiscount",
+      "value": 0.0063
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 503.6584,
+     "targetUSD": 3312.8411,
      "tierFloor": "BWR"
     }
    },
@@ -15258,18 +14837,18 @@
     "perks": [
      {
       "kind": "packDiscount",
-      "value": 0.0052
+      "value": 0.0064
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 558.4204,
+     "targetUSD": 5931.6065,
      "tierFloor": "BWR"
     }
    },
@@ -15302,18 +14881,18 @@
     "perks": [
      {
       "kind": "packDiscount",
-      "value": 0.0018
+      "value": 0.006
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 279.4142,
+     "targetUSD": 1408.8593,
      "tierFloor": "BWR"
     }
    },
@@ -15345,8 +14924,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.0071
+      "kind": "tokenGain",
+      "value": 0.0215
      }
     ],
     "tokens": 0,
@@ -15357,7 +14936,7 @@
      }
     ],
     "card": {
-     "targetUSD": 367.0005,
+     "targetUSD": 1763.5574,
      "tierFloor": "BWR"
     }
    },
@@ -15390,18 +14969,18 @@
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.0115
+      "value": 0.0083
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 18
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 386.0157,
+     "targetUSD": 2691.2633,
      "tierFloor": "BWR"
     }
    },
@@ -15433,8 +15012,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0009
+      "kind": "packDiscount",
+      "value": 0.0059
      }
     ],
     "tokens": 0,
@@ -15445,7 +15024,7 @@
      }
     ],
     "card": {
-     "targetUSD": 532.3195,
+     "targetUSD": 665.6115,
      "tierFloor": "BWR"
     }
    },
@@ -15478,18 +15057,18 @@
     "perks": [
      {
       "kind": "dustBonus",
-      "value": 0.0036
+      "value": 0.0061
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 561.7461,
+     "targetUSD": 2221.4448,
      "tierFloor": "BWR"
     }
    },
@@ -15521,19 +15100,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0035
+      "kind": "tokenGain",
+      "value": 0.0225
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 18
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 1358.6819,
+     "targetUSD": 5806.4489,
      "tierFloor": "BWR"
     }
    },
@@ -15565,19 +15144,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0027
+      "kind": "tokenGain",
+      "value": 0.0217
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 18
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 1319.6228,
+     "targetUSD": 2179.9446,
      "tierFloor": "BWR"
     }
    },
@@ -15610,18 +15189,18 @@
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.0098
+      "value": 0.0082
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 545.32,
+     "targetUSD": 2165.2834,
      "tierFloor": "BWR"
     }
    },
@@ -15654,18 +15233,18 @@
     "perks": [
      {
       "kind": "tokenGain",
-      "value": 0.005
+      "value": 0.0214
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 224.4153,
+     "targetUSD": 1648.8743,
      "tierFloor": "BWR"
     }
    },
@@ -15698,18 +15277,18 @@
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.0028
+      "value": 0.0078
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 19
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 273.4473,
+     "targetUSD": 767.0915,
      "tierFloor": "BWR"
     }
    },
@@ -15739,12 +15318,7 @@
    "hardPacks": 149,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -15753,7 +15327,7 @@
      }
     ],
     "card": {
-     "targetUSD": 258.189,
+     "targetUSD": 1679.9818,
      "tierFloor": "BWR"
     }
    },
@@ -15789,18 +15363,18 @@
     "perks": [
      {
       "kind": "tokenGain",
-      "value": 0.0018
+      "value": 0.0202
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 17
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 405.9172,
+     "targetUSD": 448.5119,
      "tierFloor": "BWR"
     }
    },
@@ -15834,19 +15408,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.0028
+      "kind": "dustBonus",
+      "value": 0.0058
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 17
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 465.5894,
+     "targetUSD": 819.8739,
      "tierFloor": "BWR"
     }
    },
@@ -15881,7 +15455,7 @@
     "perks": [
      {
       "kind": "packDiscount",
-      "value": 0.0009
+      "value": 0.0059
      }
     ],
     "tokens": 0,
@@ -15923,8 +15497,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "kind": "dustBonus",
+      "value": 0.0057
      }
     ],
     "tokens": 0,
@@ -15935,7 +15509,7 @@
      }
     ],
     "card": {
-     "targetUSD": 265.5361,
+     "targetUSD": 515.1675,
      "tierFloor": "BWR"
     }
    },
@@ -15967,15 +15541,15 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "kind": "packDiscount",
+      "value": 0.0058
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 17
+      "count": 19
      }
     ],
     "card": {
@@ -16011,8 +15585,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0009
+      "kind": "tokenGain",
+      "value": 0.0204
      }
     ],
     "tokens": 0,
@@ -16055,15 +15629,15 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.0018
+      "kind": "dustBonus",
+      "value": 0.0056
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 17
+      "count": 18
      }
     ],
     "card": {
@@ -16100,19 +15674,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0009
+      "kind": "dustBonus",
+      "value": 0.0059
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 18
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 560.1969,
+     "targetUSD": 1285.6951,
      "tierFloor": "BWR"
     }
    },
@@ -16144,19 +15718,19 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0115
+      "kind": "dustBonus",
+      "value": 0.0062
      }
     ],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 12
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 1397.1255,
+     "targetUSD": 4330.9737,
      "tierFloor": "BWR"
     }
    },
@@ -16187,12 +15761,17 @@
     "packs": 5,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0018
+      "kind": "hitOdds",
+      "value": 0.008
      }
     ],
     "tokens": 0,
-    "coupons": [],
+    "coupons": [
+     {
+      "value": 0.5,
+      "count": 20
+     }
+    ],
     "card": {
      "targetUSD": 2024.1654,
      "tierFloor": "SH"
@@ -16225,12 +15804,17 @@
     "packs": 5,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "kind": "dustBonus",
+      "value": 0.0056
      }
     ],
     "tokens": 0,
-    "coupons": [],
+    "coupons": [
+     {
+      "value": 0.5,
+      "count": 20
+     }
+    ],
     "card": {
      "targetUSD": 398.4041,
      "tierFloor": "SH"
@@ -16342,13 +15926,8 @@
    "valueUSD": 2.31,
    "hardPacks": 644,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -16381,8 +15960,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "kind": "dustBonus",
+      "value": 0.0057
      }
     ],
     "tokens": 0,
@@ -16393,7 +15972,7 @@
      }
     ],
     "card": {
-     "targetUSD": 382.7332,
+     "targetUSD": 556.7028,
      "tierFloor": "BWR"
     }
    },
@@ -16504,13 +16083,8 @@
    "valueUSD": 2.61,
    "hardPacks": 155,
    "reward": {
-    "packs": 5,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0005
-     }
-    ],
+    "packs": 8,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -16542,12 +16116,7 @@
    "hardPacks": 3843,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -16556,7 +16125,7 @@
      }
     ],
     "card": {
-     "targetUSD": 202.2561,
+     "targetUSD": 303.3841,
      "tierFloor": "BWR"
     }
    },
@@ -16666,13 +16235,8 @@
    "valueUSD": 1.16,
    "hardPacks": 113,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0006
-     }
-    ],
+    "packs": 5,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -16704,12 +16268,7 @@
    "hardPacks": 2379,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0017
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -16718,7 +16277,7 @@
      }
     ],
     "card": {
-     "targetUSD": 133.3767,
+     "targetUSD": 200.0651,
      "tierFloor": "BWR"
     }
    },
@@ -16828,13 +16387,8 @@
    "valueUSD": 2.29,
    "hardPacks": 159,
    "reward": {
-    "packs": 5,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0005
-     }
-    ],
+    "packs": 8,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -16866,12 +16420,7 @@
    "hardPacks": 2603,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -16880,7 +16429,7 @@
      }
     ],
     "card": {
-     "targetUSD": 164.6106,
+     "targetUSD": 246.9159,
      "tierFloor": "BWR"
     }
    },
@@ -16995,13 +16544,8 @@
    "valueUSD": 2.2,
    "hardPacks": 111,
    "reward": {
-    "packs": 4,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0008
-     }
-    ],
+    "packs": 6,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17033,12 +16577,7 @@
    "hardPacks": 608,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -17047,7 +16586,7 @@
      }
     ],
     "card": {
-     "targetUSD": 212.6264,
+     "targetUSD": 318.9396,
      "tierFloor": "BWR"
     }
    },
@@ -17077,13 +16616,8 @@
    "valueUSD": 9.2,
    "hardPacks": 698,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17118,13 +16652,8 @@
    "valueUSD": 7.44,
    "hardPacks": 829,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17156,13 +16685,8 @@
    "valueUSD": 1.06,
    "hardPacks": 73,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0007
-     }
-    ],
+    "packs": 5,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17196,13 +16720,8 @@
    "valueUSD": 1.84,
    "hardPacks": 441,
    "reward": {
-    "packs": 9,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0006
-     }
-    ],
+    "packs": 14,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17237,12 +16756,7 @@
    "hardPacks": 780,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -17251,7 +16765,7 @@
      }
     ],
     "card": {
-     "targetUSD": 190.4967,
+     "targetUSD": 285.7451,
      "tierFloor": "BWR"
     }
    },
@@ -17283,13 +16797,8 @@
    "valueUSD": 0.82,
    "hardPacks": 98,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 4,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17322,13 +16831,8 @@
    "valueUSD": 0.97,
    "hardPacks": 39,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0006
-     }
-    ],
+    "packs": 3,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17358,13 +16862,8 @@
    "valueUSD": 0.24,
    "hardPacks": 26,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 1,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17395,13 +16894,8 @@
    "valueUSD": 0.25,
    "hardPacks": 25,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0005
-     }
-    ],
+    "packs": 2,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17437,13 +16931,8 @@
    "valueUSD": 2.02,
    "hardPacks": 113,
    "reward": {
-    "packs": 3,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 4,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17475,13 +16964,8 @@
    "valueUSD": 3.54,
    "hardPacks": 189,
    "reward": {
-    "packs": 6,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0006
-     }
-    ],
+    "packs": 10,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17514,13 +16998,8 @@
    "valueUSD": 1.38,
    "hardPacks": 109,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0005
-     }
-    ],
+    "packs": 4,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17553,13 +17032,8 @@
    "valueUSD": 4.27,
    "hardPacks": 191,
    "reward": {
-    "packs": 7,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0005
-     }
-    ],
+    "packs": 10,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17589,13 +17063,8 @@
    "valueUSD": 0.51,
    "hardPacks": 30,
    "reward": {
-    "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0005
-     }
-    ],
+    "packs": 2,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17652,13 +17121,8 @@
    "valueUSD": 64.12,
    "hardPacks": 167,
    "reward": {
-    "packs": 4,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 7,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17691,8 +17155,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0026
+      "kind": "dustBonus",
+      "value": 0.0058
      }
     ],
     "tokens": 0,
@@ -17703,7 +17167,7 @@
      }
     ],
     "card": {
-     "targetUSD": 470.8158,
+     "targetUSD": 684.823,
      "tierFloor": "BWR"
     }
    },
@@ -17732,12 +17196,7 @@
    "hardPacks": 823,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -17746,7 +17205,7 @@
      }
     ],
     "card": {
-     "targetUSD": 202.1239,
+     "targetUSD": 303.1859,
      "tierFloor": "BWR"
     }
    },
@@ -17780,13 +17239,8 @@
    "valueUSD": 7.84,
    "hardPacks": 163,
    "reward": {
-    "packs": 6,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 9,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17819,13 +17273,8 @@
    "valueUSD": 40.38,
    "hardPacks": 306,
    "reward": {
-    "packs": 6,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 9,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17858,13 +17307,8 @@
    "valueUSD": 49.77,
    "hardPacks": 306,
    "reward": {
-    "packs": 6,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0017
-     }
-    ],
+    "packs": 9,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -17900,12 +17344,7 @@
    "hardPacks": 1280,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -17914,7 +17353,7 @@
      }
     ],
     "card": {
-     "targetUSD": 615.2772,
+     "targetUSD": 922.9159,
      "tierFloor": "BWR"
     }
    },
@@ -17943,12 +17382,7 @@
    "hardPacks": 698,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -17957,7 +17391,7 @@
      }
     ],
     "card": {
-     "targetUSD": 241.9253,
+     "targetUSD": 362.888,
      "tierFloor": "BWR"
     }
    },
@@ -17987,21 +17421,16 @@
    "hardPacks": 209,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
       "value": 0.5,
-      "count": 18
+      "count": 20
      }
     ],
     "card": {
-     "targetUSD": 69.5481,
+     "targetUSD": 104.3221,
      "tierFloor": "BWR"
     }
    },
@@ -18031,13 +17460,8 @@
    "valueUSD": 10.23,
    "hardPacks": 227,
    "reward": {
-    "packs": 7,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0006
-     }
-    ],
+    "packs": 11,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18073,12 +17497,7 @@
    "hardPacks": 719,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -18087,7 +17506,7 @@
      }
     ],
     "card": {
-     "targetUSD": 165.1379,
+     "targetUSD": 247.7068,
      "tierFloor": "BWR"
     }
    },
@@ -18121,13 +17540,8 @@
    "valueUSD": 46.26,
    "hardPacks": 719,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18160,13 +17574,8 @@
    "valueUSD": 49.82,
    "hardPacks": 965,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18196,13 +17605,8 @@
    "valueUSD": 51.08,
    "hardPacks": 802,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0006
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18231,13 +17635,8 @@
    "valueUSD": 29.44,
    "hardPacks": 707,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0008
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18274,13 +17673,8 @@
    "valueUSD": 48.66,
    "hardPacks": 2468,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18312,12 +17706,7 @@
    "hardPacks": 888,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -18326,7 +17715,7 @@
      }
     ],
     "card": {
-     "targetUSD": 156.0863,
+     "targetUSD": 234.1294,
      "tierFloor": "BWR"
     }
    },
@@ -18356,13 +17745,8 @@
    "valueUSD": 63.46,
    "hardPacks": 888,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0017
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18394,12 +17778,7 @@
    "hardPacks": 894,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -18408,7 +17787,7 @@
      }
     ],
     "card": {
-     "targetUSD": 122.5854,
+     "targetUSD": 183.8782,
      "tierFloor": "BWR"
     }
    },
@@ -18441,8 +17820,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0009
+      "kind": "hitOdds",
+      "value": 0.0076
      }
     ],
     "tokens": 0,
@@ -18453,7 +17832,7 @@
      }
     ],
     "card": {
-     "targetUSD": 235.6225,
+     "targetUSD": 342.7237,
      "tierFloor": "BWR"
     }
    },
@@ -18483,12 +17862,7 @@
    "hardPacks": 946,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -18497,7 +17871,7 @@
      }
     ],
     "card": {
-     "targetUSD": 294.3313,
+     "targetUSD": 441.497,
      "tierFloor": "BWR"
     }
    },
@@ -18527,12 +17901,7 @@
    "hardPacks": 844,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0018
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -18541,7 +17910,7 @@
      }
     ],
     "card": {
-     "targetUSD": 249.9165,
+     "targetUSD": 374.8747,
      "tierFloor": "BWR"
     }
    },
@@ -18569,13 +17938,8 @@
    "valueUSD": 16.73,
    "hardPacks": 450,
    "reward": {
-    "packs": 7,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 11,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18611,13 +17975,8 @@
    "valueUSD": 38.72,
    "hardPacks": 2036,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18650,13 +18009,8 @@
    "valueUSD": 14.53,
    "hardPacks": 1852,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18686,13 +18040,8 @@
    "valueUSD": 13.93,
    "hardPacks": 1539,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "tokenGain",
-      "value": 0.0018
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18723,13 +18072,8 @@
    "valueUSD": 79.64,
    "hardPacks": 1462,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "packDiscount",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18763,13 +18107,8 @@
    "valueUSD": 42.37,
    "hardPacks": 891,
    "reward": {
-    "packs": 10,
-    "perks": [
-     {
-      "kind": "dustBonus",
-      "value": 0.0009
-     }
-    ],
+    "packs": 15,
+    "perks": [],
     "tokens": 0,
     "coupons": [],
     "card": null
@@ -18805,8 +18144,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "hitOdds",
-      "value": 0.0028
+      "kind": "tokenGain",
+      "value": 0.0207
      }
     ],
     "tokens": 0,
@@ -18817,7 +18156,7 @@
      }
     ],
     "card": {
-     "targetUSD": 535.0516,
+     "targetUSD": 778.2568,
      "tierFloor": "BWR"
     }
    },
@@ -18849,8 +18188,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0018
+      "kind": "hitOdds",
+      "value": 0.0076
      }
     ],
     "tokens": 0,
@@ -18861,7 +18200,7 @@
      }
     ],
     "card": {
-     "targetUSD": 279.1293,
+     "targetUSD": 406.0063,
      "tierFloor": "BWR"
     }
    },
@@ -18893,8 +18232,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0135
+      "kind": "dustBonus",
+      "value": 0.0065
      }
     ],
     "tokens": 0,
@@ -18905,7 +18244,7 @@
      }
     ],
     "card": {
-     "targetUSD": 9083.9197,
+     "targetUSD": 13212.9741,
      "tierFloor": "BWR"
     }
    },
@@ -18942,8 +18281,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0027
+      "kind": "packDiscount",
+      "value": 0.0061
      }
     ],
     "tokens": 0,
@@ -18954,7 +18293,7 @@
      }
     ],
     "card": {
-     "targetUSD": 1241.6708,
+     "targetUSD": 1806.0666,
      "tierFloor": "BWR"
     }
    },
@@ -19009,7 +18348,7 @@
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.0167
+      "value": 0.0093
      }
     ],
     "tokens": 0,
@@ -19020,7 +18359,7 @@
      }
     ],
     "card": {
-     "targetUSD": 43948.4895,
+     "targetUSD": 63925.0756,
      "tierFloor": "BWR"
     }
    },
@@ -19052,8 +18391,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0211
+      "kind": "hitOdds",
+      "value": 0.0086
      }
     ],
     "tokens": 0,
@@ -19064,7 +18403,7 @@
      }
     ],
     "card": {
-     "targetUSD": 4691.0808,
+     "targetUSD": 6823.3902,
      "tierFloor": "BWR"
     }
    },
@@ -19103,7 +18442,7 @@
     "perks": [
      {
       "kind": "packDiscount",
-      "value": 0.0068
+      "value": 0.0066
      }
     ],
     "tokens": 0,
@@ -19114,7 +18453,7 @@
      }
     ],
     "card": {
-     "targetUSD": 8706.8556,
+     "targetUSD": 12664.5173,
      "tierFloor": "BWR"
     }
    },
@@ -19153,8 +18492,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0142
+      "kind": "tokenGain",
+      "value": 0.023
      }
     ],
     "tokens": 0,
@@ -19165,7 +18504,7 @@
      }
     ],
     "card": {
-     "targetUSD": 7116.8765,
+     "targetUSD": 10351.8203,
      "tierFloor": "BWR"
     }
    },
@@ -19204,7 +18543,7 @@
     "perks": [
      {
       "kind": "hitOdds",
-      "value": 0.0045
+      "value": 0.0079
      }
     ],
     "tokens": 0,
@@ -19215,7 +18554,7 @@
      }
     ],
     "card": {
-     "targetUSD": 646.3349,
+     "targetUSD": 940.1234,
      "tierFloor": "BWR"
     }
    },
@@ -19250,8 +18589,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.009
+      "kind": "hitOdds",
+      "value": 0.0081
      }
     ],
     "tokens": 0,
@@ -19262,7 +18601,7 @@
      }
     ],
     "card": {
-     "targetUSD": 1180.5746,
+     "targetUSD": 1717.1994,
      "tierFloor": "BWR"
     }
    },
@@ -19298,8 +18637,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0061
+      "kind": "dustBonus",
+      "value": 0.0063
      }
     ],
     "tokens": 0,
@@ -19310,7 +18649,7 @@
      }
     ],
     "card": {
-     "targetUSD": 4477.4026,
+     "targetUSD": 6512.5855,
      "tierFloor": "BWR"
     }
    },
@@ -19349,8 +18688,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0051
+      "kind": "tokenGain",
+      "value": 0.0219
      }
     ],
     "tokens": 0,
@@ -19361,7 +18700,7 @@
      }
     ],
     "card": {
-     "targetUSD": 2037.5389,
+     "targetUSD": 2963.6929,
      "tierFloor": "BWR"
     }
    },
@@ -19394,12 +18733,7 @@
    "hardPacks": 277,
    "reward": {
     "packs": 0,
-    "perks": [
-     {
-      "kind": "hitOdds",
-      "value": 0.0009
-     }
-    ],
+    "perks": [],
     "tokens": 0,
     "coupons": [
      {
@@ -19408,7 +18742,7 @@
      }
     ],
     "card": {
-     "targetUSD": 267.4549,
+     "targetUSD": 401.1824,
      "tierFloor": "BWR"
     }
    },
@@ -19440,8 +18774,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "tokenGain",
-      "value": 0.0147
+      "kind": "hitOdds",
+      "value": 0.0084
      }
     ],
     "tokens": 0,
@@ -19452,7 +18786,7 @@
      }
     ],
     "card": {
-     "targetUSD": 3222.3053,
+     "targetUSD": 4686.9895,
      "tierFloor": "BWR"
     }
    },
@@ -19489,8 +18823,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "packDiscount",
-      "value": 0.0009
+      "kind": "tokenGain",
+      "value": 0.0201
      }
     ],
     "tokens": 0,
@@ -19501,7 +18835,7 @@
      }
     ],
     "card": {
-     "targetUSD": 250.446,
+     "targetUSD": 364.2851,
      "tierFloor": "BWR"
     }
    },
@@ -19532,8 +18866,8 @@
     "packs": 0,
     "perks": [
      {
-      "kind": "dustBonus",
-      "value": 0.0009
+      "kind": "hitOdds",
+      "value": 0.0078
      }
     ],
     "tokens": 0,
@@ -19544,7 +18878,7 @@
      }
     ],
     "card": {
-     "targetUSD": 434.8028,
+     "targetUSD": 632.4404,
      "tierFloor": "BWR"
     }
    },

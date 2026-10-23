@@ -181,6 +181,32 @@ final class BundledDexTests: XCTestCase {
         XCTAssertTrue(missing.isEmpty, "조합이 없는 서브셋: \(missing.joined(separator: ", "))")
     }
 
+    /// **영구 혜택은 별 5개 조합에만, 체감되는 크기로 준다.** 223개 조합이 나눠 갖던 때는
+    /// 셋 중 둘이 0.1% 아래였다. 그 크기는 보상이 아니다.
+    func testPerksGoOnlyToTierFiveCombosAtANoticeableSize() throws {
+        let (_, dexes) = try loadIndexes()
+        for dex in dexes.dexes where dex.kind == .theme {
+            if dex.tier < Dex.maxTier {
+                XCTAssertTrue(dex.reward.perks.isEmpty, "\(dex.id): 별 \(dex.tier)개 조합이 영구 혜택을 준다")
+            } else {
+                XCTAssertEqual(dex.reward.perks.count, 1, "\(dex.id): 별 5개 조합은 영구 혜택 하나를 준다")
+                for perk in dex.reward.perks {
+                    XCTAssertGreaterThanOrEqual(perk.value, 0.005, "\(dex.id): \(perk.kind) 혜택이 0.5% 아래다")
+                }
+            }
+        }
+    }
+
+    /// 영구 혜택이 없는 조합도 빈손으로 끝나지 않는다. 팩, 토큰, 쿠폰, 확정 카드 중 하나는 준다.
+    func testEveryComboGivesAOneTimeReward() throws {
+        let (_, dexes) = try loadIndexes()
+        for dex in dexes.dexes where dex.kind == .theme {
+            let reward = dex.reward
+            XCTAssertTrue(reward.packs > 0 || reward.tokens > 0 || reward.card != nil || !reward.coupons.isEmpty,
+                          "\(dex.id): 완성해도 한 번 받는 보상이 없다")
+        }
+    }
+
     /// 보상 통로를 전부 토큰으로 환산한다. 통로마다 값이 실리는 방식이 달라 한자리에 모은다.
     private func rewardValue(_ reward: DexReward, packPrice: Double) -> Double {
         var total = Double(reward.packs) * packPrice + Double(reward.tokens)

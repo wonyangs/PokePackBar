@@ -202,7 +202,10 @@ struct DexPerks: Sendable, Equatable {
     /// 판매 추가금만 다른 것보다 상한이 높다. **한 점의 값이 6분의 1이기 때문이다** —
     /// 팩값 전체에 걸리는 할인·획득량과 달리 이것은 판 카드에만, 그것도 절반만 걸린다.
     /// 같은 크기의 보상을 주려면 숫자가 그만큼 커야 한다.
-    static let caps = DexPerks(tokenGain: 0.25, packDiscount: 0.15, dustBonus: 0.15,
+    /// 획득량은 25% 에서 40% 로 올렸다. 영구 혜택을 별 5개 조합에 몰았더니 나눌 몫이 적어
+    /// 조합 하나의 혜택이 작았다. 할인, 판매 추가금, 확률은 그대로다 — 이 셋을 올리면 팩을
+    /// 까서 파는 것이 남는 장사가 될 수 있다(`testRecyclingStaysUnprofitableEvenWithEveryPerk`).
+    static let caps = DexPerks(tokenGain: 0.40, packDiscount: 0.15, dustBonus: 0.15,
                                hitOdds: 0.20)
 
     /// 완성한 도감에서 혜택을 모은다. 상한을 넘으면 상한에서 멈춘다.
