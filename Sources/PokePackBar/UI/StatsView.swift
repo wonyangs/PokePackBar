@@ -94,16 +94,48 @@ struct StatsView: View {
 
     /// 그릴 때마다 세지 않는다. 개봉 기록 1,000팩의 시세를 매번 다시 찾을 이유가 없다.
     @State private var stats: CollectionStats?
+    /// 「오늘의 시세」에서 누른 카드. 있으면 기록 대신 카드 상세를 보인다.
+    @State private var spotlight: Spotlight?
+    private struct Spotlight { let cardID: String; let finish: CardFinish? }
+    @Environment(PopoverNavigation.self) private var nav
 
     var body: some View {
+        if let spotlight, let entry = index?.card(spotlight.cardID) {
+            CardSpotlightView(wallet: wallet, cardID: entry.id,
+                              name: entry.displayName(wallet.language),
+                              tier: entry.tier, setID: entry.setID,
+                              setName: index?.set(entry.setID)?.name ?? entry.setID,
+                              rarity: entry.rarity,
+                              finish: spotlight.finish,
+                              ownedCount: wallet.cardCount(entry.id)) {
+                self.spotlight = nil
+            }
+        } else {
+            records
+        }
+    }
+
+    private var records: some View {
         let l = wallet.l
-        ScrollView {
+        return ScrollView {
             if let stats {
                 VStack(alignment: .leading, spacing: 12) {
                     // 레벨은 연 팩 수에서 나오므로 기록의 맨 앞에 둔다.
                     VStack(alignment: .leading, spacing: 5) {
                         Text(l.levelHeader).font(Typography.labelSemibold).foregroundStyle(.secondary)
                         LevelCard(wallet: wallet)
+                    }
+                    // 레벨 다음, 날마다 바뀌는 소식을 둔다. 기록은 서버에만 있어 온라인에서만 보인다.
+                    if let remote = wallet.remote, wallet.showsPriceHistory {
+                        PriceNewsSection(wallet: wallet, report: remote.priceNews.report,
+                                         failed: remote.priceNews.failed, index: index,
+                                         onCard: { cardID, finish in
+                                             spotlight = Spotlight(cardID: cardID, finish: finish)
+                                         },
+                                         onPack: { setID in
+                                             nav.shopSet = setID
+                                             nav.tab = .shop
+                                         })
                     }
                     section(l.statsOpening) {
                         row(l.statsPacksOpened, count(stats.packsOpened))
@@ -144,6 +176,8 @@ struct StatsView: View {
                                          catalogueSize: index?.cards.count ?? 0,
                                          prices: CardPrices.shared)
         }
+        // 탭을 열 때는 조금 전 것이라도 다시 읽는다. 방금 뽑은 카드도 내 카드 변동에 들어가야 한다.
+        .task { await wallet.remote?.refreshPriceNews(maxAge: 120) }
     }
 
     private func section(_ title: String, @ViewBuilder rows: () -> some View) -> some View {

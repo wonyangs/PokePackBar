@@ -121,6 +121,8 @@ final class WalletStore {
     var protectedPrintings: [String: Int] = [:]
     private(set) var remote: RemoteGameSession?
     var isOnline: Bool { remote != nil }
+    /// 시세 기록과 오늘의 시세를 보여도 되는가. 기록은 서버에만 있고, 이 기능을 모르는 서버도 있다.
+    var showsPriceHistory: Bool { remote.map { !$0.priceNews.unsupported } ?? false }
     var saveBackupDirectory: URL { GamePersistence(url: fileURL).backupDirectory }
 
     /// 개봉 결과 등 UI 가 한 번만 소비해야 하는 알림. nil 이면 표시할 것이 없다.

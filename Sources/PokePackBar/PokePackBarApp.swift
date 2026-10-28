@@ -299,8 +299,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 await alerts.check(summary: summary, enabled: self.store.onlineNotifications) { path in
                     try await remote.api(path)
                 }
+                await self.announcePriceNews(remote)
             }
         }
+    }
+
+    /// 새 시세가 들어온 날, 내 카드가 크게 올랐으면 한 번 알린다. 알림 설정은 온라인 알림과 같이 쓴다.
+    private func announcePriceNews(_ remote: RemoteGameSession) async {
+        await remote.refreshPriceNews()
+        let l = wallet.l
+        let index = CardIndex.shared
+        let announcement = remote.priceNews.announcement(enabled: store.onlineNotifications,
+                                                         title: l.priceRiseTitle) { move, more in
+            let name = index?.card(move.cardID)?.displayName(wallet.language) ?? move.cardID
+            return l.priceRiseBody(name, PriceChangeFormat.percent(move.rate), more: more)
+        }
+        if let announcement { OnlineAlerts.post([announcement]) }
     }
 
     /// Observation 기반 상태 반영 — store 의 menuTitle(=menuLines) 변경 시 재호출.
@@ -672,7 +686,15 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         guard let kind = info[OnlineAlerts.kindKey] as? String else { return }
         let target = info[OnlineAlerts.targetKey] as? String ?? ""
         let printing = info[OnlineAlerts.printingKey] as? String
-        await MainActor.run { openOnline(forAlert: kind, target: target, printing: printing) }
+        await MainActor.run {
+            // 시세 소식은 온라인 창이 아니라 통계 탭의 「오늘의 시세」에 있다.
+            if kind == PriceNews.alertKind {
+                navigation.tab = .stats
+                openPopover()
+            } else {
+                openOnline(forAlert: kind, target: target, printing: printing)
+            }
+        }
     }
 
     private func openOnline(forAlert kind: String, target: String, printing: String?) {
