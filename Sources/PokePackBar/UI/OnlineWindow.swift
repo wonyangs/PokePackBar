@@ -14,7 +14,7 @@ final class OnlineWindow: NSObject, NSWindowDelegate {
         if let window {
             if myListings { model?.opensMyListings = true }
             if let section, model?.section != section { model?.section = section }
-            window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true); model?.visible = true; return
+            WindowPresentation.present(window); model?.visible = true; return
         }
         let model = OnlineHubModel(wallet: wallet)
         if myListings { model.opensMyListings = true }
@@ -30,8 +30,7 @@ final class OnlineWindow: NSObject, NSWindowDelegate {
         window.center()
         self.window = window
         model.visible = true
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        WindowPresentation.present(window)
     }
 
     /// 알림을 눌렀을 때. 그 일을 처리할 탭을 열고 해당 교환, 판매 글, 친구 신청을 짚어 준다.

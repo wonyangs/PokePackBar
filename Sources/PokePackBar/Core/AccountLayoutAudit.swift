@@ -3,6 +3,7 @@ import SwiftUI
 
 @MainActor enum AccountLayoutAudit {
     static func run(output: URL) async throws {
+        WindowPresentation.quiet = true
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let wallet = WalletStore(fileURL: output.appendingPathComponent("fixture.json"))
         wallet.setLanguage(LayoutAuditOptions.language)
@@ -60,6 +61,8 @@ import SwiftUI
             guard let window = NSApp.windows.first(where: { $0.title == OnlineText.l.accountWindowTitle && $0.isVisible }) else {
                 throw LocalAudit.Failure(description: "Account window did not reopen")
             }
+            try LocalAudit.require(window.alphaValue == 0 && window.ignoresMouseEvents && !NSApp.isActive,
+                                   "The audit put the account window on screen")
             window.close()
             try LocalAudit.require(window.contentView == nil, "Hidden account form retained")
         }
