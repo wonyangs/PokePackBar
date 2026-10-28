@@ -73,6 +73,19 @@ brew upgrade --cask poke-pack-bar
 ![계정 연결 화면](docs/reference/screenshots/account-connection.png)
 ![대량 개봉 작업 화면](docs/reference/screenshots/online-jobs.png)
 
+## 0.25.0
+
+온라인 통계의 **오늘의 시세**에서 급등·급락·내 카드 변동을 보고, 카드·팩 상세의
+그래프 버튼으로 30일·90일·전체 기록을 확인한다. 내 카드의 큰 상승은 하루 한 번 알린다.
+로그아웃하면 내 카드 시세 캐시와 늦게 도착한 응답도 정리한다.
+
+영구 혜택은 별 5개 조합에 집중하고 나머지 조합의 한 번 받는 보상을 올렸다.
+토큰 획득 상한은 40%이며, 완성 수 225·275 계단을 추가했다. 기존 재화·카드·팩과
+보상 수령 내역은 유지한다. 새 규칙을 사용하려면 온라인 기기를 0.25.0으로 업데이트한다.
+
+![오늘의 시세](docs/reference/screenshots/price-news-025-ko.png)
+![시세 기록](docs/reference/screenshots/price-history-025-en.png)
+
 ## 0.24.0
 
 서버 로그인 토큰을 이 Mac의 앱 전용 파일에 저장한다. 앱 실행·동기화·계정 창 열기는

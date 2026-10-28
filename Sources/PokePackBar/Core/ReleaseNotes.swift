@@ -56,6 +56,20 @@ extension L {
 
     var releaseNotes: [ReleaseNote] {
         [
+            ReleaseNote(version: "0.25.0", lines: [
+                t("통계 탭에 오늘의 시세를 추가하고, 카드·팩 상세에서 30일·90일·전체 시세 기록을 볼 수 있습니다. 내 카드의 큰 상승은 하루 한 번 알립니다.",
+                  "See daily price movers in Stats and 30-day, 90-day or full price history in card/pack details. Notable rises in owned cards can notify once a day.",
+                  "統計に今日の相場を追加し、カード・パック詳細で30日・90日・全期間の履歴を表示します。所持カードの大幅上昇を1日1回通知します。",
+                  "Consulta cambios diarios en Estadísticas e historiales de 30, 90 días o completos. Las subidas importantes de tus cartas se notifican una vez al día.",
+                  "Consultez les variations dans Statistiques et l’historique sur 30, 90 jours ou complet. Les fortes hausses de vos cartes peuvent être signalées une fois par jour.",
+                  "Veja variações diárias em Estatísticas e históricos de 30, 90 dias ou completos. Altas relevantes das suas cartas podem gerar um aviso por dia."),
+                t("영구 혜택을 별 5개 조합에 집중하고 한 번 받는 보상을 올렸습니다. 토큰 획득 상한은 40%이며 완성 수 225·275 계단을 추가했습니다. 새 규칙을 사용하려면 온라인 기기를 업데이트해 주세요.",
+                  "Concentrated permanent perks in five-star combinations, raised one-time rewards and the token-gain cap to 40%, and added 225/275 completion milestones. Update online devices for the new rules.",
+                  "永続特典を星5の組み合わせに集約し、一度きりの報酬を増やしました。トークン獲得上限は40%、完成数225・275の段階を追加しました。オンライン端末を更新してください。",
+                  "Concentramos ventajas permanentes en combinaciones de cinco estrellas, aumentamos recompensas y el límite de tokens al 40%, y añadimos hitos de 225/275. Actualiza los dispositivos online.",
+                  "Bonus permanents concentrés sur les combinaisons cinq étoiles, récompenses augmentées, plafond de tokens à 40 % et étapes 225/275 ajoutées. Mettez à jour les appareils en ligne.",
+                  "Vantagens permanentes concentradas nas combinações de cinco estrelas, recompensas ampliadas, limite de tokens de 40% e marcos de 225/275. Atualize os dispositivos online.")
+            ]),
             ReleaseNote(version: "0.24.0", lines: [
                 t("서버 로그인 토큰을 이 Mac의 앱 전용 파일에 저장합니다. 앱 실행·동기화는 Keychain을 읽지 않아 반복 승인 창을 없앴습니다. 비밀번호는 저장하지 않으며 파일 보호는 Keychain보다 약합니다.",
                   "Server session tokens now use an app-local file. Startup and sync never read Keychain, removing repeated approval prompts. Passwords are not saved; file protection is weaker than Keychain.",
