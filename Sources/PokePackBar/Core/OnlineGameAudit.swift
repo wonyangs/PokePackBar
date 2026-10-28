@@ -26,6 +26,13 @@ enum OnlineGameAudit {
             credentialLoader: { try ServerCredentialStore.load(configuration, root: credentials) })
         await stored.synchronize()
         try LocalAudit.require(stored.ready, "Stored expiry prevented server session validation")
+        let news = try JSONDecoder().decode(PriceReport.self, from: await stored.api(PriceHistoryRequest.movers))
+        let history = try JSONDecoder().decode(PriceSeries.self, from: await stored.api(
+            PriceHistoryRequest.path(kind: "printing", item: "base1-4#holo", range: .quarter)))
+        try LocalAudit.require(history.kind == "printing" && history.item == "base1-4#holo",
+                               "Price history query/response mismatch")
+        await stored.refreshPriceNews(maxAge: 0)
+        try LocalAudit.require(stored.priceNews.report == news, "Native price news did not load")
         _ = try await stored.api("v1/state")
         let first = RemoteGameSession(configuration: configuration, localRoot: root,
             tokenProvider: { login.access_token })
@@ -107,6 +114,8 @@ enum OnlineGameAudit {
                                    "Server rejection did not invalidate stored session")
         }
         print("PASS stored session: real local file loads stale expiry through first load and cache; HTTP 401 remains authoritative; isolated files, no personal Keychain access")
+        try LocalAudit.require(stored.priceNews.report == nil, "Revocation retained owned price news")
+        print("PASS native price APIs: movers and encoded printing history decode; logout clears owned price news")
         await second.synchronize()
         try LocalAudit.require(!second.ready, "Logout-all left another device authenticated")
         print("PASS online API: email/password, UUID-only rejection, two devices, collection delta, purchase/open, lost-response restart, logout/re-login replay without redraw, revision conflict, logout-all; isolated account and wallet; no personal Keychain access")

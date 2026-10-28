@@ -354,6 +354,7 @@ final class RemoteGameSession {
     func dismissRecoveredResult() { recoveredResult = nil }
 
     func invalidateAuthentication() {
+        priceNews.clear()
         cachedCredential = nil
         authenticationExpired = true
         ready = false

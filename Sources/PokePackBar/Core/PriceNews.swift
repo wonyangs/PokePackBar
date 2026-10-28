@@ -132,6 +132,7 @@ final class PriceNews {
     @ObservationIgnored private var loadedAt: Date?
     @ObservationIgnored private var loadedVersion: String?
     @ObservationIgnored private var loading = false
+    @ObservationIgnored private var generation = 0
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let announcedKey: String
 
@@ -155,18 +156,32 @@ final class PriceNews {
         guard !loading, !unsupported else { return }
         if version == loadedVersion, let loadedAt, Date().timeIntervalSince(loadedAt) < maxAge { return }
         loading = true
+        let visit = generation
         defer { loading = false }
         do {
-            let fresh = try JSONDecoder().decode(PriceReport.self, from: await fetch(PriceHistoryRequest.movers))
+            let data = try await fetch(PriceHistoryRequest.movers)
+            guard visit == generation else { return }
+            let fresh = try JSONDecoder().decode(PriceReport.self, from: data)
             if fresh != report { report = fresh }
             failed = false
             loadedAt = Date()
             loadedVersion = version
         } catch let failure as RemoteGameSession.Failure where failure.status == 404 {
+            guard visit == generation else { return }
             unsupported = true
         } catch {
+            guard visit == generation else { return }
             failed = report == nil
         }
+    }
+
+    /// Logout/401 invalidates both the visible account data and in-flight responses.
+    func clear() {
+        generation += 1
+        report = nil
+        failed = false
+        loadedAt = nil
+        loadedVersion = nil
     }
 
     /// 아직 판단하지 않은 기록일이면 알림 내용을 만든다. 알리지 않더라도 그날은 판단한 것으로 친다.

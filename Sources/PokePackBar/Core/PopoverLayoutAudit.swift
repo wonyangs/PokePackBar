@@ -182,6 +182,24 @@ enum PopoverLayoutAudit {
                 .frame(width: PopoverMetrics.contentWidth, height: PopoverMetrics.tabHeight)
                 .padding(PopoverMetrics.padding)),
             fixedHeight: PopoverMetrics.tabHeight + PopoverMetrics.padding * 2)
+        let priceSeries = PriceSeries(kind: "printing", item: "base1-4#holo", latest_day: "2026-10-29", points: [
+            .init(day: "2026-09-23", usd: 300), .init(day: "2026-10-15", usd: 330), .init(day: "2026-10-28", usd: 360)])
+        for (name, series, failed) in [
+            ("price-history", Optional(priceSeries), false),
+            ("price-history-empty", Optional(PriceSeries(kind: "card", item: "fixture", latest_day: nil, points: [])), false),
+            ("price-history-failed", Optional<PriceSeries>.none, true)
+        ] {
+            try await capture(name, view: AnyView(PriceHistoryPanel(wallet: wallet, title: index.card("base1-4")?.displayName(wallet.language) ?? "Charizard",
+                subtitle: nil, range: .constant(.quarter), series: series, seriesRange: .quarter, failed: failed, retry: {})
+                .padding(PopoverMetrics.padding)))
+        }
+        let priceMove = PriceMove(kind: "printing", item: "base1-4#holo", before: 300, after: 360, count: 2)
+        let priceReport = PriceReport(day: "2026-10-29", since: "2026-10-28", changed: 2,
+            risers: [priceMove], fallers: [.init(kind: "card", item: "base1-1", before: 12, after: 10)],
+            packs: [.init(kind: "pack", item: "base1", before: 900, after: 880)], owned: [priceMove])
+        try await capture("price-news", view: AnyView(PriceNewsSection(wallet: wallet, report: priceReport,
+            failed: false, index: index, onCard: { _, _ in }, onPack: { _ in })
+            .frame(width: PopoverMetrics.contentWidth).padding(PopoverMetrics.padding)))
         let report: [String: Any] = ["popoverWidth": PopoverMetrics.width, "tabHeight": PopoverMetrics.tabHeight,
                                     "oripaMinimumHeight": minimum.height, "screens": measurements,
                                     "usesLiveWallet": false, "pollsProviders": false]

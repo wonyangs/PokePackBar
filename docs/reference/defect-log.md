@@ -11,6 +11,21 @@ read_when:
 
 # 결함 대응 축적 규칙
 
+### 2026-10-29 — Clear owned-price news across authentication boundaries
+
+- New price news cached owned-card changes independently from authentication.
+  Logout/401 cleared the session token but left that report visible. An awaited
+  response could also restore account data after logout. Refresh-policy tests
+  only exercised successful visits and missed the invalidation boundary.
+- Clear the report and refresh metadata from actual session invalidation, and
+  discard replies/failures from an earlier generation. Preserve the per-day
+  notification marker to avoid duplicate notifications after re-login.
+- A regression uses `RemoteGameSession.invalidateAuthentication` for both an
+  already loaded report and a reply arriving during invalidation. Removing the
+  successful-response generation check makes the late-response assertion fail.
+- Native HTTP audits decode movers/history and check report clearing after
+  authoritative 401. Existing online private caches use the same epoch pattern.
+
 ### 2026-10-23 — Keep automatic server-session storage out of Keychain
 
 - The local signing certificate and designated requirement stayed stable, but

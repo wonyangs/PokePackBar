@@ -21,6 +21,26 @@ final class PriceNewsTests: XCTestCase {
 
     private final class Counter { var value = 0 }
 
+    func testLogoutClearsOwnedPricesAndRejectsLateReplies() async throws {
+        let config = RemoteGameConfiguration(baseURL: URL(string: "https://example.invalid")!, accountID: UUID(), deviceID: UUID())
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("price-logout-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let session = RemoteGameSession(configuration: config, localRoot: root, tokenProvider: { "synthetic" })
+        let data = try JSONSerialization.data(withJSONObject: report(day: "2026-10-22", owned: [
+            move("card", "base1-4", 10, 12, count: 2)]))
+        let news = session.priceNews
+        await news.refresh(version: "one", fetch: { _ in data })
+        XCTAssertEqual(news.report?.owned.count, 1)
+        session.invalidateAuthentication()
+        XCTAssertNil(news.report)
+        await news.refresh(version: "two", fetch: { _ in
+            session.invalidateAuthentication()
+            return data
+        })
+        XCTAssertNil(news.report, "A response arriving after logout must not restore owned prices")
+        XCTAssertNil(news.announcement(enabled: true, title: "fixture", body: { _, _ in "fixture" }))
+    }
+
     private func move(_ kind: String, _ item: String, _ before: Double, _ after: Double,
                       count: Int? = nil) -> [String: Any] {
         var move: [String: Any] = ["kind": kind, "item": item, "before": before, "after": after]
