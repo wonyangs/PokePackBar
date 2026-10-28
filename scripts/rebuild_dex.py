@@ -18,13 +18,18 @@ Reward rules (BundledDexTests holds them):
 - Set milestones pay 5% of what reaching them costs: the first in tokens, the
   second 40% in half-price coupons for the set, the third 50% as a card grant
   and 40% in coupons. Tokens fill the rest.
-- Theme rewards keep their shape. Reward packs never exceed 30% of the cost
-  (plus half a pack for rounding), and card grants follow the cost.
-- A hand-written theme below that has only its perk gets packs (tier 2-3) or
-  a card grant and coupons (tier 4-5), at the older themes' median shares.
-- Theme perks keep each kind's total. Values are reassigned so a costlier dex
-  never gives less of the same perk.
-- The last ladder step opens when every dex is complete.
+- Theme rewards keep their shape. Reward packs never exceed 45% of the cost
+  (plus half a pack for rounding) or 15 packs, and card grants follow the cost.
+- Every theme's one-time reward is at least its tier's share of the cost:
+  packs for tier 1-3, a card grant and coupons for tier 4-5. A theme with no
+  pack, token, coupon or card reward gets that shape. The shares are 1.5 times
+  the older hand-tuned medians, raised when perks moved to tier-5 themes.
+- Permanent perks go only to tier-5 themes and the ladder. Spread over all 223
+  themes, two in three gave under 0.1%. The four kinds alternate by cost, each
+  value grows with the log of the cost (a costlier dex never gives less), and
+  each kind's budget below is kept, so the caps hold.
+- The ladder has fixed steps; each step's perks grow linearly up the ladder
+  within the ladder budget. The last step opens when every dex is complete.
 """
 
 import json
@@ -38,8 +43,8 @@ INDEX = ROOT / "Sources/PokePackBar/Resources/card-index.json"
 
 TOKENS_PER_USD = 292_000
 SET_TARGET = 0.05
-THEME_TARGET = 0.30
-MAX_REWARD_PACKS = 10
+THEME_TARGET = 0.45
+MAX_REWARD_PACKS = 15
 FRACTIONS = (0.5, 0.75, 0.9)
 
 # Hand-written dexes for sets that arrived after the last rebuild, and for the
@@ -479,63 +484,95 @@ def theme_rewards(dex, row, price, before):
 # Rewards for a hand-written theme that has only its perk, by measured tier.
 # Shares are the medians of the older hand-tuned themes: easy themes give a
 # perk, middle ones a few packs, hard ones a card grant and coupons.
-SHAPED_PACKS = {2: 0.065, 3: 0.04}
-SHAPED_CARD = {4: (0.016, 0.09), 5: (0.011, 0.08)}
+SHAPED_PACKS = {1: 0.12, 2: 0.10, 3: 0.06}
+SHAPED_CARD = {4: (0.024, 0.13), 5: (0.016, 0.12)}
 GRANT_FLOOR = "BWR"
 
 
 def shape_theme(dex, price):
+    """Raise a theme's one-time reward to its tier's share; never lower it.
+
+    Taking the larger of the stored and the computed value keeps reruns stable.
+    """
     reward = dex["reward"]
-    if reward.get("packs") or reward.get("tokens") or reward.get("card") or reward.get("coupons"):
-        return
     cost = dex["medianTokens"]
     tier = dex["tier"]
-    if tier in SHAPED_PACKS and price:
+    empty = not (reward.get("packs") or reward.get("tokens") or reward.get("card")
+                 or reward.get("coupons"))
+    if tier in SHAPED_PACKS and price and (empty or reward.get("packs")):
         cap = math.floor((THEME_TARGET * cost + price / 2) / price)
         packs = min(MAX_REWARD_PACKS, cap, max(1, round(SHAPED_PACKS[tier] * cost / price)))
         if packs > 0:
-            reward["packs"] = packs
-        else:
+            reward["packs"] = max(reward.get("packs") or 0, packs)
+        elif empty:
             reward["coupons"], _ = coupons(cost, price, 0.15, THEME_TARGET * cost)
-    elif tier in SHAPED_CARD:
+    elif tier in SHAPED_CARD and (empty or reward.get("card")):
         card_share, coupon_share = SHAPED_CARD[tier]
-        reward["card"] = {"targetUSD": round(card_share * cost / TOKENS_PER_USD, 4),
-                          "tierFloor": GRANT_FLOOR}
-        reward["coupons"], _ = coupons(cost, price, coupon_share, THEME_TARGET * cost)
+        card = reward.get("card") or {"targetUSD": 0, "tierFloor": GRANT_FLOOR}
+        card["targetUSD"] = max(card["targetUSD"], round(card_share * cost / TOKENS_PER_USD, 4))
+        reward["card"] = card
+        wanted, _ = coupons(cost, price, coupon_share, THEME_TARGET * cost)
+        have = sum(c["count"] for c in reward.get("coupons") or [])
+        if sum(c["count"] for c in wanted) > have:
+            reward["coupons"] = wanted
+
+
+PERK_KINDS = ["tokenGain", "packDiscount", "dustBonus", "hitOdds"]
+PERK_TIER = 5
+# Budgets fixed at the totals before perks moved to tier-5 themes (2026-10-23),
+# so reruns do not shave them by rounding. Themes plus ladder sit at the caps.
+# Token gain's cap rose from 25% to 40% (2026-10-23); the extra 15 points all go to
+# tier-5 themes. Pack discount, resale and hit odds stay put: raising them could
+# make opening packs and selling the cards pay for itself.
+THEME_PERK_BUDGET = {"tokenGain": 0.296, "packDiscount": 0.085, "dustBonus": 0.084, "hitOdds": 0.114}
+LADDER_PERK_BUDGET = {"tokenGain": 0.1038, "packDiscount": 0.0645, "dustBonus": 0.0657,
+                      "hitOdds": 0.0855}
+# (completed dexes, Korean title, English title). The last step's count is the
+# number of dexes. 225 and 275 fill the long gap between 175 and the end.
+LADDER = [
+    (10, "첫 수집가", "First Collector"),
+    (25, "책장 정리", "Shelf Keeper"),
+    (50, "반절 사냥꾼", "Halfway Hunter"),
+    (100, "백권 서고", "Hundred Binders"),
+    (175, "세트 사냥꾼", "Set Hunter"),
+    (225, "조합 연구가", "Combo Scholar"),
+    (275, "끝판을 넘보는 자", "Endgame Seeker"),
+    (None, "도감 완성자", "Dex Completionist"),
+]
 
 
 def spread_perks(dexes):
     themes = [dex for dex in dexes if dex["kind"] == "theme"]
-    kinds = ["tokenGain", "packDiscount", "dustBonus", "hitOdds"]
-    count = {kind: sum(1 for dex in themes for p in dex["reward"]["perks"] if p["kind"] == kind)
-             for kind in kinds}
-    # Every theme gives one perk. A new one takes the kind with the fewest dexes so far.
+    holders = sorted((dex for dex in themes if dex["tier"] >= PERK_TIER),
+                     key=lambda dex: (dex["medianTokens"], dex["id"]))
     for dex in themes:
-        if not dex["reward"]["perks"]:
-            kind = min(kinds, key=lambda k: (count[k], kinds.index(k)))
-            count[kind] += 1
-            dex["reward"]["perks"] = [{"kind": kind, "value": None}]
-    for kind in kinds:
-        holders = [dex for dex in themes for p in dex["reward"]["perks"] if p["kind"] == kind]
-        old = [p["value"] for dex in holders for p in dex["reward"]["perks"]
-               if p["kind"] == kind and p["value"] is not None]
-        total = round(sum(old) * 10_000)
-        filler = sorted(old)[len(old) // 2]
-        values = sorted(old + [filler] * (len(holders) - len(old)))
-        scale = total / (sum(values) * 10_000)
-        units = [math.floor(v * 10_000 * scale) for v in values]
-        units = [max(1, u) for u in units]
-        # Spend any leftover on the costliest dexes so the order never inverts.
-        i = len(units) - 1
-        while sum(units) < total:
-            units[i] += 1
-            i = i - 1 if i > 0 else len(units) - 1
-        assert sum(units) <= total, kind
-        holders.sort(key=lambda dex: (dex["medianTokens"], dex["id"]))
-        for dex, unit in zip(holders, units):
-            for perk in dex["reward"]["perks"]:
-                if perk["kind"] == kind:
-                    perk["value"] = round(unit / 10_000, 4)
+        dex["reward"]["perks"] = []
+    for offset, kind in enumerate(PERK_KINDS):
+        group = holders[offset::len(PERK_KINDS)]
+        weights = [math.log10(dex["medianTokens"]) for dex in group]
+        total = round(THEME_PERK_BUDGET[kind] * 10_000)
+        # Floor only: equal costs get equal values, and the sum never passes the budget.
+        for dex, weight in zip(group, weights):
+            unit = math.floor(total * weight / sum(weights))
+            dex["reward"]["perks"] = [{"kind": kind, "value": round(unit / 10_000, 4)}]
+
+
+def build_ladder(dex_count):
+    # Weights 2, 3, ... 9: each step is thicker than the last, and the first is
+    # not thinned to nothing by the extra steps (about 0.47% token gain at 10).
+    weights = [index + 1 for index in range(1, len(LADDER) + 1)]
+    share = sum(weights)
+    ladder = []
+    for weight, (completed, title_ko, title_en) in zip(weights, LADDER):
+        ladder.append({
+            "completed": completed if completed is not None else dex_count,
+            "title": {"ko": title_ko, "en": title_en},
+            "perks": [{"kind": kind,
+                       "value": round(math.floor(LADDER_PERK_BUDGET[kind] * 10_000 * weight / share)
+                                      / 10_000, 4)}
+                      for kind in PERK_KINDS],
+        })
+    return ladder
 
 
 def main():
@@ -545,7 +582,6 @@ def main():
         DEX.write_text(json.dumps(data, indent=1, ensure_ascii=False))
         print(f"added {len(added)} dexes; build, run --dex-metrics, then run again with it")
         return
-    hand_written = {row[0] for rows in ADDITIONS.values() for row in rows}
     metrics = json.loads(Path(sys.argv[1]).read_text())
     rows = {row["id"]: row for row in metrics["dexes"]}
     prices = metrics["packPrices"]
@@ -564,10 +600,12 @@ def main():
             set_rewards(dex, row, price)
         else:
             theme_rewards(dex, row, price, before)
-            if dex["id"] in hand_written:
-                shape_theme(dex, price)
     spread_perks(data["dexes"])
-    data["ladder"][-1]["completed"] = len(data["dexes"])
+    for dex in data["dexes"]:
+        # Themes that lost their perk, or never had another reward, get packs or a card.
+        if dex["kind"] == "theme":
+            shape_theme(dex, prices[dex["homeSet"]])
+    data["ladder"] = build_ladder(len(data["dexes"]))
     DEX.write_text(json.dumps(data, indent=1, ensure_ascii=False))
     print(f"updated {len(data['dexes'])} dexes")
 

@@ -200,13 +200,14 @@ enum DexDifficulty {
     /// 585개까지 65배 갈리고 세트별 팩값이 47배 갈리는데 팩 수는 티어로만 정해져서, 팩만의
     /// 리턴이 0.01배에서 1.61배까지 흩어져 있었다 — 어떤 도감은 31팩 들여 50팩을 받았다.
     /// 이제 스크립트가 이 비율에 맞춰 도감마다 팩 수를 계산해 넣는다.
-    static let targetReturn = 0.30
+    /// 영구 혜택을 별 5개 조합에 몰면서 나머지 조합의 한 번 받는 보상을 올렸다(0.30 에서).
+    static let targetReturn = 0.45
 
     /// 지급 팩 수의 상한. `build_dex.py` 의 `MAX_REWARD_PACKS`.
     ///
     /// 팩은 **부수적인 재미**다. 값을 맞추려고 100개씩 주면 한 장씩 뜯는 것이 일이 된다.
     /// 보상의 본체는 영구 패시브이고, 팩은 곁들이는 것으로 둔다.
-    static let maxRewardPacks = 10
+    static let maxRewardPacks = 15
 
     static func tier(forValueUSD value: Double) -> Int {
         for (offset, limit) in tierLimits.enumerated() where value <= limit { return offset + 1 }
